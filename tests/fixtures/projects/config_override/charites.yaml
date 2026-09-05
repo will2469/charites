@@ -1,0 +1,2 @@
+rules:
+  theme.hardcode-opacity-color: "warn"

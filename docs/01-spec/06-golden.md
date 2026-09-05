@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `SPEC-06-GOLDEN`
 > **Tahapan:** Fase 6 - Validasi Penuh & Golden Snapshots (Milestone Selesai Pipa)
 > **Peran Pilar:** SPEC = WHAT (Spesifikasi Validasi Pipa Lengkap, Skema Golden Master & Fuzzing)
-> **Status:** Ready for Review
+> **Status:** Approved / Frozen (Pipeline Locked)
 > **Standar Rujukan:** Golden Master Testing Pattern / Go 1.26 Native Fuzzing Specification
 
 Dokumen ini mendefinisikan spesifikasi pengujian integrasi pipa compiler dari ujung ke ujung (*end-to-end pipeline*), standarisasi skema kanonikal **Golden Snapshots** (`tests/golden/*`), struktur korpus berkas percontohan (*fixtures*), protokol ketahanan *native fuzzing*, serta kriteria kelulusan **Gerbang Stabilitas Pipa** (*Pipeline Stability Gate*).

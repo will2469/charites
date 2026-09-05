@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -156,15 +157,31 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 			return ExitOperational
 		}
 	} else {
-		// Zero-config default
-		cfg, _ = config.Load("")
+		// Zero-config default: periksa target terlebih dahulu jika berupa direktori
+		targetConfig := filepath.Join(target, "charites.yaml")
+		if _, err := os.Stat(targetConfig); err == nil {
+			cfg, _ = config.Load(targetConfig)
+		} else {
+			targetConfigYml := filepath.Join(target, "charites.yml")
+			if _, err := os.Stat(targetConfigYml); err == nil {
+				cfg, _ = config.Load(targetConfigYml)
+			} else {
+				cfg, _ = config.Load("")
+			}
+		}
 	}
 
 	// 8. Resolusi Active Rules (3-Tier Precedence: Registry -> CLI Scope -> Config Policy)
 	activeRules := cfg.ResolveActiveRules(reg, category, rule)
 
 	// 9. Penyiapan Ignore Matcher & Direct-Target Safety
-	matcher, _ := config.LoadIgnore(".charitesignore")
+	var matcher *config.IgnoreMatcher
+	targetIgnore := filepath.Join(target, ".charitesignore")
+	if _, err := os.Stat(targetIgnore); err == nil {
+		matcher, _ = config.LoadIgnore(targetIgnore)
+	} else {
+		matcher, _ = config.LoadIgnore(".charitesignore")
+	}
 	if matcher == nil {
 		matcher = config.NewIgnoreMatcher(nil)
 	}

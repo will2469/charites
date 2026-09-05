@@ -127,7 +127,7 @@ func RunUpdate(args []string, stdout, stderr io.Writer) int {
 	defer func() { _ = dlResp.Body.Close() }()
 
 	// Dapatkan path eksekutabel saat ini
-	execPath, execErr := os.Executable()
+	execPath, execErr := OsExecutable()
 	if execErr != nil {
 		_, _ = fmt.Fprintf(stderr, "charites: error: failed to determine executable path: %v\n", execErr)
 		return ExitOperational

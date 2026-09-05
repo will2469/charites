@@ -1,0 +1,6 @@
+[WARN] fixtures/projects/config_override/src/components/Card.tsx:5:5 [theme.hardcode-opacity-color]
+  Hardcode opacity color: "bg-primary/10"
+  Hint: Use semantic token "primary-light".
+
+ 1 problem found (0 errors, 1 warning)
+  Scanned 2 files in 0ms.

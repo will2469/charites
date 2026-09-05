@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 )
 
+// OsExecutable membungkus os.Executable untuk memfasilitasi pengujian unit.
+var OsExecutable = os.Executable
+
 // RunUninstall mencopot pemasangan Charites dengan menghapus satu-satunya biner eksekutabel.
 // Menjamin pembersihan 100% tanpa residu file atau cache (Zero Residual Footprint Guarantee).
 func RunUninstall(args []string, stdout, stderr io.Writer) int {
@@ -29,7 +32,7 @@ func RunUninstall(args []string, stdout, stderr io.Writer) int {
 		return ExitOperational
 	}
 
-	execPath, err := os.Executable()
+	execPath, err := OsExecutable()
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "charites: error: failed to determine executable path: %v\n", err)
 		return ExitOperational

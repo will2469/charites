@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `QUAL-06-GOLDEN`
 > **Tahapan:** Fase 6 - Validasi Penuh & Golden Snapshots (Milestone Selesai Pipa)
 > **Peran Pilar:** QUALITY = QUALITY THRESHOLD (Ambang Batas Kualitas, Invarian Nol-Regresi & Keamanan)
-> **Status:** Ready for Review
+> **Status:** Certified / Pipeline Freeze Enforced
 > **Standar Rujukan:** Continuous Verification Standards & Zero-Regression Principles
 
 Dokumen ini mendefinisikan batasan kualitas akhir (*quality gates*), penegakan invarian nol-regresi (*zero-regression invariant*), integritas keamanan pemindaian direktori, serta tata kelola pembekuan arsitektur inti (*core architecture freeze*).

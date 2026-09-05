@@ -1,0 +1,24 @@
+---
+import { useState } from 'react';
+import type { UserProfile } from '../types/user';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+
+// Multi-line frontmatter script
+const user: UserProfile = {
+  id: "usr_123",
+  name: "Jane Doe",
+  role: "admin",
+};
+
+const pageTitle = `Dashboard - ${user.name}`;
+---
+<div class="min-h-screen bg-surface">
+  <Header title={pageTitle} />
+  <main class="container mx-auto py-8">
+    <div class="bg-primary/20 p-6 rounded-md">
+      <h2>Welcome back, {user.name}</h2>
+    </div>
+  </main>
+  <Footer />
+</div>

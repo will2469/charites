@@ -1,0 +1,10 @@
+[ERROR] fixtures/projects/opacity_violations/src/components/Card.tsx:5:5 [theme.hardcode-opacity-color]
+  Hardcode opacity color: "bg-primary/10"
+  Hint: Use semantic token "primary-light".
+
+[ERROR] fixtures/projects/opacity_violations/src/pages/index.astro:8:3 [theme.hardcode-opacity-color]
+  Hardcode opacity color: "bg-primary/20"
+  Hint: Use semantic token "primary-light".
+
+ 2 problems found (2 errors, 0 warnings)
+  Scanned 2 files in 0ms.

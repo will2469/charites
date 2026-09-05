@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ARCH-06-GOLDEN`
 > **Tahapan:** Fase 6 - Validasi Penuh & Golden Snapshots (Milestone Selesai Pipa)
 > **Peran Pilar:** ARCH = HOW (Rancangan Arsitektur Pipa Terpadu, Harness Golden & Pembekuan Inti)
-> **Status:** Ready for Review
+> **Status:** Approved / Frozen (Pipeline Locked)
 > **Standar Rujukan:** Compiler Pipeline Integration & Golden Master Architecture
 
 Dokumen ini mendefinisikan arsitektur integrasi pipa compiler (*unidirectional staged pipeline*), harness pembanding *golden snapshot*, pemisahan boundary rule, serta tata kelola pembekuan arsitektur inti.

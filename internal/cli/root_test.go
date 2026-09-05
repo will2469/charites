@@ -104,4 +104,41 @@ func TestExecute_Entrypoint(t *testing.T) {
 	if code != cli.ExitClean {
 		t.Errorf("expected Execute(--help) to return 0, got %d", code)
 	}
+
+	// 0 args defaults to scan .
+	var stdout, stderr bytes.Buffer
+	code0 := cli.ExecuteArgs([]string{}, &stdout, &stderr)
+	if code0 != cli.ExitClean {
+		t.Errorf("expected 0 args to return 0, got %d", code0)
+	}
+}
+
+func TestExecuteArgs_PathResolution(t *testing.T) {
+	paths := []string{
+		".",
+		"..",
+		"./src",
+		"../charites",
+		"src/components",
+		"file.astro",
+		"file.tsx",
+		"file.jsx",
+		"file.ts",
+		"file.js",
+		"file.json",
+		"file.yaml",
+		"file.yml",
+	}
+
+	for _, p := range paths {
+		t.Run("path_"+p, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			// We only care that isPath returns true and routes to RunScan (even if target does not exist, it routes to scan and returns exit 2 or 0)
+			_ = cli.ExecuteArgs([]string{p}, &stdout, &stderr)
+			// Ensure it did NOT output "unknown command"
+			if strings.Contains(stderr.String(), "unknown command") {
+				t.Errorf("expected path %q to be recognized as path, got unknown command", p)
+			}
+		})
+	}
 }
