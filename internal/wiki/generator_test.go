@@ -79,7 +79,7 @@ func TestGenerator_Generate(t *testing.T) {
 	if !strings.Contains(sidebarContent, "<details open>") {
 		t.Errorf("_Sidebar.md missing collapsible details")
 	}
-	if !strings.Contains(sidebarContent, "<summary><b>Theme</b> (20 rules)") {
+	if !strings.Contains(sidebarContent, "<summary><b>Theme</b> (24 rules)") {
 		t.Errorf("_Sidebar.md missing Theme category summary")
 	}
 	if !strings.Contains(sidebarContent, "* [**Theme Overview**](theme)") {

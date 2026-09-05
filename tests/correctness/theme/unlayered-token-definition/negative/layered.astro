@@ -1,0 +1,17 @@
+---
+// N1: Layered :root inside @layer theme
+---
+<style>
+  @layer theme {
+    :root {
+      --primary: #2563eb;
+      --background: #ffffff;
+    }
+  }
+
+  .card {
+    margin: 0;
+    padding: 1rem;
+  }
+</style>
+<div class="bg-primary">Card</div>

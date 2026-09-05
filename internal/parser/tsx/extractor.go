@@ -302,13 +302,63 @@ func (e *extractor) tryHandleJSX() bool {
 	}
 
 	isVoid := voidElements[strings.ToLower(tagName)]
-	if p.selfClosing || isVoid {
+	switch {
+	case p.selfClosing || isVoid:
 		e.bld.AddSelfClosingElement(tagName, span, p.rawClasses, p.classes, p.attrs, p.hasDynamic)
-	} else {
+	case strings.EqualFold(tagName, "style") || strings.EqualFold(tagName, "script"):
+		e.bld.OpenElement(tagName, span, p.rawClasses, p.classes, p.attrs, p.hasDynamic)
+		e.consumeRawTextElement(tagName)
+	default:
 		e.bld.OpenElement(tagName, span, p.rawClasses, p.classes, p.attrs, p.hasDynamic)
 	}
 
 	return true
+}
+
+func (e *extractor) consumeRawTextElement(tagName string) {
+	closePrefix := "</" + strings.ToLower(tagName)
+	startLine, startCol, textStart := e.line, e.col, e.pos
+
+	for e.pos < e.len {
+		if e.src[e.pos] == '<' && e.matchClosingPrefix(closePrefix) {
+			e.finalizeRawText(tagName, textStart, startLine, startCol, len(closePrefix))
+			return
+		}
+		e.advance()
+	}
+
+	e.finalizeRawText(tagName, textStart, startLine, startCol, 0)
+}
+
+func (e *extractor) matchClosingPrefix(prefix string) bool {
+	if e.pos+len(prefix) > e.len {
+		return false
+	}
+	return strings.EqualFold(string(e.src[e.pos:e.pos+len(prefix)]), prefix)
+}
+
+func (e *extractor) finalizeRawText(tagName string, textStart, startLine, startCol, prefixLen int) {
+	rawText := string(e.src[textStart:e.pos])
+	if strings.TrimSpace(rawText) != "" {
+		e.bld.AddText(rawText, ir.Span{
+			Line:      startLine,
+			Column:    startCol,
+			EndLine:   e.line,
+			EndColumn: e.col,
+		})
+	}
+
+	if prefixLen > 0 {
+		e.advanceBytes(prefixLen)
+		for e.pos < e.len && e.src[e.pos] != '>' {
+			e.advance()
+		}
+		if e.pos < e.len && e.src[e.pos] == '>' {
+			e.advance()
+		}
+	}
+
+	e.bld.CloseElement(tagName)
 }
 
 func (e *extractor) skipLineComment() {

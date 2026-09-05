@@ -1,0 +1,13 @@
+---
+// A1: Nested var with fallback, or commented var
+---
+<div class="bg-[var(--brand,var(--sub-brand,#fff))]">
+  <!-- Commented out: style="color: var(--ghost)" -->
+  <span class="text-foreground">Adversarial Safe</span>
+</div>
+<style>
+  /* var(--commented-without-fallback) */
+  .title {
+    color: inherit;
+  }
+</style>

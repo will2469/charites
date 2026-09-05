@@ -26,6 +26,10 @@ var (
 	_ Rule = (*theme.NestedOpacityContrastRule)(nil)
 	_ Rule = (*theme.ImageThemeHardcodeRule)(nil)
 	_ Rule = (*theme.SVGHardcodeFillRule)(nil)
+	_ Rule = (*theme.UnlayeredTokenDefinitionRule)(nil)
+	_ Rule = (*theme.MissingTokenFallbackRule)(nil)
+	_ Rule = (*theme.TokenSourceDriftRule)(nil)
+	_ Rule = (*theme.ApplyBloatRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -50,6 +54,10 @@ func builtinRules() []Rule {
 		theme.NewNestedOpacityContrastRule(),
 		theme.NewImageThemeHardcodeRule(),
 		theme.NewSVGHardcodeFillRule(),
+		theme.NewUnlayeredTokenDefinitionRule(),
+		theme.NewMissingTokenFallbackRule(),
+		theme.NewTokenSourceDriftRule(),
+		theme.NewApplyBloatRule(),
 	}
 }
 

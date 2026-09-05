@@ -8,7 +8,7 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 | Category | Rules Count | Documentation |
 | :--- | :---: | :--- |
-| `theme` | 20 | [`theme`](theme) |
+| `theme` | 24 | [`theme`](theme) |
 
 ---
 
@@ -16,6 +16,7 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 | Rule ID | Category | Severity | Description | Documentation |
 | :--- | :---: | :---: | :--- | :--- |
+| `theme.apply-bloat` | `theme` | `WARN` | Detects excessive use of @apply with more than 8 utility classes in CSS or style blocks | [`theme.apply-bloat`](theme.apply-bloat) |
 | `theme.backdrop-blur-hardcode` | `theme` | `WARN` | Detects hardcoded arbitrary blur and backdrop-blur scalars in Tailwind utility classes | [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode) |
 | `theme.focus-ring-hardcode` | `theme` | `WARN` | Detects hardcoded primitive palette or arbitrary hex colors on focus rings and outlines | [`theme.focus-ring-hardcode`](theme.focus-ring-hardcode) |
 | `theme.gradient-hardcode` | `theme` | `WARN` | Detects hardcoded primitive, arbitrary hex, or monochrome colors in gradient stops | [`theme.gradient-hardcode`](theme.gradient-hardcode) |
@@ -30,11 +31,14 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 | `theme.image-theme-hardcode` | `theme` | `WARN` | Detects graphic assets and logos in img tags lacking dark mode theme adaptation | [`theme.image-theme-hardcode`](theme.image-theme-hardcode) |
 | `theme.important-override` | `theme` | `ERROR` | Detects !important modifiers on color utility classes that break theme cascade and specificity hierarchy | [`theme.important-override`](theme.important-override) |
 | `theme.inline-style-hardcode` | `theme` | `ERROR` | Detects hardcoded color literals inside HTML/JSX style attributes that prevent theme cascade | [`theme.inline-style-hardcode`](theme.inline-style-hardcode) |
+| `theme.missing-token-fallback` | `theme` | `WARN` | Detects CSS variable references without fallback values | [`theme.missing-token-fallback`](theme.missing-token-fallback) |
 | `theme.nested-opacity-contrast` | `theme` | `WARN` | Detects nested opacity modifiers that compound to cause catastrophic text contrast degradation | [`theme.nested-opacity-contrast`](theme.nested-opacity-contrast) |
 | `theme.primitive-in-component` | `theme` | `ERROR` | Detects direct usage of Tailwind primitive palette colors in component classes instead of semantic tokens | [`theme.primitive-in-component`](theme.primitive-in-component) |
 | `theme.pseudo-hardcode-color` | `theme` | `WARN` | Detects hardcoded primitive, arbitrary hex, or monochrome colors inside pseudo-element and pseudo-class variants | [`theme.pseudo-hardcode-color`](theme.pseudo-hardcode-color) |
 | `theme.shadow-without-border-dark` | `theme` | `WARN` | Detects elevated containers with shadow lacking border or ring indicators in dark mode | [`theme.shadow-without-border-dark`](theme.shadow-without-border-dark) |
 | `theme.svg-hardcode-fill` | `theme` | `WARN` | Detects hardcoded color attributes on SVG markup preventing theme adaptation | [`theme.svg-hardcode-fill`](theme.svg-hardcode-fill) |
+| `theme.token-source-drift` | `theme` | `ERROR` | Detects hardcoded color values bypassing the single source of truth design token pipeline | [`theme.token-source-drift`](theme.token-source-drift) |
+| `theme.unlayered-token-definition` | `theme` | `ERROR` | Detects CSS custom property definitions declared outside @layer theme or @layer base | [`theme.unlayered-token-definition`](theme.unlayered-token-definition) |
 | `theme.unpaired-dark-variant` | `theme` | `WARN` | Detects one-sided dark theme variant declarations causing severe contrast collisions | [`theme.unpaired-dark-variant`](theme.unpaired-dark-variant) |
 
 ---

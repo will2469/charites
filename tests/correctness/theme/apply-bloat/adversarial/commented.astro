@@ -1,0 +1,17 @@
+---
+// A1: Commented out @apply or @apply with exactly 8 classes
+---
+<div class="pill">
+  <span>Pill</span>
+</div>
+<style>
+  /*
+  .bad {
+    @apply flex items-center justify-between p-4 bg-white rounded-lg shadow-md border border-gray-200 text-sm font-medium;
+  }
+  */
+  .pill {
+    /* exactly 8 classes */
+    @apply inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full;
+  }
+</style>

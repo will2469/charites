@@ -240,11 +240,55 @@ func (l *lexer) handleOpenElement(startLine, startCol int) {
 	}
 
 	isVoid := voidElements[strings.ToLower(tagName)]
-	if p.selfClosing || isVoid {
+	switch {
+	case p.selfClosing || isVoid:
 		l.bld.AddSelfClosingElement(tagName, span, p.rawClasses, p.classes, p.attrs, p.hasDynamic)
-	} else {
+	case strings.EqualFold(tagName, "style") || strings.EqualFold(tagName, "script"):
+		l.bld.OpenElement(tagName, span, p.rawClasses, p.classes, p.attrs, p.hasDynamic)
+		l.consumeRawTextElement(tagName)
+	default:
 		l.bld.OpenElement(tagName, span, p.rawClasses, p.classes, p.attrs, p.hasDynamic)
 	}
+}
+
+func (l *lexer) consumeRawTextElement(tagName string) {
+	closePrefix := "</" + strings.ToLower(tagName)
+	startLine := l.line
+	startCol := l.col
+	textStart := l.pos
+
+	for l.pos < l.len {
+		if l.src[l.pos] == '<' && l.pos+len(closePrefix) <= l.len {
+			cand := strings.ToLower(string(l.src[l.pos : l.pos+len(closePrefix)]))
+			if cand == closePrefix {
+				rawText := string(l.src[textStart:l.pos])
+				if strings.TrimSpace(rawText) != "" {
+					l.bld.AddText(rawText, ir.Span{
+						Line:      startLine,
+						Column:    startCol,
+						EndLine:   l.line,
+						EndColumn: l.col,
+					})
+				}
+				l.advanceBytes(len(closePrefix))
+				l.skipUntilChar('>')
+				l.bld.CloseElement(tagName)
+				return
+			}
+		}
+		l.advance()
+	}
+
+	rawText := string(l.src[textStart:l.pos])
+	if strings.TrimSpace(rawText) != "" {
+		l.bld.AddText(rawText, ir.Span{
+			Line:      startLine,
+			Column:    startCol,
+			EndLine:   l.line,
+			EndColumn: l.col,
+		})
+	}
+	l.bld.CloseElement(tagName)
 }
 
 // handleTag memproses tag pembuka, penutup, fragment, comment, atau doctype.

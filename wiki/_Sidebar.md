@@ -7,9 +7,10 @@
 ### Rule Categories
 
 <details open>
-<summary><b>Theme</b> (20 rules)</summary>
+<summary><b>Theme</b> (24 rules)</summary>
 
 * [**Theme Overview**](theme)
+* [`theme.apply-bloat`](theme.apply-bloat)
 * [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode)
 * [`theme.focus-ring-hardcode`](theme.focus-ring-hardcode)
 * [`theme.gradient-hardcode`](theme.gradient-hardcode)
@@ -24,11 +25,14 @@
 * [`theme.image-theme-hardcode`](theme.image-theme-hardcode)
 * [`theme.important-override`](theme.important-override)
 * [`theme.inline-style-hardcode`](theme.inline-style-hardcode)
+* [`theme.missing-token-fallback`](theme.missing-token-fallback)
 * [`theme.nested-opacity-contrast`](theme.nested-opacity-contrast)
 * [`theme.primitive-in-component`](theme.primitive-in-component)
 * [`theme.pseudo-hardcode-color`](theme.pseudo-hardcode-color)
 * [`theme.shadow-without-border-dark`](theme.shadow-without-border-dark)
 * [`theme.svg-hardcode-fill`](theme.svg-hardcode-fill)
+* [`theme.token-source-drift`](theme.token-source-drift)
+* [`theme.unlayered-token-definition`](theme.unlayered-token-definition)
 * [`theme.unpaired-dark-variant`](theme.unpaired-dark-variant)
 
 </details>
