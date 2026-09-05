@@ -1,7 +1,6 @@
 package css
 
 import (
-	"bytes"
 	"strings"
 )
 
@@ -18,100 +17,32 @@ func NewThemeTokenRegistry() *ThemeTokenRegistry {
 	}
 }
 
-// ParseTheme memindai konten CSS dan mengekstrak seluruh deklarasi variabel di dalam blok @theme { ... }.
-// Mengabaikan komentar CSS /* ... */ dan whitespace.
+// ParseTheme memindai konten CSS dan mengekstrak seluruh deklarasi variabel di dalam blok @theme { ... }
+// menggunakan CSS Lexer dan AST Parser resmi Charites.
 func ParseTheme(src []byte) (*ThemeTokenRegistry, error) {
-	registry := NewThemeTokenRegistry()
-	cleaned := stripCSSComments(src)
-
-	// Cari setiap kemunculan blok @theme { ... }
-	idx := 0
-	for {
-		themeIdx := bytes.Index(cleaned[idx:], []byte("@theme"))
-		if themeIdx == -1 {
-			break
-		}
-		themeStart := idx + themeIdx + len("@theme")
-
-		// Cari kurung kurawal pembuka '{'
-		openBrace := bytes.IndexByte(cleaned[themeStart:], '{')
-		if openBrace == -1 {
-			break
-		}
-		blockStart := themeStart + openBrace + 1
-
-		// Cari kurung kurawal penutup '}' penyeimbang
-		braceDepth := 1
-		blockEnd := -1
-		for i := blockStart; i < len(cleaned); i++ {
-			if cleaned[i] == '{' {
-				braceDepth++
-			} else if cleaned[i] == '}' {
-				braceDepth--
-				if braceDepth == 0 {
-					blockEnd = i
-					break
-				}
-			}
-		}
-
-		if blockEnd == -1 {
-			// Blok @theme tidak ditutup sempurna, ekstraksi hingga akhir berkas
-			extractDeclarations(cleaned[blockStart:], registry)
-			break
-		}
-
-		extractDeclarations(cleaned[blockStart:blockEnd], registry)
-		idx = blockEnd + 1
+	sheet, err := Parse(src)
+	if err != nil {
+		return nil, err
 	}
 
+	registry := NewThemeTokenRegistry()
+	collectThemeRules(sheet.Rules, registry)
 	return registry, nil
 }
 
-// stripCSSComments menghapus seluruh komentar /* ... */ dari buffer CSS.
-func stripCSSComments(src []byte) []byte {
-	var buf bytes.Buffer
-	buf.Grow(len(src))
-
-	i := 0
-	for i < len(src) {
-		if i+1 < len(src) && src[i] == '/' && src[i+1] == '*' {
-			// Mulai komentar
-			end := bytes.Index(src[i+2:], []byte("*/"))
-			if end == -1 {
-				// Komentar tidak ditutup, abaikan sisa berkas
-				break
+func collectThemeRules(rules []Rule, registry *ThemeTokenRegistry) {
+	for _, r := range rules {
+		at, ok := r.(*AtRule)
+		if !ok {
+			continue
+		}
+		if strings.HasPrefix(strings.ToLower(at.Name), "@theme") {
+			for _, decl := range at.Declarations {
+				if strings.HasPrefix(decl.Property, "--") && decl.Value != "" {
+					registry.Variables[decl.Property] = decl.Value
+				}
 			}
-			i += end + 4
-			continue
 		}
-		buf.WriteByte(src[i])
-		i++
-	}
-
-	return buf.Bytes()
-}
-
-// extractDeclarations memindai baris deklarasi properti kustom CSS (--var: val;).
-func extractDeclarations(block []byte, registry *ThemeTokenRegistry) {
-	lines := bytes.Split(block, []byte(";"))
-	for _, rawLine := range lines {
-		trimmed := strings.TrimSpace(string(rawLine))
-		if trimmed == "" {
-			continue
-		}
-
-		colonIdx := strings.IndexByte(trimmed, ':')
-		if colonIdx == -1 {
-			continue
-		}
-
-		key := strings.TrimSpace(trimmed[:colonIdx])
-		val := strings.TrimSpace(trimmed[colonIdx+1:])
-
-		// Hanya simpan deklarasi variabel CSS custom properties (--*)
-		if strings.HasPrefix(key, "--") && val != "" {
-			registry.Variables[key] = val
-		}
+		collectThemeRules(at.Rules, registry)
 	}
 }
