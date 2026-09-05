@@ -209,3 +209,19 @@ func ResolveExitCode(res *ScanResult, failOnWarn bool) int {
 ```
 Kesalahan operasional (flag salah, berkas tidak ditemukan, argumen tidak sah) ditangani langsung di level CLI router dengan mengembalikan exit code **`2`**.
 Sesuai kontrak `SPEC-05-CLI`, temuan pelanggaran diagnostik dilarang keras menghasilkan exit code `2`.
+
+---
+
+## 7. Realisasi Arsitektur Bebas Residu (Zero Residual Footprint Architecture)
+
+Untuk memenuhi persyaratan `SPEC-05-LIFECYCLE-001` dan `GOV-00-CONTRACT`:
+1. **Stateless Memory Model:**
+   - Seluruh pipeline eksekusi (`internal/cli`, `internal/scanner`, `internal/analyzer`, `internal/reporter`) beroperasi murni di heap memory proses.
+   - Tidak ada modul yang memanggil `os.UserHomeDir()` atau `os.UserCacheDir()` untuk tujuan persistensi status atau cache biner.
+2. **Ephemeral Process Lifecycle:**
+   - Proses diinisialisasi melalui `cmd/charites/main.go`, mengalir secara sinkron lewat orchestrator, dan diakhiri dengan `os.Exit(code)`.
+   - Tidak ada goroutine yang di-detach sebagai daemon di luar siklus hidup proses `main()`.
+3. **Hermetic Host Isolation:**
+   - Tidak ada berkas sementara (*scratch files*) yang ditulis ke filesystem host.
+   - Saat biner dihapus dari filesystem host, tidak ada state tersembunyi yang tersisa (*100% clean uninstall*).
+

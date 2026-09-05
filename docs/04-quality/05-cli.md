@@ -62,4 +62,18 @@ Pengukuran wajib dilakukan secara terisolasi terhadap `io.Discard` untuk menghil
 | **Deterministic Byte Equality** | 100% identik biner | `TestReporter_Determinism` |
 | **Linter Compliance** | $0$ issues | `golangci-lint run ./internal/cli/... ./internal/reporter/...` |
 | **Cross-Platform Compilation** | 100% build pass (4 target) | `make cross-compile` |
+| **Host Cleanliness & Zero Leftover** | 0 file residual di `$HOME` / `/tmp` | Audit sistem pre/post eksekusi & `pgrep -a charites == 0` |
+
+---
+
+## 5. Invarian Kebersihan Lingkungan Host (`QUAL-05-HOST-CLEANLINESS`)
+
+1. **Zero Filesystem Artifacts Outside Workspace:**
+   - Verifikasi audit sistem: Eksekusi `charites scan` wajib menghasilkan **0 berkas baru** di `$HOME`, `~/.config`, `~/.cache`, atau direktori temporary sistem (`/tmp` pada Linux/macOS, `%TEMP%` pada Windows).
+2. **Zero Residual Processes / Daemons:**
+   - Setelah proses CLI selesai, jumlah proses aktif `charites` di memori sistem **MUST** sama dengan nol (`pgrep -a charites` menghasilkan 0 proses).
+   - Tidak ada background telemetry goroutine atau worker daemon yang tetap hidup setelah proses keluar (*run-to-completion exit*).
+3. **Audit Siklus Hidup Update & Uninstall:**
+   - Penghapusan biner terbukti secara empiris meninggalkan *zero leftover* pada seluruh platform yang didukung (Linux, macOS, Windows).
+
 

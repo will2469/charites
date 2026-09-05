@@ -48,6 +48,13 @@ Available Commands:
    - Jika path target berada di dalam direktori *builtin hard exclusion* (misal `charites scan node_modules/foo/Card.tsx`), sistem keamanan *direct-target safety* **MUST** menolak pemindaian dan keluar dengan exit code `2` dan pesan error di `stderr`:
      `charites: error: scan target "<path>" is within excluded directory (builtin hard exclusion).`
 
+### 1.2. Kontrak Siklus Hidup Biner & Zero Residual Footprint (SPEC-05-LIFECYCLE-001)
+1. **Zero Host Pollution Invariant:** Biner CLI `charites` beroperasi secara murni *in-memory* dan *in-workspace*. CLI dilarang keras membuat berkas state, cache, atau konfigurasi global di luar target direktori yang sedang dipindai (dilarang membuat `~/.config/charites`, `~/.cache/charites`, `%APPDATA%\charites`, dsb.).
+2. **Ephemeral Run-to-Completion:** Setiap pemanggilan CLI (subcommand `scan`, `version`, `help`) bersifat *run-to-completion*. Saat proses mengembalikan kode keluar, seluruh alokasi memori dilepaskan oleh OS dan tidak ada proses latar belakang, daemon, socket, atau berkas sementara di `/tmp` yang ditinggalkan.
+3. **Pembaruan & Pencopotan Bersih (Clean Update & Uninstall Contract):**
+   - **Update:** Pengguna memperbarui Charites cukup dengan mengganti berkas biner secara atomik tanpa perlu membersihkan cache atau menjalankan perintah migrasi database.
+   - **Uninstall:** Menghapus satu-satunya berkas biner `charites` menjamin sistem pengguna kembali 100% bersih tanpa ada *leftover* di direktori mana pun pada sistem operasi (*Zero Leftover Guarantee*).
+
 ---
 
 ## 2. Matriks Flag Subcommand `scan` & Aturan Normalisasi

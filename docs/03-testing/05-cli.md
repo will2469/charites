@@ -29,6 +29,7 @@ Fase 5 mewajibkan pembuktian empiris melalui matriks 13 skenario uji eksekutabel
 | **11** | TTY / Pipe / `NO_COLOR` | `NO_COLOR=1 charites scan .`<br>`charites scan . \| cat`<br>`charites scan --no-color .` | Lingkungan non-TTY atau flag/env no-color | ANSI escape codes dinonaktifkan (Mode `ColorNever`), output teks murni tanpa ANSI bytes. |
 | **12** | Deterministic Ordering | 2x eksekusi `charites scan --format=json .` pada korpus sama | Urutan scheduling paralel acak | Output biner identik 100% (`bytes.Equal`), urutan slice mengikuti 7-tier total ordering. |
 | **13** | Exit Codes Taxonomy | Berbagai kondisi pemindaian | Skenario clean, violations, operational error, cancellation | `0`: Clean repo (atau warning tanpa fail-on-warn).<br>`1`: Violation error (atau warning + fail-on-warn).<br>`2`: Operational / CLI error.<br>`130`: SIGINT cancel. |
+| **14** | Zero Host Footprint & Residual Audit | `charites scan .` | Audit sebelum dan sesudah eksekusi terhadap `~/.cache`, `~/.config`, `/tmp/charites*`, dan proses sistem | Tidak ada pembuatan direktori/berkas di luar target workspace; 0 daemon/proses tertinggal (`pgrep -a charites` = 0). |
 
 ---
 

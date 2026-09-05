@@ -44,20 +44,23 @@ $$\mathbf{SPEC\ PASS} \longrightarrow \mathbf{ARCH\ PASS} \longrightarrow \mathb
   - Resolusi TTY dan `NO_COLOR` (Mode `ColorNever`).
   - Total ordering 7-tingkat untuk determinisme output.
   - Taksonomi exit code 0, 1, 2, 130 terkunci.
+  - Kontrak Zero Residual Footprint & Clean Lifecycle (SPEC-05-LIFECYCLE-001) terkunci.
 
 - [x] **`ROAD-05-READINESS-002` (ARCH-05 Compliance = PASS):**
   - Matriks kepemilikan komponen terpetakan secara ketat (`internal/cli/root.go`, `internal/cli/scan.go`, `internal/config`, `internal/scanner`, `internal/analyzer`, `internal/reporter`, `internal/cli/exit.go`).
   - ARCH hanya menjelaskan HOW tanpa menambah behavior baru di luar SPEC.
   - Zero External Dependencies invariant dipertahankan.
+  - Realisasi arsitektur bebas residu (stateless memory, ephemeral lifecycle, hermetic host isolation) terpetakan.
 
 - [x] **`ROAD-05-READINESS-003` (TEST-05 Compliance = PASS):**
-  - Matriks 13 skenario eksekutabel didefinisikan secara lengkap.
+  - Matriks 14 skenario eksekutabel didefinisikan secara lengkap (termasuk audit bebas residu host).
   - Golden snapshot contracts (`inline_clean`, `inline_violations`, `inline_no_color`, `json_clean`, `json_violations`) terspesifikasi.
   - Pengujian determinisme biner dan E2E subprocess exit code matrix terspesifikasi.
 
 - [x] **`ROAD-05-READINESS-004` (QUALITY-05 Compliance = PASS):**
   - Ambang batas eksplisit dikunci: `internal/cli` $\ge 85\%$, `internal/reporter` $\ge 90\%$.
   - 0 Data Race Invariant, $\le 12$ cyclomatic complexity per fungsi, linter compliance 0 issues.
+  - Invarian kebersihan host dan 0 proses tertinggal terkunci (`QUAL-05-HOST-CLEANLINESS`).
   - CI Baseline terverifikasi pada commit final Fase 4.
 
 - [x] **`ROAD-05-READINESS-005` (CI Evidence Verification = PASS):**

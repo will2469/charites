@@ -83,3 +83,33 @@ $$\text{Registry (Base Candidates)} \longrightarrow \text{CLI Scope (--category,
 2. **Config Policy:** Menetapkan status aktif/nonaktif dan severity override. Kebijakan `off` pada config mengalahkan flag `--rule` pada CLI.
 3. **Filesystem Ignore:** Membatasi penelusuran berkas berdasarkan aturan pengguna.
 4. **Built-in Invariant:** Pengecualian mutlak bawaan (`node_modules/`, `.git/`, direktori symlink) tidak dapat dinegasi oleh aturan pengguna atau target berkas langsung.
+
+---
+
+## 4. Invarian Bebas Residu & Kebersihan Siklus Hidup (Zero Residual Footprint Invariant)
+
+Untuk melindungi integritas sistem operasi pengguna dan memastikan portabilitas murni, Charites memberlakukan **Invarian Bebas Residu & Kebersihan Siklus Hidup** (*Zero Residual Footprint Invariant*) yang mengikat seluruh tahapan rilis dan biner eksekutabel:
+
+### 4.1. Filosofi Biner Tunggal Mandiri (Pure Standalone Executable)
+1. **Zero External Runtime Dependencies:** Charites didistribusikan sebagai artefak biner tunggal mandiri (`CGO_ENABLED=0`) tanpa membutuhkan pustaka sistem dinamis (glibc/musl) khusus, driver, interpreter eksternal (Node.js, Python), atau daemon pendukung.
+2. **Atomic Placement:** Instalasi Charites semata-mata adalah penempatan berkas biner tunggal ke dalam direktori eksekutabel pilihan pengguna (misalnya `/usr/local/bin/charites` atau `$HOME/.local/bin/charites`).
+
+### 4.2. Invarian Bebas Polusi Host (Zero Host Pollution Invariant)
+1. **Dilarang Menulis di Luar Workspace Target:** Selama proses eksekusi, pemindaian, analisis, pelaporan, atau parsing, Charites **DILARANG KERAS** membuat, memodifikasi, atau meninggalkan berkas/direktori di lingkungan sistem pengguna di luar target workspace yang ditentukan secara eksplisit.
+2. **Dilarang Membuat Direktori Global Tersembunyi:** Charites tidak pernah membuat atau mengasumsikan keberadaan direktori konfigurasi atau cache global pengguna, termasuk namun tidak terbatas pada:
+   - Linux/Unix: `~/.config/charites`, `~/.cache/charites`, `~/.charites`, `/var/cache/charites`, `/tmp/charites*`
+   - macOS: `~/Library/Application Support/charites`, `~/Library/Caches/charites`
+   - Windows: `%APPDATA%\charites`, `%LOCALAPPDATA%\charites`, `%TEMP%\charites*`
+3. **Dilarang Memodifikasi Konfigurasi Shell / Sistem Host:** Charites tidak pernah menginjeksikan script atau alias ke `.bashrc`, `.zshrc`, `.profile`, Windows Registry, atau environment variable sistem secara tersembunyi.
+4. **Dilarang Menjalankan Background Daemon / Sockets / PID Files:** Charites beroperasi sebagai CLI synchronous ephemeral run-to-completion. Charites **DILARANG** mendaftarkan background daemon, systemd unit, launchd plist, cron job, Windows service, telemetry emitter di background, Unix domain socket, atau meninggalkan PID file.
+
+### 4.3. Jaminan Bersih Total Siklus Hidup: Update & Uninstall (Zero Leftover Guarantee)
+1. **Invarian Pembaruan (Clean Update Invariant):**
+   - Pembaruan versi Charites dilakukan secara atomik murni dengan mengganti biner lama dengan biner baru (`cp new_charites $(which charites)` atau `curl ... -o $(which charites)`).
+   - Tidak ada skema database tersembunyi, state migrasi, atau cache versi lama yang tertinggal di mesin pengguna yang dapat memicu konflik antar-versi.
+2. **Invarian Pencopotan (Clean Uninstall Invariant):**
+   - Pencopotan Charites dilakukan secara tuntas dan bersih 100% hanya dengan **menghapus satu-satunya berkas biner `charites`** (`rm $(which charites)`).
+   - Menghapus biner Charites secara deterministik menjamin tidak ada satupun artefak sisa (*zero residual leftover*), berkas konfigurasi yatim piatu, cache tersembunyi, entri registri, atau proses zombie di sistem operasi pengguna.
+3. **In-Memory Ephemeral Execution:**
+   - Seluruh pemrosesan memori (AST buffer, cache token Tailwind, dictionary IR, context) dialokasikan dalam memori proses (*heap*) dan dibebaskan seketika saat proses CLI berakhir (`os.Exit`). Tidak ada berkas sementara (*temporary swap files*) yang ditulis ke disk.
+

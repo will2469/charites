@@ -26,6 +26,8 @@ Dokumen ini mendefinisikan spesifikasi formal untuk penyiapan awal (_setup_) rep
     2. **Linux ARM64:** `GOOS=linux GOARCH=arm64`
     3. **macOS Apple Silicon:** `GOOS=darwin GOARCH=arm64`
     4. **Windows x86_64:** `GOOS=windows GOARCH=amd64`
+- **SPEC-00-BUILD-003 (Zero Residual Host Pollution & Standalone Invariant):**
+  - Biner Charites yang dihasilkan merupakan biner mandiri (*pure standalone binary*) yang tidak memerlukan penginstal (*installer wizard*), tidak mendaftarkan layanan latar belakang (*daemon/systemd service*), tidak menulis ke direktori global sistem (`~/.config`, `~/.cache`, `%APPDATA%`), dan menjamin tidak ada artefak sisa (*zero residual leftover*) pada sistem pengguna saat biner diperbarui atau dihapus (*clean update & uninstall*).
 - **Dependency File Policy:** Berkas `go.sum` **MUST NOT** be required pada Fase 0 saat dependensi eksternal bernilai nol (*zero external dependencies*).
 
 ---
