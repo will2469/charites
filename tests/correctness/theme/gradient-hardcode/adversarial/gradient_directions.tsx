@@ -2,8 +2,11 @@ import React from "react";
 
 export function GradientDirections() {
   return (
-    <div className="bg-gradient-to-tr bg-gradient-to-bl bg-gradient-to-t">
-      <span>Direction Utilities</span>
+    <div>
+      <span className="bg-gradient-to-tr">TR</span>
+      <span className="bg-gradient-to-bl">BL</span>
+      <span className="bg-gradient-to-t">T</span>
     </div>
+
   );
 }
