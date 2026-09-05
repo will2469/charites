@@ -2,10 +2,11 @@
 
 > **Kode Dokumen:** `ARCH-01-CONTRACT`
 > **Tahapan:** Fase 1 - Kunci Kontrak Data (IR & Diagnostic)
-> **Status:** Ready for Review
+> **Peran Pilar:** ARCH = HOW (Rancangan Arsitektur, Desain Iterator & Batasan Teknis)
+> **Status:** Ready for Execution
 > **Standar Rujukan:** Go Memory Model & Go 1.26 Standard Iterator Specification
 
-Dokumen ini menjelaskan rancangan teknis internal, optimalisasi memory layout, dan mekanisme traversal pohon **Intermediate Representation (`ir.Node`)** menggunakan Go 1.26 native iterators tanpa alokasi heap.
+Dokumen ini menjelaskan rancangan teknis internal, batasan kepemilikan konstruksi, optimalisasi memory layout, dan mekanisme traversal pohon **Intermediate Representation (`ir.Node`)** menggunakan Go 1.26 native iterators.
 
 ---
 
@@ -15,9 +16,9 @@ Untuk menjamin kompilasi statis Go bebas dari error `import cycle not allowed`, 
 
 ```mermaid
 graph TD
-    Parser["internal/parser"] -->|"Builds []*ir.Node"| IR["internal/ir\n(node.go & diagnostic.go)"]
-    Rules["internal/rules"] -->|"Consumes *ir.Node\nReturns []ir.Diagnostic"| IR
-    Analyzer["internal/analyzer"] -->|"Walks *ir.Node\nCollects []ir.Diagnostic"| IR
+    Parser["internal/parser (IR Builder)"] -->|"Owns construction\nBuilds []*ir.Node"| IR["internal/ir\n(node.go & diagnostic.go)"]
+    Rules["internal/rules"] -->|"Consumes *ir.Node (Read-Only)\nReturns []ir.Diagnostic"| IR
+    Analyzer["internal/analyzer"] -->|"Walks *ir.Node (Read-Only)\nCollects []ir.Diagnostic"| IR
     Reporter["internal/reporter"] -->|"Formats []ir.Diagnostic"| IR
     MCP["internal/mcp"] -->|"Serializes []ir.Diagnostic"| IR
 
@@ -30,12 +31,13 @@ graph TD
 - `internal/ir` **hanya mengimpor paket bawaan Go** (`iter`, `strings`, `encoding/json`).
 - `internal/rules` mengimpor `internal/ir`, tetapi **TIDAK PERNAH** mengimpor `internal/analyzer`.
 - `internal/analyzer` mengimpor `internal/ir` dan `internal/rules`, sehingga aliran dependensi bersifat asiklik murni (DAG - *Directed Acyclic Graph*).
+- **Siklus Kepemilikan (Lifecycle Ownership):** `internal/parser` memiliki hak eksklusif membangun pohon node (*owns construction*). Setelah diserahkan ke pipeline analisis, objek node diperlakukan *read-only* tanpa mutasi state.
 
 ---
 
 ## 2. Memory Layout & Field Alignment `ir.Node`
 
-Pada repositori dengan ribuan komponen UI, terdapat ratusan ribu node elemen yang dialokasikan di memori. Untuk meminimalkan *padding bloat* pada arsitektur 64-bit:
+Pada repositori dengan ribuan komponen UI, terdapat ratusan ribu node elemen yang dialokasikan di memori. Untuk meminimalkan *padding bloat* pada arsitektur 64-bit, susunan field diatur secara presisi:
 
 ```go
 type Node struct {
@@ -52,11 +54,14 @@ type Node struct {
 ```
 *Total Struct Size: 136 bytes per node.*
 
+> [!NOTE]
+> Ukuran struct $\le 136$ bytes diverifikasi secara empiris dalam unit test melalui `unsafe.Sizeof(ir.Node{})`, bukan disandarkan pada analyzer eksternal.
+
 ---
 
-## 3. Traversal Bebas Alokasi (Go 1.26 Native Iterator)
+## 3. Desain Traversal (Go 1.26 Native Iterator)
 
-Metode tradisional `Children()` mengembalikan slice baru atau rekursi fungsi callback yang berpotensi menyebabkan alokasi heap saat melintasi pohon besar. Charites mengimplementasikan traversal pohon menggunakan fitur **Go 1.26 `iter.Seq`**:
+Metode tradisional `Children()` yang mengembalikan slice baru atau rekursi fungsi callback dapat memicu penyalinan slice yang tidak efisien. Charites mengimplementasikan traversal pohon menggunakan fitur **Go 1.26 `iter.Seq`**:
 
 ```go
 package ir
@@ -64,7 +69,7 @@ package ir
 import "iter"
 
 // Walk melakukan pre-order depth-first traversal pada pohon IR
-// Menghasilkan zero heap allocation (0 B/op, 0 allocs/op)
+// Didesain untuk iterasi idiomatik Go 1.26 tanpa perlu menyalin slice anak.
 func (n *Node) Walk() iter.Seq[*Node] {
     return func(yield func(*Node) bool) {
         var walk func(curr *Node) bool
@@ -87,15 +92,17 @@ func (n *Node) Walk() iter.Seq[*Node] {
 }
 ```
 
-### Penggunaan pada Analyzer Engine:
-```go
-// Traversal idiomatik Go 1.26 tanpa slice copy
-for node := range root.Walk() {
-    if node.Type == ir.NodeElement {
-        rule.Evaluate(node)
-    }
-}
-```
+### Karakteristik Desain Traversal:
+- **Zero-Copy Iteration:** Tidak ada alokasi slice penampung sementara saat melintasi pohon.
+- **Idiomatic Consumption:** Konsumen (`analyzer`) melakukan traversal dengan sintaks loop Go 1.26 yang bersih:
+  ```go
+  for node := range root.Walk() {
+      if node.Type == ir.NodeElement {
+          rule.Evaluate(node)
+      }
+  }
+  ```
+- **Karakteristik Alokasi Memori:** Alokasi aktual diukur melalui benchmark suite. Target performa adalah 0 allocs/op di bawah optimasi compiler (inlining), yang dikelola di pilar Quality sebagai *Performance Budget*.
 
 ---
 
@@ -106,3 +113,4 @@ Untuk mempercepat kerja rule evaluator, struct `Node` dilengkapi metode pembantu
 1. **`node.HasClass(name string) bool`**: Pencarian linear cepat dalam slice `Classes` tokenized.
 2. **`node.GetAttr(name string) (string, bool)`**: Mengambil nilai atribut dari map `Attributes`.
 3. **`node.IsElement(tags ...string) bool`**: Memeriksa kecocokan tag elemen secara variadic (misal: `node.IsElement("div", "section")`).
+

@@ -2,7 +2,8 @@
 
 > **Kode Dokumen:** `SPEC-01-CONTRACT`
 > **Tahapan:** Fase 1 - Kunci Kontrak Data (IR & Diagnostic)
-> **Status:** Ready for Review
+> **Peran Pilar:** SPEC = WHAT (Spesifikasi Kontrak Data & Invarian Fungsional)
+> **Status:** Ready for Execution
 > **Standar Rujukan:** IETF RFC 2119 / RFC 8174
 
 Dokumen ini mendefinisikan spesifikasi formal kebutuhan fungsional dan representasi data untuk **Intermediate Representation (`ir.Node`)**, **Temuan Diagnosis (`ir.Diagnostic`)**, serta **Interface Evaluasi Rule (`rules.Rule`)** pada mesin Charites.
@@ -14,7 +15,7 @@ Dokumen ini mendefinisikan spesifikasi formal kebutuhan fungsional dan represent
 Kontrak data pada Fase 1 dirancang dengan prinsip **Leaf-Level SSOT (Single Source of Truth)**:
 1. **Zero Circular Dependency:** Seluruh tipe data esensial (`Node`, `Span`, `Diagnostic`, `Severity`) didefinisikan di dalam paket daun `internal/ir`. Paket ini **DILARANG** mengimpor paket `analyzer`, `rules`, `parser`, atau `reporter`.
 2. **Framework Agnostic:** Kontrak `ir.Node` menormalkan sintaks heterogen (Astro template, React TSX, HTML) menjadi representasi pohon terpadu tanpa membawa metadata spesifik AST parser pihak ketiga.
-3. **Immutability Post-Construction:** Begitu pohon IR selesai dibangun oleh IR Builder, node **MUST** diperlakukan sebagai *read-only* selama traversal evaluasi rule.
+3. **Construction Ownership & Post-Construction Immutability:** IR Builder pada paket parser (`internal/parser`) memiliki hak penuh saat konstruksi (*owns construction*). Begitu pohon IR selesai dirakit dan diserahkan kepada konsumen (`analyzer`, `rules`), seluruh mutasi terhadap field node (`Parent`, `Children`, `Attributes`, `Classes`, `Span`) **DILARANG KERAS** (*post-construction mutation by analyzer/rule evaluation is strictly prohibited*). Seluruh konsumen **MUST** memperlakukan struktur `ir.Node` sebagai *read-only*.
 
 ---
 
@@ -57,10 +58,13 @@ type Node struct {
 }
 ```
 
-#### Persyaratan Invarian `ir.Node`:
-- **`Classes` Tokenization:** Token class **MUST** dipisahkan berdasarkan spasi (*whitespace-delimited*) dan dibersihkan dari spasi kosong. Contoh atribut `class="p-4  bg-primary "` menghasilkan slice `[]string{"p-4", "bg-primary"}`.
-- **1-Indexed Position:** Posisi `Span.Line` dan `Span.Column` **MUST** dimulai dari angka `1` sesuai dengan standar editor dan terminal IDE.
-- **Bi-Directional Traversal:** Setiap `Node` yang memiliki anak **MUST** mengisi pointer `Parent` pada setiap anak yang menunjuk kembali ke node tersebut.
+#### Persyaratan Invarian Fungsional `ir.Node`:
+- **`Classes` Tokenization:** Token class **MUST** dipisahkan berdasarkan spasi (*whitespace-delimited*) dan dibersihkan dari spasi berlebih. Contoh atribut `class="p-4  bg-primary "` menghasilkan slice `[]string{"p-4", "bg-primary"}`.
+- **1-Indexed Position:** Posisi `Span.Line` dan `Span.Column` **MUST** dimulai dari angka `1` sesuai standar editor teks dan terminal IDE.
+- **Bi-Directional Traversal Invariant:** Setiap `Node` yang memiliki anak **MUST** menjamin bahwa `child.Parent == parent` dan `parent.Children` memuat `child`.
+- **Deterministic Traversal Order:** Traversal pohon melalui iterator `Walk()` **MUST** mengeksekusi urutan pre-order *depth-first search* secara deterministik.
+- **Immediate Early Termination:** Traversal iterator **MUST** berhenti seketika saat konsumen mengembalikan sinyal terminasi (`false`).
+- **Non-Mutating Traversal:** Traversal iterator **MUST NOT** memodifikasi state atau struktur node apa pun di dalam pohon IR.
 
 ---
 
@@ -83,7 +87,7 @@ type Diagnostic struct {
     File     string   `json:"file"`               // Path relatif berkas sumber
     Line     int      `json:"line"`               // Baris lokasi temuan (1-indexed)
     Column   int      `json:"column"`             // Kolom lokasi temuan (1-indexed)
-    Rule     string   `json:"rule"`               // Kode unik Semgrep rule (contoh: "theme.hardcode-opacity-color")
+    Rule     string   `json:"rule"`               // Charites Rule ID (contoh: "theme.hardcode-opacity-color")
     Severity Severity `json:"severity"`           // "error" | "warn" | "info"
     Message  string   `json:"message"`            // Deskripsi pelanggaran ringkas
     Hint     string   `json:"hint,omitempty"`     // Rekomendasi tindakan remediasi
@@ -91,8 +95,11 @@ type Diagnostic struct {
 ```
 
 #### Persyaratan Invarian `Diagnostic`:
-- **Serialisasi JSON Flat:** Tag JSON **MUST** menghasilkan struktur datar (*flat array*) untuk mempermudah integrasi dengan `jq`, editor IDE, dan payload Model Context Protocol (MCP).
-- **Deterministik:** Diagnosis dengan nilai `File`, `Line`, `Column`, dan `Rule` yang sama **MUST** menghasilkan representasi JSON byte-per-byte yang identik.
+- **Struktur Serialisasi JSON:**
+  - Setiap objek `Diagnostic` individual direpresentasikan sebagai **flat JSON object** (kunci-kunci datar tanpa objek bersarang).
+  - Koleksi diagnosis direpresentasikan sebagai **JSON array of Diagnostic objects** (`[]Diagnostic`).
+- **Byte-Level Determinism:** Untuk setiap objek `Diagnostic` dengan seluruh field bernilai identik, hasil serialisasi JSON **MUST** bersifat deterministik dan byte-per-byte identik.
+- **Collection Ordering Determinism:** Koleksi diagnosis **MUST** memiliki urutan yang deterministik saat dilaporkan, diurutkan berdasarkan tuple lokasi dan rule `(File, Line, Column, Rule)`.
 
 ---
 
@@ -108,7 +115,7 @@ import (
 )
 
 type Rule interface {
-    ID() string                                   // Identifier Semgrep tunggal (contoh: "theme.hardcode-opacity-color")
+    ID() string                                   // Charites Rule ID tunggal (format: <category>.<rule-slug>, misal: "theme.hardcode-opacity-color")
     Description() string                          // Penjelasan maksud dan tujuan rule
     Category() string                             // Kategori (theme, a11y, perf, layout, seo)
     DefaultSeverity() ir.Severity                 // Default severity jika tidak dioverride config
@@ -145,3 +152,4 @@ Sistem scanner dan analyzer **MUST** mendukung komentar pengabaian inline (*inli
      ```
 2. **Aturan Evaluasi Pengabaian:**
    - Jika sebuah node didahului atau memuat komentar direktif `charites:ignore`, diagnostic yang memiliki `Rule` yang terdaftar dalam komentar tersebut **MUST** dibatalkan (*suppressed*) dan tidak dilaporkan ke output akhir.
+

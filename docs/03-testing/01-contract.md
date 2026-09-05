@@ -2,14 +2,17 @@
 
 > **Kode Dokumen:** `TEST-01-CONTRACT`
 > **Tahapan:** Fase 1 - Kunci Kontrak Data (IR & Diagnostic)
-> **Status:** Ready for Review
+> **Peran Pilar:** TEST = PROOF (Harness Pengujian, Skenario Smoke & Asersi Pembuktian)
+> **Status:** Ready for Execution
 > **Standar Rujukan:** Modern Testing Principles & Go Benchmarking Standards
 
-Dokumen ini mendefinisikan rencana pengujian unit dan pengukuran performa alokasi memori untuk paket kontrak data **`internal/ir`**.
+Dokumen ini mendefinisikan skenario pembuktian empiris, rencana pengujian unit komprehensif, dan benchmark alokasi memori untuk membuktikan pemenuhan seluruh kontrak fungsional pada **`internal/ir`**.
 
 ---
 
 ## 1. Skenario Uji Coba Unit (`internal/ir/node_test.go`)
+
+Paket `internal/ir` wajib memiliki pengujian unit deterministik yang membuktikan seluruh invarian normatif:
 
 ### Test Case 1: Traversal Pohon Pre-Order (`TestNode_Walk`)
 - **Tujuan:** Memastikan iterator `Walk()` mengunjungi seluruh node anak secara teratur sesuai urutan *depth-first search*.
@@ -20,34 +23,63 @@ Dokumen ini mendefinisikan rencana pengujian unit dan pengukuran performa alokas
   │   └── grandchild1 (text)
   └── child2 (button)
   ```
-- **Ekspektasi:**
-  - Node dikunjungi dengan urutan tepat: `root` -> `child1` -> `grandchild1` -> `child2`.
+- **Asersi Pembuktian:**
+  - Node dikunjungi dengan urutan presisi: `root` -> `child1` -> `grandchild1` -> `child2`.
   - Total kunjungan berjumlah 4 node.
 
 ### Test Case 2: Terminasi Awal Iterator (*Early Exit*)
-- **Tujuan:** Memastikan perulangan `for n := range root.Walk()` dapat dihentikan di tengah jalan menggunakan `break` tanpa memicu memory leak atau panic.
-- **Ekspektasi:** Traversal berhenti seketika saat `yield` mengembalikan `false`.
+- **Tujuan:** Memastikan perulangan `for n := range root.Walk()` dapat dihentikan seketika di tengah jalan menggunakan `break` tanpa memicu panic atau traversal lanjutan.
+- **Asersi Pembuktian:** Traversal berhenti seketika saat callback `yield` mengembalikan `false`.
 
-### Test Case 3: Helper Metode (`TestNode_Helpers`)
-- Menguji `HasClass("bg-primary")` menghasilkan `true` dan `HasClass("missing")` menghasilkan `false`.
-- Menguji `GetAttr("role")` mengembalikan nilai dan boolean exist yang valid.
-- Menguji `IsElement("div", "span")` berfungsi variadic dengan benar.
+### Test Case 3: Invarian Hubungan Induk-Anak (`TestNode_ParentChildInvariant`)
+- **Tujuan:** Membuktikan invarian traversal dua arah (*bidirectional traversal*).
+- **Asersi Pembuktian:**
+  - Untuk setiap node anak, pointer `child.Parent` menunjuk secara identik ke node induknya (`child.Parent == parent`).
+  - Irisan `parent.Children` memuat pointer `child`.
+  - Node akar (*root*) memiliki `Parent == nil`.
+
+### Test Case 4: Tokenisasi Kelas Semantik (`TestNode_ClassTokenization`)
+- **Tujuan:** Membuktikan tokenisasi kelas CSS berbasis whitespace.
+- **Input:** Atribut kelas dengan berbagai variasi spasi (`"p-4   bg-primary   text-sm\t\n"`).
+- **Asersi Pembuktian:**
+  - Menghasilkan slice `[]string{"p-4", "bg-primary", "text-sm"}` tanpa elemen string kosong atau whitespace tersisa.
+  - Nilai `RawClasses` tetap mempertahankan string asli yang belum di-split.
+
+### Test Case 5: Pengindeksan Rentang Posisi (`TestNode_SpanIndexing`)
+- **Tujuan:** Membuktikan kepatuhan format posisi 1-indexed.
+- **Asersi Pembuktian:**
+  - `Span.Line >= 1` dan `Span.Column >= 1`.
+  - `Span.EndLine >= Span.Line`.
+  - Jika satu baris, `Span.EndColumn >= Span.Column`.
+
+### Test Case 6: Verifikasi Ukuran Memori Struct (`TestNode_StructSize`)
+- **Tujuan:** Membuktikan optimasi memory layout dan field alignment pada arsitektur 64-bit.
+- **Asersi Pembuktian:** `unsafe.Sizeof(ir.Node{}) <= 136` bytes.
+
+### Test Case 7: Helper Metode (`TestNode_Helpers`)
+- Menguji `HasClass("bg-primary")` bernilai `true` dan `HasClass("missing")` bernilai `false`.
+- Menguji `GetAttr("role")` mengembalikan nilai dan flag exist yang valid.
+- Menguji `IsElement("div", "span")` berfungsi secara variadic dengan benar.
 
 ---
 
 ## 2. Skenario Uji Coba Serialisasi Diagnostic (`internal/ir/diagnostic_test.go`)
 
-### Test Case 1: JSON Marshaling Determinism
-- **Input:** Struct `Diagnostic` terisi lengkap.
-- **Ekspektasi:**
-  - Hasil `json.Marshal(diag)` menghasilkan flat JSON dengan kunci tepat: `file`, `line`, `column`, `rule`, `severity`, `message`, `hint`.
-  - Tidak ada field kosong yang tidak perlu.
+### Test Case 1: Struktur JSON Flat & Determinisme Byte-Level
+- **Tujuan:** Membuktikan bahwa `Diagnostic` menghasilkan serialisasi flat JSON deterministik.
+- **Asersi Pembuktian:**
+  - Hasil `json.Marshal(diag)` menghasilkan flat JSON object dengan kunci tepat: `file`, `line`, `column`, `rule`, `severity`, `message`, `hint`.
+  - Dua instance `Diagnostic` dengan seluruh nilai field identik **MUST** menghasilkan byte array JSON yang identik 100%.
+
+### Test Case 2: Determinisme Pengurutan Koleksi
+- **Tujuan:** Membuktikan stabilitas urutan temuan saat diserialisasikan ke array JSON.
+- **Asersi Pembuktian:** Koleksi diagnosis diurutkan secara stabil berdasarkan `(File, Line, Column, Rule)`.
 
 ---
 
-## 3. Benchmark Alokasi Memori (Zero-Alloc Gate)
+## 3. Benchmark Pengukuran Alokasi Memori (`BenchmarkNode_Walk`)
 
-Mekanisme traversal pohon IR adalah *hot-path* yang dieksekusi jutaan kali. Benchmark alokasi wajib dijalankan:
+Benchmark dijalankan untuk mengukur performa alokasi pada *hot-path* traversal:
 
 ```go
 func BenchmarkNode_Walk(b *testing.B) {
@@ -66,8 +98,7 @@ func BenchmarkNode_Walk(b *testing.B) {
     }
 }
 ```
+### Evaluasi Alokasi (Performance Budget Target):
+- **Target Desain:** **`0 B/op`** dan **`0 allocs/op`** di bawah optimasi compiler inlining Go 1.26.
+- **Kebijakan Ambang Batas:** Jika hasil benchmark terukur mengalami deviasi alokasi ($> 0$), hasil tersebut dicatat sebagai **Performance Regression Warning** untuk diinvestigasi lebih lanjut, tanpa otomatis membatalkan validitas fungsional kontrak `ir.Node`.
 
-### Kriteria Penerimaan Benchmark:
-- **Alokasi Heap:** **`0 B/op`**
-- **Jumlah Alokasi:** **`0 allocs/op`**
-- Jika ditemukan alokasi $> 0$, Pull Request **DITOLAK**.
