@@ -1,0 +1,12 @@
+---
+// ADV-001: .dark mentioned only in comments and standard class
+---
+<div class="dark text-foreground">
+  <p>Dark mode container</p>
+</div>
+<style>
+  /* .dark without color-scheme comment should not trigger */
+  .button {
+    background: blue;
+  }
+</style>

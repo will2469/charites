@@ -1,0 +1,13 @@
+---
+// POS-001: Mixing prefers-color-scheme media query with .dark class
+---
+<style>
+  @media (prefers-color-scheme: dark) {
+    body {
+      background: #121212;
+    }
+  }
+  .dark {
+    --bg-main: #000000;
+  }
+</style>

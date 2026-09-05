@@ -7,11 +7,14 @@
 ### Rule Categories
 
 <details open>
-<summary><b>Theme</b> (24 rules)</summary>
+<summary><b>Theme</b> (32 rules)</summary>
 
 * [**Theme Overview**](theme)
 * [`theme.apply-bloat`](theme.apply-bloat)
 * [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode)
+* [`theme.chart-color-hardcode`](theme.chart-color-hardcode)
+* [`theme.dual-strategy-collision`](theme.dual-strategy-collision)
+* [`theme.dynamic-class`](theme.dynamic-class)
 * [`theme.focus-ring-hardcode`](theme.focus-ring-hardcode)
 * [`theme.gradient-hardcode`](theme.gradient-hardcode)
 * [`theme.hardcode-border-color`](theme.hardcode-border-color)
@@ -22,14 +25,19 @@
 * [`theme.hardcode-shadow-color`](theme.hardcode-shadow-color)
 * [`theme.hardcode-size`](theme.hardcode-size)
 * [`theme.hardcode-z-index`](theme.hardcode-z-index)
+* [`theme.hydration-theme-mismatch`](theme.hydration-theme-mismatch)
 * [`theme.image-theme-hardcode`](theme.image-theme-hardcode)
 * [`theme.important-override`](theme.important-override)
 * [`theme.inline-style-hardcode`](theme.inline-style-hardcode)
+* [`theme.meta-theme-color-mismatch`](theme.meta-theme-color-mismatch)
+* [`theme.missing-color-scheme`](theme.missing-color-scheme)
 * [`theme.missing-token-fallback`](theme.missing-token-fallback)
 * [`theme.nested-opacity-contrast`](theme.nested-opacity-contrast)
+* [`theme.no-reduced-motion`](theme.no-reduced-motion)
 * [`theme.primitive-in-component`](theme.primitive-in-component)
 * [`theme.pseudo-hardcode-color`](theme.pseudo-hardcode-color)
 * [`theme.shadow-without-border-dark`](theme.shadow-without-border-dark)
+* [`theme.split-theme-state`](theme.split-theme-state)
 * [`theme.svg-hardcode-fill`](theme.svg-hardcode-fill)
 * [`theme.token-source-drift`](theme.token-source-drift)
 * [`theme.unlayered-token-definition`](theme.unlayered-token-definition)

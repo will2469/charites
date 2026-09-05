@@ -1,0 +1,10 @@
+---
+// ADV-001: Comments mentioning prefers-color-scheme should not trigger
+---
+<style>
+  /* Previously we used @media (prefers-color-scheme: dark) */
+  .dark {
+    color-scheme: dark;
+    --bg-main: #09090b;
+  }
+</style>

@@ -10,6 +10,9 @@ The `theme` category contains static analysis rules for code quality, architectu
 | :--- | :---: | :--- | :--- | :---: |
 | `theme.apply-bloat` | `WARN` | Detects excessive use of @apply with more than 8 utility classes in CSS or style blocks | [`theme.apply-bloat`](theme.apply-bloat) | `enabled` |
 | `theme.backdrop-blur-hardcode` | `WARN` | Detects hardcoded arbitrary blur and backdrop-blur scalars in Tailwind utility classes | [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode) | `enabled` |
+| `theme.chart-color-hardcode` | `ERROR` | Detects hardcoded color values on chart visualization components | [`theme.chart-color-hardcode`](theme.chart-color-hardcode) | `enabled` |
+| `theme.dual-strategy-collision` | `WARN` | Detects conflicting dark mode strategies (@media vs .dark/[data-theme]) in the same style scope | [`theme.dual-strategy-collision`](theme.dual-strategy-collision) | `enabled` |
+| `theme.dynamic-class` | `ERROR` | Detects unpadded dynamic template strings breaking Tailwind JIT class generation | [`theme.dynamic-class`](theme.dynamic-class) | `enabled` |
 | `theme.focus-ring-hardcode` | `WARN` | Detects hardcoded primitive palette or arbitrary hex colors on focus rings and outlines | [`theme.focus-ring-hardcode`](theme.focus-ring-hardcode) | `enabled` |
 | `theme.gradient-hardcode` | `WARN` | Detects hardcoded primitive, arbitrary hex, or monochrome colors in gradient stops | [`theme.gradient-hardcode`](theme.gradient-hardcode) | `enabled` |
 | `theme.hardcode-border-color` | `WARN` | Detects hardcoded border and divider colors using primitive palettes, raw hex literals, or static monochrome | [`theme.hardcode-border-color`](theme.hardcode-border-color) | `enabled` |
@@ -20,14 +23,19 @@ The `theme` category contains static analysis rules for code quality, architectu
 | `theme.hardcode-shadow-color` | `WARN` | Detects hardcoded color literals embedded in box-shadow declarations | [`theme.hardcode-shadow-color`](theme.hardcode-shadow-color) | `enabled` |
 | `theme.hardcode-size` | `WARN` | Detects hardcoded arbitrary size, spacing, or typography scalars in Tailwind utility classes | [`theme.hardcode-size`](theme.hardcode-size) | `enabled` |
 | `theme.hardcode-z-index` | `WARN` | Detects hardcoded arbitrary z-index scalars that trigger stacking context wars | [`theme.hardcode-z-index`](theme.hardcode-z-index) | `enabled` |
+| `theme.hydration-theme-mismatch` | `WARN` | Detects SSR root layouts lacking blocking inline script for theme initialization | [`theme.hydration-theme-mismatch`](theme.hydration-theme-mismatch) | `enabled` |
 | `theme.image-theme-hardcode` | `WARN` | Detects graphic assets and logos in img tags lacking dark mode theme adaptation | [`theme.image-theme-hardcode`](theme.image-theme-hardcode) | `enabled` |
 | `theme.important-override` | `ERROR` | Detects !important modifiers on color utility classes that break theme cascade and specificity hierarchy | [`theme.important-override`](theme.important-override) | `enabled` |
 | `theme.inline-style-hardcode` | `ERROR` | Detects hardcoded color literals inside HTML/JSX style attributes that prevent theme cascade | [`theme.inline-style-hardcode`](theme.inline-style-hardcode) | `enabled` |
+| `theme.meta-theme-color-mismatch` | `WARN` | Detects static meta theme-color tags lacking media prefers-color-scheme queries | [`theme.meta-theme-color-mismatch`](theme.meta-theme-color-mismatch) | `enabled` |
+| `theme.missing-color-scheme` | `WARN` | Detects dark theme definitions (.dark, [data-theme="dark"]) missing color-scheme property | [`theme.missing-color-scheme`](theme.missing-color-scheme) | `enabled` |
 | `theme.missing-token-fallback` | `WARN` | Detects CSS variable references without fallback values | [`theme.missing-token-fallback`](theme.missing-token-fallback) | `enabled` |
 | `theme.nested-opacity-contrast` | `WARN` | Detects nested opacity modifiers that compound to cause catastrophic text contrast degradation | [`theme.nested-opacity-contrast`](theme.nested-opacity-contrast) | `enabled` |
+| `theme.no-reduced-motion` | `WARN` | Detects global theme transitions without prefers-reduced-motion media query wrapping | [`theme.no-reduced-motion`](theme.no-reduced-motion) | `enabled` |
 | `theme.primitive-in-component` | `ERROR` | Detects direct usage of Tailwind primitive palette colors in component classes instead of semantic tokens | [`theme.primitive-in-component`](theme.primitive-in-component) | `enabled` |
 | `theme.pseudo-hardcode-color` | `WARN` | Detects hardcoded primitive, arbitrary hex, or monochrome colors inside pseudo-element and pseudo-class variants | [`theme.pseudo-hardcode-color`](theme.pseudo-hardcode-color) | `enabled` |
 | `theme.shadow-without-border-dark` | `WARN` | Detects elevated containers with shadow lacking border or ring indicators in dark mode | [`theme.shadow-without-border-dark`](theme.shadow-without-border-dark) | `enabled` |
+| `theme.split-theme-state` | `WARN` | Detects ad-hoc direct access to theme state via localStorage outside ThemeProvider | [`theme.split-theme-state`](theme.split-theme-state) | `enabled` |
 | `theme.svg-hardcode-fill` | `WARN` | Detects hardcoded color attributes on SVG markup preventing theme adaptation | [`theme.svg-hardcode-fill`](theme.svg-hardcode-fill) | `enabled` |
 | `theme.token-source-drift` | `ERROR` | Detects hardcoded color values bypassing the single source of truth design token pipeline | [`theme.token-source-drift`](theme.token-source-drift) | `enabled` |
 | `theme.unlayered-token-definition` | `ERROR` | Detects CSS custom property definitions declared outside @layer theme or @layer base | [`theme.unlayered-token-definition`](theme.unlayered-token-definition) | `enabled` |

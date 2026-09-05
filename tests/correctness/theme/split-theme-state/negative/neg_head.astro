@@ -1,0 +1,9 @@
+---
+// NEG-002: Allowed localStorage bootstrap in root head
+---
+<head>
+  <script is:inline>
+    const theme = localStorage.getItem('theme') || 'light';
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  </script>
+</head>

@@ -1,0 +1,10 @@
+---
+// NEG-001: Scoped inside prefers-reduced-motion: no-preference
+---
+<style>
+  @media (prefers-reduced-motion: no-preference) {
+    * {
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+  }
+</style>

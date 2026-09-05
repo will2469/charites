@@ -58,6 +58,14 @@ func builtinRules() []Rule {
 		theme.NewMissingTokenFallbackRule(),
 		theme.NewTokenSourceDriftRule(),
 		theme.NewApplyBloatRule(),
+		theme.NewMissingColorSchemeRule(),
+		theme.NewMetaThemeColorMismatchRule(),
+		theme.NewNoReducedMotionRule(),
+		theme.NewChartColorHardcodeRule(),
+		theme.NewDynamicClassRule(),
+		theme.NewDualStrategyCollisionRule(),
+		theme.NewHydrationThemeMismatchRule(),
+		theme.NewSplitThemeStateRule(),
 	}
 }
 

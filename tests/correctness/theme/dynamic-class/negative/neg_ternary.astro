@@ -1,0 +1,7 @@
+---
+// NEG-002: Full classes in ternary expression
+const { isActive } = Astro.props;
+---
+<div class={`p-4 ${isActive ? "bg-primary text-white" : "bg-muted text-gray-500"} rounded`}>
+  Content
+</div>

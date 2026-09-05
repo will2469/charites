@@ -1,0 +1,15 @@
+---
+// NEG-001: Blocking inline theme script in head
+---
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <script is:inline>
+      const theme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    </script>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
