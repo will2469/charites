@@ -37,9 +37,7 @@ jobs:
           fi
 
       - name: Install golangci-lint (QUAL-00-LINT-001 Pinned v1.64.8)
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 
       - name: Build, Test, and Lint (ARCH-00-BUILD-ORDER / TEST-00-BUILD-ORDER)
         run: make all
