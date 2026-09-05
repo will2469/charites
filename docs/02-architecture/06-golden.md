@@ -2,67 +2,70 @@
 
 > **Kode Dokumen:** `ARCH-06-GOLDEN`
 > **Tahapan:** Fase 6 - Validasi Penuh & Golden Snapshots (Milestone Selesai Pipa)
+> **Peran Pilar:** ARCH = HOW (Rancangan Arsitektur Pipa Terpadu, Harness Golden & Pembekuan Inti)
 > **Status:** Ready for Review
 > **Standar Rujukan:** Compiler Pipeline Integration & Golden Master Architecture
 
-Dokumen ini mendefinisikan arsitektur integrasi penuh dari ujung ke ujung (*end-to-end integrated compiler pipeline*), arsitektur *test harness* pembanding *golden snapshot*, serta jaminan kestabilan antarmuka internal sebelum memasuki tahapan ekspansi ekosistem dan rules.
+Dokumen ini mendefinisikan arsitektur integrasi pipa compiler (*unidirectional staged pipeline*), harness pembanding *golden snapshot*, pemisahan boundary rule, serta tata kelola pembekuan arsitektur inti.
 
 ---
 
-## 1. Topologi Pipa Terpadu End-to-End (Single-Pass Architecture)
+## 1. Topologi Pipa Terpadu (Unidirectional Staged Pipeline)
 
-Pipa pemindaian Charites dirancang sebagai aliran data searah (*unidirectional single-pass pipeline*) berkinerja tinggi:
+Pipa pemindaian Charites dirancang sebagai aliran data bertahap searah tanpa siklus dependensi:
 
 ```mermaid
 flowchart TD
-    subgraph Disk_Ingestion ["1. Ingestion & Filtering"]
+    subgraph Stage1 ["1. Ingestion & Filtering Stage"]
         Files["Disk Files (.astro, .tsx)"]
-        CSS["global.css (@theme)"]
         YAML["charites.yaml"]
         Ignore[".charitesignore"]
 
         YAML --> ConfigEngine["config.Load()"]
         Ignore --> Matcher["config.NewMatcher()"]
-        CSS --> TokenExtractor["parser/tailwind"]
 
-        Files --> Walker["scanner.WalkFiles()\n(Early Pruning)"]
+        Files --> Walker["scanner.Walker\n(Early Pruning & Symlink Safety)"]
         Matcher -.-> Walker
     end
 
-    subgraph Concurrency_Execution ["2. Worker Pool & AST Construction"]
+    subgraph Stage2 ["2. Concurrency & AST Construction Stage"]
         Walker --> JobsQueue["Jobs Channel"]
-        JobsQueue --> Pool["scanner.WorkerPool (NumCPU)"]
+        JobsQueue --> Pool["scanner.WorkerPool (GOMAXPROCS)"]
 
         Pool --> AstroParse["parser/astro (Line Offset)"]
-        Pool --> TSXParse["parser/tsx (JSX Visitor)"]
+        Pool --> TSXParse["parser/tsx (JSX Extractor)"]
 
-        AstroParse --> IRBuilder["ir.Builder (Tree Normalizer)"]
+        AstroParse --> IRBuilder["ir.Builder (Tree Assembler)"]
         TSXParse --> IRBuilder
     end
 
-    subgraph Evaluation_Engine ["3. Zero-Alloc Traversal & Rule Evaluation"]
+    subgraph Stage3 ["3. Rule-Agnostic Traversal Stage"]
         IRBuilder --> Tree["*ir.Node (Unified AST)"]
         Tree --> Iterator["root.Walk() (Go 1.26 iter.Seq)"]
 
-        Iterator --> Dispatcher["analyzer.Engine"]
-        TokenExtractor -.-> TokenMap["OPACITY_TOKEN_MAP"]
-        TokenMap -.-> Dispatcher
+        Iterator --> Engine["analyzer.Engine\n(Pure Rule-Agnostic)"]
+        ConfigEngine --> ActiveRules["Active Rules (ActiveRule Wrappers)"]
+        ActiveRules --> Engine
 
-        Dispatcher --> Rules["rules.Registry (Active Rules)"]
-        Rules --> Evaluate["rule.Evaluate(node)"]
+        Engine --> Evaluate["rule.Evaluate(node)\n(Rule Encapsulates Token Maps)"]
         Evaluate --> RawDiags["Raw Diagnostics"]
     end
 
-    subgraph Suppression_Reporting ["4. Suppression, Sorting & Presentation"]
-        RawDiags --> IgnoreFilter["context.IsIgnored()\n(Inline Directives)"]
-        IgnoreFilter --> Sorter["Deterministic Sorter\n(File:Line:Col:Rule)"]
+    subgraph Stage4 ["4. Suppression, Total Ordering & Presentation Stage"]
+        RawDiags --> IgnoreFilter["context.IsIgnored()\n(Inline Directives & Span Scope)"]
+        IgnoreFilter --> Sorter["Deterministic Sorter\n(Total Ordering Comparator)"]
 
         Sorter --> Reporter["reporter.Reporter"]
         Reporter --> ANSI["reporter/inline.go (stdout)"]
         Reporter --> JSON["reporter/json.go (stdout)"]
-        Reporter --> Exit["Exit Code (0/1/2)"]
+        Reporter --> Exit["Exit Code Resolver (0/1/2/130)"]
     end
 ```
+
+### 1.1. Invarian Kemurnian Boundary Engine (Rule-Agnostic Substrate)
+- Engine `analyzer.Engine` **DILARANG KERAS** memiliki ketergantungan langsung ke `OPACITY_TOKEN_MAP` atau kamus token rule spesifik.
+- Seluruh logika token semantik, kelas CSS warna, dan rekomendasi hint dienkapsulasi penuh di dalam rule terkait (misal: `internal/rules/theme/hardcode_opacity_color.go`).
+- Engine murni bertindak sebagai orkestrator traversal AST yang memanggil interface `rule.Evaluate(node)`.
 
 ---
 
@@ -86,25 +89,26 @@ import (
 var update = flag.Bool("update", false, "Update golden snapshot files")
 
 func TestPipeline_GoldenSnapshots(t *testing.T) {
-    fixtures := []string{"astro_opacity", "tsx_opacity", "clean_project"}
+    if *update && os.Getenv("CI") == "true" {
+        t.Fatal("FATAL: Golden snapshots MUST NOT be updated in CI environments!")
+    }
 
-    for _, fixture := range fixtures {
-        t.Run(fixture, func(t *testing.T) {
-            fixtureDir := filepath.Join("fixtures", fixture)
-            goldenJSON := filepath.Join("golden", fixture+".golden.json")
+    scenarios := []string{"clean", "opacity_violations", "config_override", "ignore_patterns"}
+
+    for _, sc := range scenarios {
+        t.Run(sc, func(t *testing.T) {
+            projectDir := filepath.Join("fixtures", "projects", sc)
+            goldenJSON := filepath.Join("golden", "projects", sc+".golden.json")
 
             var stdout bytes.Buffer
-            // Eksekusi pemindaian end-to-end via CLI controller
-            exitCode := cli.ExecuteWithBuffer([]string{"scan", fixtureDir, "-f", "json"}, &stdout)
+            _ = cli.ExecuteWithBuffer([]string{"scan", projectDir, "-f", "json"}, &stdout)
 
-            actualBytes := stdout.Bytes()
+            // 1. Normalisasi output aktual (hilangkan runtime duration_ms untuk komparasi)
+            actualBytes := normalizeJSONForGolden(stdout.Bytes())
 
             if *update {
-                // Tulis ulang berkas golden jika -update aktif
-                err := os.WriteFile(goldenJSON, actualBytes, 0644)
-                if err != nil {
-                    t.Fatalf("failed to update golden file: %v", err)
-                }
+                _ = os.WriteFile(goldenJSON, actualBytes, 0644)
+                t.Logf("UPDATED golden file: %s", goldenJSON)
                 return
             }
 
@@ -114,7 +118,7 @@ func TestPipeline_GoldenSnapshots(t *testing.T) {
             }
 
             if !bytes.Equal(actualBytes, expectedBytes) {
-                t.Fatalf("Golden snapshot mismatch on %s!\nDiff:\n%s", fixture, computeDiff(expectedBytes, actualBytes))
+                t.Fatalf("Golden snapshot mismatch on %s!\nDiff:\n%s", sc, computeDiff(expectedBytes, actualBytes))
             }
         })
     }
@@ -123,17 +127,17 @@ func TestPipeline_GoldenSnapshots(t *testing.T) {
 
 ---
 
-## 3. Arsitektur Ketahanan Fuzzing (`tests/fuzz/`)
+## 3. Arsitektur Ketahanan Fuzzing Bertingkat (`tests/fuzz/`)
 
-Fuzzing dijalankan pada layer perantara AST dan Lexer untuk membuktikan tidak ada rekursi tak berhingga (*infinite loop*) atau *panic dereference*:
-- **Astro Splitter Resilience:** Menguji pemisahan blok frontmatter dengan kombinasi karakter tak lazim (`---` di dalam string, kutip gantung, comment HTML bersarang).
-- **TSX Visitor Resilience:** Menguji tag JSX tanpa nama, penutup tag di luar kurung, kurung kurawal kurung siku tidak seimbang.
-- **Tree Assembler Resilience:** Menguji pembuatan relasi `Parent`/`Children` pada dokumen dengan kedalaman melebihi 256 tingkat.
+Fuzzing dijalankan pada dua lapisan terpisah:
+1. **Parser-Level Fuzzing:** Memvalidasi kekebalan scanner dan extractor terhadap byte malformed murni (`astro_fuzz_test.go`, `tsx_fuzz_test.go`).
+2. **Pipeline-Level Fuzzing:** Memvalidasi aliran menyeluruh dari byte acak hingga traversal rule dan serialisasi reporter (`pipeline_fuzz_test.go`).
 
 ---
 
-## 4. Invarian Pembekuan Pipa (Core Infrastructure Freeze)
+## 4. Invarian Pembekuan Arsitektur Inti (Core Architecture Freeze)
 
-Dengan berakhirnya Fase 6:
-1. **Core Pipeline Locked:** Struktur kontrak `internal/ir`, `internal/parser`, `internal/scanner`, `internal/analyzer`, dan `internal/reporter` dinyatakan **FINAL**.
-2. **Pluggable Expansion:** Tahapan berikutnya (Fase 8) dilarang mengubah arsitektur pipa. Penambahan puluhan rule audit baru murni dilakukan dengan membuat file mandiri di `internal/rules/<domain>/` yang mengimplementasikan interface `Rule` dan mendaftarkannya ke `Registry`.
+- **Architecture Freeze $\neq$ Bug Fix Freeze:**
+  - Kontrak antarmuka `internal/ir`, `internal/parser`, `internal/scanner`, `internal/analyzer`, dan `internal/reporter` dibekukan dari perombakan arsitektural mayor.
+  - Perbaikan cacat kode (*bug fixes*), penajaman deteksi, dan peningkatan efisiensi yang mematuhi kontrak antarmuka tetap diperbolehkan.
+- **Modular Expansion:** Tahapan berikutnya (Fase 8) murni mengimplementasikan interface `Rule` di direktori terisolasi `internal/rules/<domain>/` tanpa memodifikasi pipeline engine.

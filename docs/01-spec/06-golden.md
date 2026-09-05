@@ -2,10 +2,11 @@
 
 > **Kode Dokumen:** `SPEC-06-GOLDEN`
 > **Tahapan:** Fase 6 - Validasi Penuh & Golden Snapshots (Milestone Selesai Pipa)
+> **Peran Pilar:** SPEC = WHAT (Spesifikasi Validasi Pipa Lengkap, Skema Golden Master & Fuzzing)
 > **Status:** Ready for Review
 > **Standar Rujukan:** Golden Master Testing Pattern / Go 1.26 Native Fuzzing Specification
 
-Dokumen ini mendefinisikan spesifikasi pengujian integrasi pipa compiler dari ujung ke ujung (*end-to-end pipeline*), standarisasi berkas **Golden Snapshots** (`tests/golden/*`), korpus berkas percontohan (*fixtures*), ketahanan *native fuzzing*, serta kriteria kelulusan **Gerbang Stabilitas Pipa** (*Pipeline Stability Gate*).
+Dokumen ini mendefinisikan spesifikasi pengujian integrasi pipa compiler dari ujung ke ujung (*end-to-end pipeline*), standarisasi skema kanonikal **Golden Snapshots** (`tests/golden/*`), struktur korpus berkas percontohan (*fixtures*), protokol ketahanan *native fuzzing*, serta kriteria kelulusan **Gerbang Stabilitas Pipa** (*Pipeline Stability Gate*).
 
 ---
 
@@ -13,45 +14,77 @@ Dokumen ini mendefinisikan spesifikasi pengujian integrasi pipa compiler dari uj
 
 Untuk mencegah terjadinya regresi diagnosis atau pergeseran pelaporan (*diagnostic drift*):
 
-### 1.1. Format Berkas Golden Snapshot
-Setiap skenario pemindaian uji coba wajib memiliki snapshot kebenaran mutlak (*ground truth*):
-1. **JSON Snapshot (`<scenario>.golden.json`):**
-   Menyimpan seluruh payload struktur `ScanResult` (array `diagnostics`, `summary`, `passed`) secara presisi hingga baris dan kolom.
-2. **Terminal ANSI Snapshot (`<scenario>.golden.txt`):**
-   Menyimpan representasi teks mentah yang dicetak ke terminal (termasuk kode warna ANSI atau mode teks tanpa warna) untuk memastikan tidak ada perubahan visual atau degradasi keterbacaan yang tidak disengaja.
+### 1.1. Skema Kanonikal Dokumen JSON Golden (ScanResult JSON v1)
+Setiap berkas snapshot JSON (`<scenario>.golden.json`) mematuhi skema kanonikal tunggal:
 
-### 1.2. Mekanisme Pembaruan Terkontrol (`-update` Flag)
-- Secara bawaan, eksekusi `go test ./tests/...` membandingkan output scanner terkini dengan isi berkas `.golden.*`.
-- Jika terdapat perbedaan sekecil apapun (pergeseran nomor baris, perubahan kata pesan, dsb.), test **MUST FAIL**.
-- Pembaruan berkas golden snapshot hanya diizinkan jika pengembang menambahkan flag eksplisit:
+```json
+{
+  "schema_version": 1,
+  "tool_version": "1.0.0",
+  "summary": {
+    "scanned_files": 28,
+    "error_count": 1,
+    "warning_count": 1,
+    "info_count": 0,
+    "passed": false
+  },
+  "diagnostics": [
+    {
+      "file": "src/pages/index.astro",
+      "line": 14,
+      "column": 8,
+      "rule": "theme.hardcode-opacity-color",
+      "category": "theme",
+      "severity": "error",
+      "message": "Hardcode opacity color: \"bg-primary/10\"",
+      "hint": "Use semantic token \"primary-light\"."
+    }
+  ]
+}
+```
+
+### 1.2. Isolasi Metadata Non-Deterministik (`duration_ms`)
+- Nilai `duration_ms` merupakan stopwatch runtime yang bervariasi di setiap eksekusi mesin.
+- **Invarian Komparasi Golden:** Selama evaluasi uji snapshot golden, field `duration_ms` dinormalisasi (dihilangkan atau diatur ke nilai konstan 0) sehingga pengujian regresi murni memverifikasi semantik diagnosis, bukan fluktuasi CPU.
+
+### 1.3. Format Terminal Text Snapshot (`<scenario>.golden.txt`)
+- Menyimpan representasi visual pelaporan teks terminal.
+- **Normalisasi Lintas Platform:** Wajib menggunakan encoding UTF-8, pemisah baris LF murni (`\n`, bukan `\r\n`), dan path POSIX forward slash (`/`).
+- Disimpan dalam mode `ColorNever` untuk menjamin kesetaraan biner lintas runner CI (Linux, macOS, Windows).
+
+### 1.4. Mekanisme Pembaruan Terkontrol (`-update` Flag)
+- Secara bawaan, eksekusi `go test ./tests/...` membandingkan output scanner terkini dengan berkas `.golden.*`. Jika terdapat perbedaan sekecil apa pun, test **MUST FAIL**.
+- Pembaruan berkas golden snapshot hanya diizinkan via flag lokal eksplisit:
   ```bash
-  go test ./tests/... -run TestGolden -update
+  go test ./tests/... -run TestPipeline_GoldenSnapshots -update
   ```
-- Setiap perubahan pada berkas golden snapshot **MUST** ditinjau dalam git diff sebelum di-commit.
+- **Larangan CI:** Lingkungan CI **DILARANG KERAS** menjalankan test dengan flag `-update`.
+- Ketika `-update` dijalankan, harness wajib mencetak daftar berkas yang diperbarui dan menginstruksikan pengembang untuk meninjau `git diff` sebelum melakukan commit.
 
 ---
 
-## 2. Spesifikasi Korpus Fixtures Komprehensif (`tests/fixtures/`)
+## 2. Struktur Korpus Fixtures Terstandarisasi (`tests/fixtures/`)
 
-Direktori fixture merepresentasikan variasi kode dunia nyata yang akan dipindai oleh Charites:
+Direktori fixtures memisahkan sampel level berkas dan sampel level proyek:
 
-### 2.1. Korpus Astro (`tests/fixtures/astro/`)
-- `clean.astro`: Komponen Astro bersih yang mematuhi seluruh aturan desain (token semantik, accessible markup).
-- `opacity_violations.astro`: Komponen yang memuat variasi kelas terlarang: `bg-primary/10`, `border-destructive/20`, `text-accent/5`.
-- `complex_frontmatter.astro`: Komponen dengan blok `---` lebih dari 50 baris untuk memvalidasi presisi line offset.
-- `inline_ignore.astro`: Komponen dengan komentar `<!-- charites:ignore theme.hardcode-opacity-color -->`.
-- `nested_slots.astro`: Template bersarang kompleks dengan `<slot />` dan komponen Astro internal.
-
-### 2.2. Korpus TSX / JSX (`tests/fixtures/tsx/`)
-- `clean.tsx`: Komponen React bersih tanpa pelanggaran.
-- `opacity_violations.tsx`: Komponen dengan pelanggaran pada atribut `className`.
-- `template_literals.tsx`: Komponen yang memanfaatkan string backtick: `` `p-4 ${active ? "bg-primary/10" : ""}` ``.
-- `inline_ignore.tsx`: Komponen dengan komentar `// charites:ignore theme.hardcode-opacity-color`.
-
-### 2.3. Korpus Konfigurasi & CSS (`tests/fixtures/config/`)
-- `global.css`: Definisi blok `@theme` resmi Tailwind CSS v4.
-- `charites.yaml`: Contoh konfigurasi override status dan penambahan ignore path.
-- `.charitesignore`: Contoh pola pengabaian file dan direktori kustom.
+```
+tests/fixtures/
+├── astro/                  # Sampel komponen Astro individual
+│   ├── clean.astro
+│   ├── opacity_violations.astro
+│   ├── complex_frontmatter.astro
+│   └── inline_ignore.astro
+├── tsx/                    # Sampel komponen React TSX individual
+│   ├── clean.tsx
+│   ├── opacity_violations.tsx
+│   ├── template_literals.tsx
+│   └── inline_ignore.tsx
+└── projects/               # Sampel repositori mini terintegrasi
+    ├── clean/              # Repositori bersih (Zero Noise Invariant)
+    ├── opacity_violations/ # Repositori dengan beragam pelanggaran
+    ├── config_override/    # Repositori dengan charites.yaml overrides
+    └── ignore_patterns/    # Repositori dengan .charitesignore & inline ignore
+```
 
 ---
 
@@ -59,20 +92,21 @@ Direktori fixture merepresentasikan variasi kode dunia nyata yang akan dipindai 
 
 Untuk memastikan parser dan IR builder kebal dari input acak (*chaos resilience*):
 
-1. **Target Fuzzing:**
-   - `FuzzAstroPipeline`: Mengalirkan byte acak ke Astro frontmatter splitter, HTML lexer, hingga IR builder.
-   - `FuzzTSXPipeline`: Mengalirkan byte acak ke TSX JSX visitor hingga IR builder.
-2. **Invarian Tanpa Panic:**
-   Input apapun-termasuk kode HTML tidak ditutup, kutipan gantung, sintaks JavaScript cacat, atau byte biner acak-**DILARANG KERAS** memicu panic di Go runtime. Parser wajib pulih secara anggun (*graceful recovery*).
-3. **Durasi Eksekusi CI:**
-   Fuzz testing wajib dijalankan minimal **60 detik per modul** sebelum rilis binary.
+1. **Dua Tingkat Pengujian Fuzzing:**
+   - **Level 1 (Parser Invariants):** `FuzzAstroParser` dan `FuzzTSXParser` (dari Fase 2) untuk membuktikan ketahanan lexer/parser murni.
+   - **Level 2 (Pipeline Integration):** `FuzzAstroPipeline` dan `FuzzTSXPipeline` untuk menguji aliran penuh (Parser $\rightarrow$ IR $\rightarrow$ Engine Traversal $\rightarrow$ Sorting).
+2. **Kriteria Kelulusan Fuzzing:**
+   Target fuzzing wajib berjalan terus-menerus selama minimal **60 detik per modul** tanpa memicu panic runtime, fatal error stack overflow, atau penghentian abnormal proses Go.
 
 ---
 
 ## 4. Kriteria Kelulusan Gerbang Stabilitas Pipa (Stability Gate)
 
-Fase 6 adalah titik balik arsitektur Charites. Seluruh pipa pemindaian dinyatakan **SELESAI & STABIL** jika:
-1. Seluruh pengujian Golden Snapshot lulus 100%.
-2. Pengujian Fuzzing lulus tanpa crash.
-3. Seluruh alur CLI (Fase 5) terbukti terhubung mulus dengan Scanner (Fase 4), Rules (Fase 3), Parser (Fase 2), dan IR (Fase 1).
-4. Binary dikunci (*locked*) dan siap memasuki Fase 7 (Ekosistem MCP & Wiki) dan Fase 8 (Ekspansi 30+ Rules).
+Fase 6 adalah titik pembekuan pipa compiler inti:
+1. Seluruh pengujian Golden Master lulus 100%.
+2. Pengujian Fuzzing lulus $\ge 60\text{ detik}$ tanpa crash.
+3. Seluruh alur CLI terbukti terhubung mulus dengan Engine, Rules, Parser, dan IR.
+4. **Pembekuan Arsitektur Inti (Architecture Freeze $\neq$ Bug Fix Freeze):**
+   - Batas antarmuka modul inti (`internal/ir`, `internal/parser`, `internal/scanner`, `internal/analyzer`, `internal/reporter`) dibekukan dari perombakan struktural.
+   - Perbaikan bug (*bug fixes*) dan optimasi non-breaking yang mematuhi kontrak tetap diizinkan.
+   - Penambahan rule baru di Fase 8 murni bersifat modular (*pluggable rules*) tanpa memodifikasi engine inti.

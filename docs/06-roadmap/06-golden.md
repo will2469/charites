@@ -19,15 +19,15 @@ Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) serta deklarasi pemb
 1. **`tests/fixtures/`**: Direktori korpus berkas percontohan dunia nyata yang mencakup:
    - `astro/`: Kasus pelanggaran opacity, line offset frontmatter panjang, inline ignore, dan komponen bersih.
    - `tsx/`: Kasus pelanggaran atribut JSX, template literals, inline ignore, dan komponen bersih.
-   - `config/`: Berkas `global.css` (@theme Tailwind v4), `charites.yaml`, dan `.charitesignore`.
-2. **`tests/golden/`**: Kumpulan berkas snapshot kebenaran mutlak:
-   - `astro_opacity.golden.json` & `astro_opacity.golden.txt`
-   - `tsx_opacity.golden.json` & `tsx_opacity.golden.txt`
-   - `clean_project.golden.json` & `clean_project.golden.txt`
+   - `projects/`: Sampel repositori mini (`clean/`, `opacity_violations/`, `config_override/`, `ignore_patterns/`).
+2. **`tests/golden/projects/`**: Kumpulan berkas snapshot kebenaran mutlak:
+   - `clean.golden.json` & `clean.golden.txt`
+   - `opacity_violations.golden.json` & `opacity_violations.golden.txt`
    - `config_override.golden.json` & `config_override.golden.txt`
-3. **`tests/golden_test.go`**: Suite pengujian regresi snapshot otomatis dengan dukungan flag pembaruan `-update`.
-4. **`tests/fuzz/`**: Native fuzzing suite Go 1.26 (`astro_fuzz_test.go`, `tsx_fuzz_test.go`).
-5. **`tests/benchmark_test.go`**: Pengujian benchmark latensi pemindaian menyeluruh (*end-to-end latency benchmark*).
+   - `ignore_patterns.golden.json` & `ignore_patterns.golden.txt`
+3. **`tests/golden_test.go`**: Suite pengujian regresi snapshot otomatis dengan dukungan flag pembaruan lokal `-update`.
+4. **`tests/fuzz/`**: Native fuzzing suite Go 1.26 bertingkat (`astro_fuzz_test.go`, `tsx_fuzz_test.go`, `pipeline_fuzz_test.go`).
+5. **`tests/benchmark_test.go`**: Pengujian benchmark latensi pemindaian menyeluruh (`BENCH-06-E2E-001`).
 
 ---
 
