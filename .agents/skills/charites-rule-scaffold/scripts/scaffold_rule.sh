@@ -38,7 +38,7 @@ TITLE_CASE_NAME=$(echo "${SLUG//-/ }" | sed -e 's/\b\(.\)/\u\1/g')
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 RULES_DIR="${REPO_ROOT}/internal/rules"
-CORPUS_DIR="${REPO_ROOT}/tests/correctness/${RULE_ID}"
+CORPUS_DIR="${REPO_ROOT}/tests/correctness/${CATEGORY}/${SLUG}"
 WIKI_FILE="${REPO_ROOT}/wiki/${RULE_ID}.md"
 
 echo "=== Scaffolding Charites Rule: ${RULE_ID} ==="
@@ -130,4 +130,4 @@ echo "1. Register in internal/rules/registry.go:"
 echo "     registry.Register(New${STRUCT_NAME}())"
 echo "2. Implement pattern inspection in internal/rules/${RULE_FILE_NAME}"
 echo "3. Run golden corpus test:"
-echo "     go test -v ./tests/correctness/${RULE_ID}/..."
+echo "     go test -v ./tests/correctness/${CATEGORY}/${SLUG}/..."

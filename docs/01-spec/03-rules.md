@@ -140,7 +140,7 @@ Jika ditemukan pelanggaran pada `node`:
 
 ---
 
-## 4. Spesifikasi Argus Tri-Corpus (`tests/correctness/theme.hardcode-opacity-color/`)
+## 4. Spesifikasi Argus Tri-Corpus (`tests/correctness/theme/hardcode-opacity-color/`)
 
 Pengujian semantik rule ini **MUST** dibagi ke dalam 3 sub-korpus terpisah:
 

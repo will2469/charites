@@ -1,0 +1,12 @@
+---
+// Basic Astro component with direct hardcoded opacity colors
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+---
+
+<div class="card p-6 rounded-xl bg-primary/10 border border-destructive/20">
+  <h2 class="text-xl font-bold text-primary/20">{title}</h2>
+  <span class="badge ring-1 ring-warning/10 bg-primary/5">Warning Badge</span>
+</div>

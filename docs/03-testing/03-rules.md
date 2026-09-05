@@ -12,10 +12,10 @@ Dokumen ini mendefinisikan strategi pengujian ketat untuk modul rule Charites, m
 
 ## 1. Metodologi Argus Tri-Corpus & Pemisahan Tanggung Jawab
 
-Setiap rule diuji terhadap 3 sub-korpus di bawah direktori `tests/correctness/<rule_id>/`:
+Setiap rule diuji terhadap 3 sub-korpus di bawah direktori `tests/correctness/<category>/<slug>/`:
 
 ```text
-tests/correctness/theme.hardcode-opacity-color/
+tests/correctness/theme/hardcode-opacity-color/
 ├── positive/      # True Positives: Kasus pelanggaran nyata (termasuk varian Tailwind)
 │   ├── basic.astro
 │   └── variants.tsx

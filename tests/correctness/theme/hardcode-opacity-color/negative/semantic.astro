@@ -1,0 +1,12 @@
+---
+// Astro component using compliant official semantic tokens
+interface Props {
+  heading: string;
+}
+const { heading } = Astro.props;
+---
+
+<div class="card p-6 rounded-xl bg-primary-light border border-destructive-light">
+  <h2 class="text-xl font-bold text-muted">{heading}</h2>
+  <span class="badge ring-1 ring-warning-light bg-primary-subtle">Semantic Badge</span>
+</div>
