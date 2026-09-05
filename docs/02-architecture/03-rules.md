@@ -2,10 +2,11 @@
 
 > **Kode Dokumen:** `ARCH-03-RULES`
 > **Tahapan:** Fase 3 - Rule Contract & Proving Ground Rule (`theme.hardcode-opacity-color`)
-> **Status:** Ready for Review
+> **Peran Pilar:** ARCH = HOW (Rancangan Engine Rule, Registri Deterministik & Normalisasi Varian)
+> **Status:** Ready for Execution
 > **Standar Rujukan:** Micro-Kernel Rule Engine Architecture & Zero-Circular Dependency Pattern
 
-Dokumen ini mendefinisikan arsitektur internal dari layer rule Charites (`internal/rules/*`), mekanisme registri in-memory thread-safe (`sync.RWMutex`), integrasi evaluasi murni berbasis `ir.Node`, serta arsitektur proving ground rule pertama: **`theme.hardcode-opacity-color`**.
+Dokumen ini mendefinisikan arsitektur internal dari layer rule Charites (`internal/rules/*`), mekanisme registri in-memory thread-safe (`sync.RWMutex`) dengan urutan deterministik, integrasi evaluasi murni berbasis `ir.Node`, serta mekanisme normalisasi varian leksikal pada rule pertama: **`theme.hardcode-opacity-color`**.
 
 ---
 
@@ -23,16 +24,18 @@ flowchart TD
 
     subgraph Rules_Kernel ["Rule Engine (internal/rules)"]
         RuleInterface["Rule Interface\n(ID, Category, Evaluate)"]
-        Registry["In-Memory Registry\n(sync.RWMutex, Fast O(1) Lookup)"]
+        Registry["In-Memory Registry\n(sync.RWMutex, Fast O(1) Lookup, Sorted Output)"]
 
         subgraph Proving_Ground ["Rule Proving Ground"]
             RuleTheme["theme/hardcode_opacity_color.go\n(theme.hardcode-opacity-color)"]
+            VariantStripper["Lexical Normalizer\n(Strips hover:, dark:, md: etc.)"]
             Map["OPACITY_TOKEN_MAP\n(Pre-compiled Semantic Lookup)"]
         end
     end
 
     subgraph Engine_Consumer ["Consumer (internal/analyzer - Fase 4)"]
         Engine["Analyzer Traversal Engine\n(iter.Seq[*ir.Node] Walk)"]
+        IgnoreFilter["Ignore Suppression Layer\n(Filters charites:ignore)"]
     end
 
     Node -->|Input Argument| RuleInterface
@@ -40,10 +43,12 @@ flowchart TD
     RuleInterface -->|Specifies Default| Severity
 
     RuleTheme -.->|Implements| RuleInterface
-    RuleTheme --> Map
+    RuleTheme --> VariantStripper
+    VariantStripper --> Map
     Registry -->|Registers & Queries| RuleInterface
-    Engine -->|Queries Active Rules| Registry
+    Engine -->|Queries Active Rules (Sorted)| Registry
     Engine -->|Calls Evaluate() on Tree Nodes| RuleTheme
+    RuleTheme -->|Raw Diagnostics| IgnoreFilter
 ```
 
 ### Invarian Ketergantungan Bebas Sirkular:
@@ -59,7 +64,7 @@ internal/analyzer (Mengimpor internal/ir dan internal/rules)
 
 ---
 
-## 2. Arsitektur In-Memory Registry (`internal/rules/registry.go`)
+## 2. Arsitektur In-Memory Registry Deterministik (`internal/rules/registry.go`)
 
 Registry bertindak sebagai Single Source of Truth (SSOT) katalog seluruh rule yang terkompilasi ke dalam binary Charites:
 
@@ -68,13 +73,14 @@ package rules
 
 import (
     "fmt"
+    "sort"
     "sync"
 )
 
 type Registry struct {
     mu         sync.RWMutex
-    rules      map[string]Rule            // Key: Semgrep ID (misal: "theme.hardcode-opacity-color")
-    categories map[string][]Rule          // Index kategori: "theme" -> []Rule
+    rules      map[string]Rule   // Key: Charites Rule ID (misal: "theme.hardcode-opacity-color")
+    categories map[string][]Rule // Index kategori: "theme" -> []Rule
 }
 
 func NewRegistry() *Registry {
@@ -112,6 +118,10 @@ func (r *Registry) All() []Rule {
     for _, rule := range r.rules {
         list = append(list, rule)
     }
+    // Menjamin urutan deterministik berdasarkan Rule ID
+    sort.Slice(list, func(i, j int) bool {
+        return list[i].ID() < list[j].ID()
+    })
     return list
 }
 
@@ -121,33 +131,49 @@ func (r *Registry) ByCategory(category string) []Rule {
     rules := r.categories[category]
     out := make([]Rule, len(rules))
     copy(out, rules)
+    sort.Slice(out, func(i, j int) bool {
+        return out[i].ID() < out[j].ID()
+    })
     return out
 }
 ```
 
 ### Karakteristik Desain:
-1. **Thread-Safety Penuh:** Registrasi dilakukan pada saat inisialisasi binary (`init()` atau builder bootstrap). Pembacaan (`Get`, `All`, `ByCategory`) dilindungi oleh `sync.RWMutex` sehingga aman diakses serentak oleh ribuan goroutine worker pool.
-2. **$O(1)$ Lookup:** Pencarian rule berdasarkan ID string Semgrep berjalan konstan melalui hashmap.
-3. **Penyalinan Slice Defensif:** Metode `ByCategory` dan `All` mengembalikan salinan slice (*defensive copy*) untuk mencegah mutasi eksternal pada struktur data internal registri.
+1. **Thread-Safety Penuh:** Registrasi dilakukan pada saat inisialisasi binary (`init()` atau builder bootstrap). Pembacaan (`Get`, `All`, `ByCategory`) dilindungi oleh `sync.RWMutex`.
+2. **Deterministic Output:** Karena iterasi map Go bersifat acak, `All()` dan `ByCategory()` wajib melakukan pengurutan leksikografis berdasarkan `rule.ID()`, memastikan reproduktibilitas urutan diagnosis.
+3. **Penyalinan Slice Defensif:** Mengembalikan salinan slice (*defensive copy*) untuk mencegah efek samping mutasi eksternal.
 
 ---
 
 ## 3. Arsitektur Rule Proving Ground: `theme.hardcode-opacity-color`
 
-Rule `theme.hardcode-opacity-color` dirancang sebagai cetak biru (*reference blueprint*) untuk seluruh rule audit berikutnya.
-
 ### 3.1. Struktur Modul
 ```text
 internal/rules/
 ├── rule.go                         # Definisi interface Rule & Severity mapper
-├── registry.go                     # Registry katalog in-memory
-├── registry_test.go                # Unit test registry concurrency & error handling
+├── registry.go                     # Registry katalog in-memory deterministik
+├── registry_test.go                # Unit test registry concurrency & sorting determinism
 └── theme/
-    ├── hardcode_opacity_color.go      # Logika evaluasi rule #1
+    ├── hardcode_opacity_color.go      # Logika evaluasi & lexical normalizer
     └── hardcode_opacity_color_test.go # Unit test table-driven & benchmark
 ```
 
-### 3.2. Alur Eksekusi Evaluasi (`Evaluate`)
+### 3.2. Normalisasi Varian Leksikal (*Variant Stripping*)
+Sebelum melakukan pencocokan utility dasar, rule memisahkan varian Tailwind (seperti `hover:`, `dark:`, `md:`, `focus:`) tanpa memerlukan parser CSS penuh:
+
+```go
+func stripVariants(token string) string {
+    // Memotong seluruh prefix variant hingga ke utility dasar
+    // Contoh: "md:hover:bg-primary/10" -> "bg-primary/10"
+    lastColon := strings.LastIndexByte(token, ':')
+    if lastColon >= 0 && lastColon < len(token)-1 {
+        return token[lastColon+1:]
+    }
+    return token
+}
+```
+
+### 3.3. Alur Eksekusi Evaluasi (`Evaluate`)
 
 ```mermaid
 flowchart TD
@@ -157,13 +183,14 @@ flowchart TD
 
     LoopClasses --> CheckSlash{"Mengandung karakter '/'?"}
     CheckSlash -- Tidak --> NextClass["Lanjut ke token berikutnya"]
-    CheckSlash -- Ya --> MatchPrefix{"Cocok prefix utility?\n(bg-, text-, border-, ring-)"}
+    CheckSlash -- Ya --> StripVar["Normalisasi Varian: stripVariants(token)"]
+    StripVar --> MatchPrefix{"Cocok prefix utility?\n(bg-, text-, border-, ring-)"}
 
     MatchPrefix -- Tidak --> NextClass
     MatchPrefix -- Ya --> MapLookup{"Key ada di OPACITY_TOKEN_MAP?"}
 
     MapLookup -- Tidak --> NextClass
-    MapLookup -- Ya --> EmitDiag["Buat ir.Diagnostic\n(Span line:col, Semgrep ID, Pesan & Hint)"]
+    MapLookup -- Ya --> EmitDiag["Buat ir.Diagnostic Dinamis:\nMsg: Hardcode opacity color: <original_class>\nHint: Use semantic token <replacement>"]
     EmitDiag --> Collect["Append ke slice []ir.Diagnostic"]
     Collect --> NextClass
 
@@ -172,19 +199,10 @@ flowchart TD
     MoreClasses -- Tidak --> ReturnDiags(["Return []ir.Diagnostic"])
 ```
 
-### 3.3. Optimasi Kinerja Evaluasi (Zero Heap Allocation pada Kasus Bersih)
-- **Fast Path:** Jika `len(node.Classes) == 0`, fungsi langsung mengembalikan `nil` tanpa alokasi memori.
-- **Fast Character Scan:** Sebelum menjalankan regex atau map lookup, periksa keberadaan byte `/` menggunakan `strings.IndexByte(class, '/')`. Utilitas tanpa slash seperti `p-4`, `flex`, `text-center` langsung diabaikan dalam $O(1)$ CPU cycle.
-- **Pre-compiled Map:** Pasangan token slash dan pengganti semantiknya dimuat dalam in-memory lookup map global (`OPACITY_TOKEN_MAP`), menghindari operasi parsing CSS berulang saat evaluasi node.
-
 ---
 
-## 4. Siklus Hidup dan Integrasi dengan Traversal Engine
+## 4. Pemisahan Tanggung Jawab: Evaluasi vs Pengabaian Direktif (*Separation of Concerns*)
 
-Meskipun Traversal Engine baru diimplementasikan pada Fase 4 (`internal/analyzer/engine.go`), kontrak integrasinya diikat pada fase ini:
+1. **Tanggung Jawab Rule:** Fungsi `rule.Evaluate(node)` murni membandingkan token terhadap `OPACITY_TOKEN_MAP` dan menghasilkan diagnosis mentah. Rule **TIDAK PERLU** memeriksa komentar ignore `charites:ignore`.
+2. **Tanggung Jawab Engine Analyzer (Fase 4):** Lapisan engine traversal menerima diagnosis dari rule, memeriksa keberadaan direktif ignore pada node atau scope terkait, lalu menyaring (*suppress*) temuan yang diabaikan sebelum dikirim ke reporter.
 
-1. Engine memuat AST Unified Tree (`*ir.Node`).
-2. Engine mengkueri seluruh rule aktif dari `Registry` (memperhitungkan filter `--category`, `--rule`, dan `charites.yaml`).
-3. Menggunakan iterator Go 1.26 `node.Walk()`, setiap node diserahkan ke `rule.Evaluate(node)`.
-4. Jika `node` memiliki flag `Ignore` yang cocok dengan Semgrep ID rule (`// charites:ignore theme.hardcode-opacity-color`), diagnostic yang dihasilkan langsung disaring (*dropped*).
-5. Diagnostic yang valid dikumpulkan ke dalam buffer pelaporan.

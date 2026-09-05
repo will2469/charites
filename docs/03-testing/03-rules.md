@@ -2,161 +2,109 @@
 
 > **Kode Dokumen:** `TEST-03-RULES`
 > **Tahapan:** Fase 3 - Rule Contract & Proving Ground Rule (`theme.hardcode-opacity-color`)
-> **Status:** Ready for Review
+> **Peran Pilar:** TEST = PROOF (Harness Pengujian, Skenario Smoke & Asersi Pembuktian)
+> **Status:** Ready for Execution
 > **Standar Rujukan:** Argus Tri-Corpus Semantic Verification & Table-Driven Unit Testing
 
-Dokumen ini mendefinisikan strategi pengujian ketat untuk modul rule Charites, mencakup **Argus Tri-Corpus Semantic Verification**, verifikasi regresi unit testing, dan pengujian konkurensi registri in-memory.
+Dokumen ini mendefinisikan strategi pengujian ketat untuk modul rule Charites, mencakup **Argus Tri-Corpus Semantic Verification**, matriks pembuktian batas deteksi (*boundary matrix*), dan pengujian determinisme registri in-memory.
 
 ---
 
-## 1. Metodologi Argus Tri-Corpus Semantic Verification
+## 1. Metodologi Argus Tri-Corpus & Pemisahan Tanggung Jawab
 
-Setiap rule yang diimplementasikan pada Charites wajib lolos uji 3 sub-korpus terpisah di bawah direktori `tests/correctness/<rule_id>/`:
+Setiap rule diuji terhadap 3 sub-korpus di bawah direktori `tests/correctness/<rule_id>/`:
 
 ```text
 tests/correctness/theme.hardcode-opacity-color/
-├── positive/      # True Positives: Kasus pelanggaran nyata
+├── positive/      # True Positives: Kasus pelanggaran nyata (termasuk varian Tailwind)
 │   ├── basic.astro
-│   └── complex.tsx
+│   └── variants.tsx
 ├── negative/      # True Negatives: Kasus legal (Zero Noise Invariant)
 │   ├── semantic.astro
 │   └── clean.tsx
-└── adversarial/   # False Positive Bait: Pola jebakan mirip tapi sah
+└── adversarial/   # False Positive Bait: Jebakan slash non-warna & out-of-scope utilities
     ├── slash_layout.astro
     ├── line_height.tsx
-    └── ignored.astro
+    ├── arbitrary_color.tsx
+    └── unmapped_opacity.astro
 ```
 
-### 1.1. Metrik Kelulusan Evaluasi (`RuleCorrectnessMetric`)
-Sebuah rule dinyatakan **CORRECT & VERIFIED** jika dan hanya jika:
+### 1.1. Pemisahan Pengujian (Rule Correctness vs Suppression):
+1. **Rule Correctness:** Menguji fungsi murni `rule.Evaluate(node)` terhadap token kelas untuk memastikan hanya pola yang memiliki pengganti semantik yang dilaporkan.
+2. **Suppression Correctness:** Pengujian pemfilteran komentar `charites:ignore` diisolasi pada layer engine analyzer (Fase 4), memastikan rule murni bebas dari dependensi parser komentar.
+
+### 1.2. Metrik Kelulusan Evaluasi (`RuleCorrectnessMetric`):
 ```text
 Pass = (PositiveViolations > 0) && (NegativeViolations == 0) && (AdversarialViolations == 0)
 ```
-- **Zero Noise Invariant:** `NegativeViolations == 0`. Tidak boleh ada peringatan/error palsu pada kode yang mematuhi pedoman.
-- **Bait Immunity Invariant:** `AdversarialViolations == 0`. Kode yang menggunakan utilitas slash non-warna atau diberi inline ignore tidak boleh memicu diagnostic.
 
 ---
 
-## 2. Test Harness Otomatis Tri-Corpus (`tests/correctness_gate_test.go`)
+## 2. Matriks Uji Lengkap (Boundary & Correctness Matrix)
 
-Runner pengujian memuat AST dan mengevaluasi rule terhadap ketiga sub-korpus secara otomatis:
+Matriks berikut mengunci batas fungsional Rule #1:
+
+| Pola Input Class | Klasifikasi | Ekspektasi Deteksi | Ekspektasi Diagnostic / Hint |
+| :--- | :---: | :---: | :--- |
+| `bg-primary/10` | In-Scope |  Violation | Hint: `Use semantic token "primary-light".` |
+| `text-primary/20` | In-Scope |  Violation | Hint: `Use semantic token "primary-light".` |
+| `border-destructive/20` | In-Scope |  Violation | Hint: `Use semantic token "destructive-light".` |
+| `ring-warning/10` | In-Scope |  Violation | Hint: `Use semantic token "warning-light".` |
+| `bg-primary/5` | In-Scope |  Violation | Hint: `Use semantic token "primary-subtle".` |
+| `hover:bg-primary/10` | In-Scope (Variant) |  Violation | Hint: `Use semantic token "primary-light".` |
+| `dark:bg-primary/10` | In-Scope (Variant) |  Violation | Hint: `Use semantic token "primary-light".` |
+| `md:hover:bg-primary/10` | In-Scope (Chained) |  Violation | Hint: `Use semantic token "primary-light".` |
+| `bg-primary-light` | Negative (Clean) |  Pass (0 diag) | Token semantik resmi |
+| `bg-primary-subtle` | Negative (Clean) |  Pass (0 diag) | Token semantik resmi |
+| `text-muted` | Negative (Clean) |  Pass (0 diag) | Token semantik resmi |
+| `w-1/2`, `h-1/3`, `max-w-1/2` | Out-of-Scope |  Pass (0 diag) | Pecahan dimensi tata letak |
+| `aspect-16/9`, `aspect-4/3` | Out-of-Scope |  Pass (0 diag) | Rasio aspek CSS |
+| `grid-cols-2/3` | Out-of-Scope |  Pass (0 diag) | Fraksi template grid |
+| `text-sm/6`, `text-xs/relaxed` | Out-of-Scope |  Pass (0 diag) | Modifier line-height typography |
+| `bg-primary/30`, `bg-primary/50` | Out-of-Scope |  Pass (0 diag) | Opacity tanpa pemetaan token resmi |
+| `bg-primary/100`, `bg-primary/[0.1]` | Out-of-Scope |  Pass (0 diag) | Format nilai arbitrary / non-mapped |
+| `bg-[#123456]/10` | Out-of-Scope |  Pass (0 diag) | Arbitrary hex color (tanpa token pengganti) |
+| `bg-red-500/10` | Out-of-Scope |  Pass (0 diag) | Raw palette color (milik rule terpisah) |
+| `bg-black/10` | Out-of-Scope |  Pass (0 diag) | Raw black color (milik rule terpisah) |
+
+---
+
+## 3. Pengujian In-Memory Registry (`internal/rules/registry_test.go`)
+
+Registry diuji terhadap thread-safety dan **stabilitas urutan deterministik**:
 
 ```go
-package tests
-
-import (
-    "os"
-    "path/filepath"
-    "testing"
-
-    "github.com/will2469/charites/internal/parser/astro"
-    "github.com/will2469/charites/internal/parser/tsx"
-    "github.com/will2469/charites/internal/rules"
-    "github.com/will2469/charites/internal/rules/theme"
-)
-
-func TestTriCorpus_ThemeHardcodeOpacityColor(t *testing.T) {
-    rule := theme.NewHardcodeOpacityColorRule()
-    baseDir := filepath.Join("correctness", rule.ID())
-
-    // 1. Verifikasi Positive Corpus (Wajib mendeteksi pelanggaran)
-    t.Run("Positive_Corpus", func(t *testing.T) {
-        files := loadTestFiles(t, filepath.Join(baseDir, "positive"))
-        totalDiags := runRuleOnFiles(t, rule, files)
-        if totalDiags == 0 {
-            t.Fatalf("Rule %s GAGAL mendeteksi pelanggaran pada positive corpus", rule.ID())
-        }
-    })
-
-    // 2. Verifikasi Negative Corpus (Wajib 0 pelanggaran - Zero Noise)
-    t.Run("Negative_Corpus", func(t *testing.T) {
-        files := loadTestFiles(t, filepath.Join(baseDir, "negative"))
-        totalDiags := runRuleOnFiles(t, rule, files)
-        if totalDiags != 0 {
-            t.Fatalf("Rule %s menghasilkan false positive (%d temuan) pada negative corpus", rule.ID(), totalDiags)
-        }
-    })
-
-    // 3. Verifikasi Adversarial Corpus (Wajib 0 pelanggaran - Bait Immunity)
-    t.Run("Adversarial_Corpus", func(t *testing.T) {
-        files := loadTestFiles(t, filepath.Join(baseDir, "adversarial"))
-        totalDiags := runRuleOnFiles(t, rule, files)
-        if totalDiags != 0 {
-            t.Fatalf("Rule %s termakan jebakan false positive (%d temuan) pada adversarial corpus", rule.ID(), totalDiags)
-        }
-    })
-}
-```
-
----
-
-## 3. Matriks Kasus Uji `theme.hardcode-opacity-color`
-
-### 3.1. Positive Test Cases
-| Input Class | Deteksi Pelanggaran | Rekomendasi Hint |
-| :--- | :---: | :--- |
-| `bg-primary/10` | Ya | `primary-light` |
-| `border-destructive/20` | Ya | `destructive-light` |
-| `text-accent/5` | Ya | `accent-subtle` |
-| `ring-warning/10` | Ya | `warning-light` |
-| `bg-secondary/10` | Ya | `muted-light` |
-
-### 3.2. Negative Test Cases (Valid & Sah)
-| Input Class | Alasan Valid |
-| :--- | :--- |
-| `bg-primary-light` | Token semantik resmi dari `global.css` |
-| `border-destructive-light` | Token semantik resmi dari `global.css` |
-| `text-muted-subtle` | Token semantik resmi dari `global.css` |
-| `p-4 flex flex-col gap-2` | Utilitas tata letak standar tanpa relasi warna |
-
-### 3.3. Adversarial Test Cases (Jebakan Slash Non-Warna)
-| Input Class | Sifat Jebakan | Ekspektasi |
-| :--- | :--- | :---: |
-| `w-1/2`, `h-1/3`, `w-2/3` | Slash digunakan untuk rasio lebar/tinggi pecahan | **Abaikan (0 diag)** |
-| `aspect-16/9`, `aspect-4/3` | Slash digunakan untuk rasio aspek | **Abaikan (0 diag)** |
-| `grid-cols-2/3` | Slash digunakan untuk grid template column | **Abaikan (0 diag)** |
-| `text-xs/relaxed`, `text-sm/6` | Slash digunakan untuk modifier line-height Tailwind | **Abaikan (0 diag)** |
-| `bg-primary/10` + inline ignore | Terdapat comment `// charites:ignore theme.hardcode-opacity-color` | **Abaikan (0 diag)** |
-
----
-
-## 4. Pengujian Registri In-Memory (`internal/rules/registry_test.go`)
-
-Paket registri diuji terhadap keandalan konkurensi dan validitas integritas data:
-
-```go
-func TestRegistry_Concurrency(t *testing.T) {
+func TestRegistry_DeterministicOrder(t *testing.T) {
     reg := rules.NewRegistry()
-    rule := theme.NewHardcodeOpacityColorRule()
-    _ = reg.Register(rule)
+    // Daftarkan rule secara acak
+    _ = reg.Register(&mockRule{id: "theme.hardcode-palette-color"})
+    _ = reg.Register(&mockRule{id: "a11y.missing-alt"})
+    _ = reg.Register(&mockRule{id: "theme.hardcode-opacity-color"})
 
-    const workers = 50
-    var wg sync.WaitGroup
-    wg.Add(workers)
-
-    for i := 0; i < workers; i++ {
-        go func() {
-            defer wg.Done()
-            // Akses serentak get & list dilarang race condition atau panic
-            r, ok := reg.Get("theme.hardcode-opacity-color")
-            if !ok || r == nil {
-                t.Errorf("expected rule found")
-            }
-            all := reg.All()
-            if len(all) == 0 {
-                t.Errorf("expected non-empty rules")
-            }
-        }()
+    all := reg.All()
+    if len(all) != 3 {
+        t.Fatalf("expected 3 rules, got %d", len(all))
     }
-    wg.Wait()
+
+    // Wajib terurut secara leksikografis
+    expected := []string{
+        "a11y.missing-alt",
+        "theme.hardcode-opacity-color",
+        "theme.hardcode-palette-color",
+    }
+    for i, r := range all {
+        if r.ID() != expected[i] {
+            t.Errorf("urutan indeks %d tidak sesuai: dapat %s, ingin %s", i, r.ID(), expected[i])
+        }
+    }
 }
 ```
 
 ---
 
-## 5. Benchmark Kinerja Evaluasi Rule
+## 4. Benchmark Kinerja Evaluasi Rule
 
-Pengujian kecepatan evaluasi node wajib diukur menggunakan tool benchmark Go:
+Kecepatan evaluasi diukur untuk memastikan fungsi tidak memicu alokasi heap saat memeriksa node bersih:
 
 ```go
 func BenchmarkEvaluateHardcodeOpacityColor_Clean(b *testing.B) {
@@ -174,6 +122,7 @@ func BenchmarkEvaluateHardcodeOpacityColor_Clean(b *testing.B) {
 }
 ```
 
-### Ambang Batas Kinerja:
-- **Zero Allocations:** `0 B/op` dan `0 allocs/op` saat mengevaluasi node bersih tanpa pelanggaran.
-- **Throughput:** Waktu eksekusi $\le 50\text{ ns/op}$ per node.
+### Evaluasi Target (Performance Budget):
+- **Node Bersih:** Target `0 B/op` dan `0 allocs/op`.
+- **Waktu Eksekusi:** Target evaluasi berada dalam rentang wajar nanodetik pada runner target.
+

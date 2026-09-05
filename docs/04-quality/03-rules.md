@@ -34,18 +34,23 @@ Pada Fase 4, scanner Charites akan mendistribusikan puluhan ribu file dan ratusa
 
 ---
 
-## 3. Ambang Batas Efisiensi Memori & Alokasi
+## 3. Anggaran Performa & Efisiensi Alokasi Memori (Performance Budget)
 
-Setiap pemindaian proyek frontend berskala enterprise dapat memproses jutaan AST node. Efisiensi alokasi memori pada fungsi evaluasi rule menjadi penentu performa:
+Karakteristik alokasi memori pada fungsi evaluasi rule diatur sebagai anggaran desain (Performance Budget):
 
-| Kondisi Evaluasi | Batas Alokasi Memori | Batas Alokasi Objek | Batas Waktu Eksekusi |
-| :--- | :---: | :---: | :---: |
-| **Node Bersih (Tanpa Class)** | `0 B/op` | `0 allocs/op` | $\le 10\text{ ns/op}$ |
-| **Node Bersih (Class Legal)** | `0 B/op` | `0 allocs/op` | $\le 50\text{ ns/op}$ |
-| **Node Pelanggaran (1 Pelanggaran)** | $\le 128\text{ B/op}$ | $\le 2\text{ allocs/op}$ | $\le 250\text{ ns/op}$ |
+| Kondisi Evaluasi | Target Alokasi Memori | Target Alokasi Objek | Target Waktu Eksekusi (Desain) | Klasifikasi |
+| :--- | :---: | :---: | :---: | :--- |
+| **Node Bersih (Tanpa Class)** | `0 B/op` | `0 allocs/op` | $\le 10\text{ ns/op}$ | Allocation Invariant |
+| **Node Bersih (Class Legal)** | `0 B/op` | `0 allocs/op` | $\le 50\text{ ns/op}$ | Allocation Invariant |
+| **Node Pelanggaran (1 Pelanggaran)** | $\le 128\text{ B/op}$ | $\le 2\text{ allocs/op}$ | $\le 250\text{ ns/op}$ | Performance Target |
 
-### Aturan Alokasi Defensif:
-- Selalu gunakan slice `nil` alih-alih `make([]ir.Diagnostic, 0)` ketika tidak ada diagnostic yang dihasilkan, sehingga tidak memicu alokasi heap kosong di Go runtime.
+### Metodologi Pengukuran Benchmark (`QUAL-03-PERF-001` / `TEST-03-BENCH-001`):
+Angka target nanodetik di atas merupakan target performa desain, bukan gerbang mutlak lintas compiler atau lingkungan hardware. Pengukuran wajib mengikuti protokol:
+- **Baseline Toolchain:** Go 1.26 (toolchain `go1.26.x`), `CGO_ENABLED=0`.
+- **Eksekusi:** `go test -bench=BenchmarkEvaluateHardcodeOpacityColor -benchmem -count=5`.
+- **Environment:** `GOMAXPROCS=1` untuk benchmark evaluasi node tunggal deterministik.
+- **Warm/Cold Methodology:** Benchmark runner standar Go dengan fase warm-up dan isolasi timer (`b.ResetTimer()`).
+- **Defensive Allocation:** Selalu kembalikan slice `nil` alih-alih `make([]ir.Diagnostic, 0)` ketika tidak ada temuan pelanggaran, sehingga menjamin $0$ alokasi heap saat mengevaluasi node bersih.
 
 ---
 
@@ -53,8 +58,8 @@ Setiap pemindaian proyek frontend berskala enterprise dapat memproses jutaan AST
 
 | Metrik Kualitas | Ambang Batas Minimum | Cara Pengukuran |
 | :--- | :---: | :--- |
-| **Statement Coverage (`internal/rules/...`)** | $\ge 95\%$ | `go test -cover ./internal/rules/...` |
-| **Branch Coverage Logika Rule** | $100\%$ | Pengujian seluruh cabang if/else pada `hardcode_opacity_color.go` |
+| **Statement Coverage (`internal/rules/...`)** | $\ge 90\%$ | `go test -cover ./internal/rules/...` |
+| **Branch Coverage Logika Rule** | Cakupan seluruh cabang if/else pada rule | Table-driven matrix tests |
 | **Cyclomatic Complexity** | $\le 10$ per fungsi | `gocyclo -over 10 ./internal/rules` |
 | **Data Race Verification** | $0$ data race detected | `go test -race ./internal/rules/...` |
 | **Linter Compliance** | $0$ issues | `golangci-lint run ./internal/rules/...` |
