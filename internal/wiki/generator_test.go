@@ -65,6 +65,23 @@ func TestGenerator_Generate(t *testing.T) {
 	if !strings.Contains(ruleContent, "# theme.hardcode-opacity-color") {
 		t.Errorf("rule doc missing header")
 	}
+
+	// 4. Verify _Sidebar.md for GitHub Wiki hierarchical navigation
+	sidebarPath := filepath.Join(tmpDir, "_Sidebar.md")
+	sidebarBytes, readErr := os.ReadFile(filepath.Clean(sidebarPath)) //nolint:gosec // controlled test path
+	if readErr != nil {
+		t.Fatalf("_Sidebar.md was not generated: %v", readErr)
+	}
+	sidebarContent := string(sidebarBytes)
+	if !strings.Contains(sidebarContent, "* [**Home**](Home.md)") {
+		t.Errorf("_Sidebar.md missing Home link")
+	}
+	if !strings.Contains(sidebarContent, "* [**Theme**](theme.md)") {
+		t.Errorf("_Sidebar.md missing Theme category header")
+	}
+	if !strings.Contains(sidebarContent, "  * [`theme.hardcode-opacity-color`](theme/hardcode-opacity-color.md)") {
+		t.Errorf("_Sidebar.md missing nested rule entry with indentation")
+	}
 }
 
 func TestGenerator_WithCustomRegistry(t *testing.T) {

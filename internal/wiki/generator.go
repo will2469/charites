@@ -23,6 +23,7 @@ type Generator struct {
 	tmplHome     *template.Template
 	tmplCategory *template.Template
 	tmplRule     *template.Template
+	tmplSidebar  *template.Template
 }
 
 // NewGenerator membuat instance Generator baru berbasis rules.Registry dan memuat embedded templates.
@@ -38,12 +39,14 @@ func NewGenerator(reg *rules.Registry) *Generator {
 	tmplHome := template.Must(template.New("home.md.tmpl").Funcs(funcMap).ParseFS(templateFS, "templates/home.md.tmpl"))
 	tmplCategory := template.Must(template.New("category.md.tmpl").Funcs(funcMap).ParseFS(templateFS, "templates/category.md.tmpl"))
 	tmplRule := template.Must(template.New("rule.md.tmpl").Funcs(funcMap).ParseFS(templateFS, "templates/rule.md.tmpl"))
+	tmplSidebar := template.Must(template.New("sidebar.md.tmpl").Funcs(funcMap).ParseFS(templateFS, "templates/sidebar.md.tmpl"))
 
 	return &Generator{
 		reg:          reg,
 		tmplHome:     tmplHome,
 		tmplCategory: tmplCategory,
 		tmplRule:     tmplRule,
+		tmplSidebar:  tmplSidebar,
 	}
 }
 
@@ -69,6 +72,16 @@ type categoryTemplateData struct {
 	Title    string
 	Category string
 	Rules    []homeRuleEntry
+}
+
+type sidebarCategoryEntry struct {
+	Name  string
+	Title string
+	Rules []homeRuleEntry
+}
+
+type sidebarTemplateData struct {
+	Categories []sidebarCategoryEntry
 }
 
 type ruleTemplateData struct {
@@ -120,7 +133,18 @@ func (g *Generator) Generate(outputDir string) error {
 		return fmt.Errorf("failed to write Home.md: %w", wErr)
 	}
 
+	// 2b. Render _Sidebar.md for GitHub Wiki hierarchical navigation
+	sidebarContent, sErr := g.renderSidebar(categories, catMap)
+	if sErr != nil {
+		return fmt.Errorf("failed to render _Sidebar.md: %w", sErr)
+	}
+	sidebarPath := filepath.Join(tmpDir, "_Sidebar.md")
+	if wErr := os.WriteFile(sidebarPath, []byte(sidebarContent), 0o600); wErr != nil {
+		return fmt.Errorf("failed to write _Sidebar.md: %w", wErr)
+	}
+
 	// 3. Render <category>.md dan <category>/<slug>.md untuk setiap domain
+
 	for _, cat := range categories {
 		if err := g.renderCategoryDocs(tmpDir, cat, catMap[cat]); err != nil {
 			return err
@@ -247,6 +271,39 @@ func (g *Generator) renderCategory(category string, categoryRules []rules.Rule) 
 
 	var buf bytes.Buffer
 	if err := g.tmplCategory.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func (g *Generator) renderSidebar(categories []string, catMap map[string][]rules.Rule) (string, error) {
+	data := sidebarTemplateData{
+		Categories: make([]sidebarCategoryEntry, 0, len(categories)),
+	}
+
+	for _, cat := range categories {
+		cRules := catMap[cat]
+		titleCat := strings.ToUpper(cat[:1]) + cat[1:]
+		entry := sidebarCategoryEntry{
+			Name:  cat,
+			Title: titleCat,
+			Rules: make([]homeRuleEntry, 0, len(cRules)),
+		}
+		for _, r := range cRules {
+			slug := strings.TrimPrefix(r.ID(), cat+".")
+			entry.Rules = append(entry.Rules, homeRuleEntry{
+				ID:          r.ID(),
+				Category:    cat,
+				Slug:        slug,
+				Severity:    strings.ToUpper(string(r.DefaultSeverity())),
+				Description: r.Description(),
+			})
+		}
+		data.Categories = append(data.Categories, entry)
+	}
+
+	var buf bytes.Buffer
+	if err := g.tmplSidebar.Execute(&buf, data); err != nil {
 		return "", err
 	}
 	return buf.String(), nil

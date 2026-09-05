@@ -1,0 +1,11 @@
+# [Charites Wiki](Home.md)
+
+* [**Home**](Home.md)
+
+---
+
+### Rule Categories
+{{range .Categories}}
+* [**{{.Title}}**]({{.Name}}.md)
+{{range .Rules}}  * [`{{.ID}}`]({{.Category}}/{{.Slug}}.md)
+{{end}}{{end}}
