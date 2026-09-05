@@ -2,10 +2,11 @@
 
 > **Kode Dokumen:** `ARCH-05-CLI`
 > **Tahapan:** Fase 5 - Reporter Output & CLI Entrypoint
+> **Peran Pilar:** ARCH = HOW (Rancangan Arsitektur CLI, Dispatcher & Abstraksi Reporter)
 > **Status:** Ready for Review
 > **Standar Rujukan:** Unix Philosophy CLI & Decoupled Presentation Layer Architecture
 
-Dokumen ini mendefinisikan arsitektur internal dari layer antarmuka pengguna CLI (`internal/cli/*`), router dispatcher, normalisasi argumen dan flag, serta abstraksi presenter laporan (`internal/reporter/*`).
+Dokumen ini mendefinisikan arsitektur internal dari paket antarmuka CLI (`internal/cli/*`), router dispatcher, validasi dan normalisasi flag, serta arsitektur presenter laporan (`internal/reporter/*`).
 
 ---
 
@@ -14,29 +15,31 @@ Dokumen ini mendefinisikan arsitektur internal dari layer antarmuka pengguna CLI
 ```mermaid
 flowchart TD
     subgraph Entry ["Binary Entrypoint"]
-        Main["cmd/charites/main.go"] --> Root["internal/cli/root.go\n(Command Router)"]
+        Main["cmd/charites/main.go"] --> Root["internal/cli/root.go\n(Command Dispatcher)"]
     end
 
-    subgraph Dispatcher ["Subcommand Normalizer"]
-        Root --> ScanCmd["cli/scan.go\n(charites scan)"]
-        Root -.->|Alias Mapping| ScanCmd
-        Root --> VersionCmd["cli/version.go\n(charites version)"]
+    subgraph Dispatcher ["Subcommand & Flag Normalizer"]
+        Root -->|Empty Args / scan / check / run| ScanCmd["cli/scan.go\n(RunScan Handler)"]
+        Root -->|version / -v / --version| VersionCmd["cli/version.go\n(RunVersion Handler)"]
+        Root -->|help / -h / --help| HelpCmd["cli/help.go\n(RunHelp Handler)"]
+        Root -->|Unknown Command| ErrorHandler["Stderr Error -> Exit 2"]
     end
 
     subgraph Controller ["Scan Orchestrator"]
-        ScanCmd --> Options["ScanOptions Struct\n(Direct Target, Ext, Category, Rule)"]
-        Options --> Orchestrate["Execute Scan Pipeline\n(Config -> Scanner -> Engine)"]
+        ScanCmd --> Validator["Validate & Normalize Options\n(Ext Check, Category/Rule Conflict)"]
+        Validator --> Orchestrate["Execute Scan Pipeline\n(Config -> Scanner -> Engine)"]
     end
 
     subgraph Presenter ["Presentation Layer (internal/reporter)"]
-        Orchestrate --> Result["ScanResult Envelope\n(Diagnostics, Summary, Elapsed)"]
-        Result --> FormatSwitch{"Format Selector\n(-f / --format)"}
-        FormatSwitch -- "inline" --> Inline["reporter/inline.go\n(ANSI Formatter & TTY Check)"]
-        FormatSwitch -- "json" --> JSON["reporter/json.go\n(JSON Stream Encoder)"]
+        Orchestrate --> Result["ScanResult Envelope\n(Version, Summary, Diagnostics)"]
+        Result --> ColorResolver["ColorMode Resolver\n(--no-color, NO_COLOR, isTTY)"]
+        ColorResolver --> FormatSwitch{"Format Selector\n(-f / --format)"}
+        FormatSwitch -- "inline" --> Inline["reporter/inline.go\n(POSIX Path & ANSI Formatter)"]
+        FormatSwitch -- "json" --> JSON["reporter/json.go\n(JSON Document Encoder)"]
     end
 
     subgraph Exit ["Process Termination"]
-        Inline --> ExitResolver["Exit Code Resolver\n(0 = Clean, 1 = Violation, 2 = Fatal)"]
+        Inline --> ExitResolver["Exit Code Resolver\n(0 = Clean, 1 = Violations, 2 = Operational Error)"]
         JSON --> ExitResolver
         ExitResolver --> OSExit["os.Exit(code)"]
     end
@@ -46,66 +49,82 @@ flowchart TD
 
 ## 2. Arsitektur Dispatcher & Router Subcommand (`internal/cli/`)
 
-Untuk menjaga binary tetap ramping dan tanpa ketergantungan library pihak ketiga yang membengkak:
-1. **Zero External CLI Dependency:**
-   Dispatcher dibangun memanfaatkan paket bawaan Go `flag.FlagSet` yang diisolasi per-subcommand.
-2. **Normalisasi Alias Otomatis:**
-   ```go
-   func Execute(args []string) int {
-       if len(args) == 0 {
-           return runScan([]string{"."})
-       }
+Untuk menjaga dependensi eksternal tetap nol (Zero Dependency Invariant):
+- Menggunakan standar Go `flag.FlagSet` yang diisolasi per-subcommand.
+- Normalisasi pemanggilan 0 argumen dan argumen path langsung:
 
-       switch args[0] {
-       case "scan", "check", "run":
-           return runScan(args[1:])
-       case "version", "-v", "--version":
-           return runVersion()
-       case "help", "-h", "--help":
-           return runHelp()
-       default:
-           // Jika argumen pertama berupa path berkas/folder atau flag
-           return runScan(args)
-       }
-   }
-   ```
-3. **Penyelarasan Flag Ergonomi (A-E):**
-   Flag parsing menyaring parameter ke dalam struktur `ScanOptions`:
-   - `TargetPath`: Path sasaran (file tunggal atau direktori).
-   - `Extensions`: Slice ekstensi yang diizinkan (misal `[]string{".astro", ".tsx"}`).
-   - `CategoryFilter`: String kategori atau kosong.
-   - `RuleFilter`: String Semgrep ID tunggal atau kosong.
-   - `Format`: `"inline"` atau `"json"`.
+```go
+package cli
+
+import (
+    "fmt"
+    "os"
+    "strings"
+)
+
+func Execute(args []string) int {
+    if len(args) == 0 {
+        return RunScan([]string{"."})
+    }
+
+    switch args[0] {
+    case "scan", "check", "run":
+        return RunScan(args[1:])
+    case "version", "-v", "--version":
+        return RunVersion()
+    case "help", "-h", "--help":
+        return RunHelp()
+    default:
+        // Jika argumen diawali dengan '-' (flag) atau berupa path berkas/direktori
+        if strings.HasPrefix(args[0], "-") || isPath(args[0]) {
+            return RunScan(args)
+        }
+        fmt.Fprintf(os.Stderr, "charites: error: unknown command \"%s\". Run 'charites help' for usage.\n", args[0])
+        return 2
+    }
+}
+```
 
 ---
 
-## 3. Arsitektur Presenter Laporan (`internal/reporter/`)
+## 3. Validasi & Normalisasi Flag Pemindaian (`internal/cli/scan.go`)
 
-Layer pelaporan dipisahkan secara bersih (*decoupled*) dari mesin evaluasi dan scanner:
+### 3.1. Normalisasi Flag `--ext`
+- Input dibersihkan: huruf kecil (*lowercase*), spasi dipangkas (*trimmed*), dan tanda titik awal dipastikan ada.
+- Verifikasi ekstensi terdaftar (`.astro`, `.tsx`, `.jsx`).
+- Jika terdapat ekstensi tidak dikenal atau string kosong, fungsi mencetak error ke `stderr` dan mengembalikan exit code `2`.
 
-### 3.1. Kontrak Antarmuka Reporter (`reporter.go`)
+### 3.2. Validasi Konflik `--category` dan `--rule`
+- Jika kedua flag disertakan, sistem memeriksa apakah kategori rule cocok dengan nilai `--category`.
+- Jika terjadi ketidaksesuaian, sistem menolak eksekusi dengan exit code `2`.
+
+---
+
+## 4. Arsitektur Presenter Laporan (`internal/reporter/`)
+
+### 4.1. Data Transfer Objects (DTO) & Interface Reporter (`reporter.go`)
 
 ```go
 package reporter
 
 import (
     "io"
-    "time"
     "github.com/will2469/charites/internal/ir"
 )
 
 type ScanSummary struct {
-    ScannedFiles int           `json:"scanned_files"`
-    Duration     time.Duration `json:"duration"`
-    ErrorCount   int           `json:"error_count"`
-    WarningCount int           `json:"warning_count"`
-    InfoCount    int           `json:"info_count"`
-    Passed       bool          `json:"passed"`
+    ScannedFiles int   `json:"scanned_files"`
+    DurationMS   int64 `json:"duration_ms"`
+    ErrorCount   int   `json:"error_count"`
+    WarningCount int   `json:"warning_count"`
+    InfoCount    int   `json:"info_count"`
+    Passed       bool  `json:"passed"`
 }
 
 type ScanResult struct {
-    Diagnostics []ir.Diagnostic `json:"diagnostics"`
+    Version     string          `json:"version"`
     Summary     ScanSummary     `json:"summary"`
+    Diagnostics []ir.Diagnostic `json:"diagnostics"`
 }
 
 type Reporter interface {
@@ -113,20 +132,42 @@ type Reporter interface {
 }
 ```
 
-### 3.2. ANSI Terminal Formatter (`internal/reporter/inline.go`)
-- **Deteksi TTY Otomatis:** Memeriksa apakah file descriptor `os.Stdout` terhubung ke pseudoterminal (*character device*) atau dialihkan ke pipe.
-- **Dukungan `NO_COLOR` Standard:** Memeriksa `os.Getenv("NO_COLOR") != ""`. Jika aktif, seluruh kode warna escape string di-strip menjadi teks polos.
-- **Grouping Diagnostik:** Menata keluaran berdasarkan urutan hierarki file untuk meminimalkan redundansi path di terminal.
+### 4.2. Resolusi ColorMode Portabel (`internal/reporter/color.go`)
 
-### 3.3. JSON Stream Presenter (`internal/reporter/json.go`)
-- Menggunakan `json.NewEncoder(w)` dengan indentasi teratur (`SetIndent("", "  ")`).
-- Menulis output langsung ke `io.Writer` tanpa buffer alokasi string sementara yang besar.
+```go
+type ColorMode int
+
+const (
+    ColorAuto ColorMode = iota
+    ColorNever
+)
+
+func ResolveColorMode(noColorFlag bool) ColorMode {
+    if noColorFlag {
+        return ColorNever
+    }
+    if os.Getenv("NO_COLOR") != "" {
+        return ColorNever
+    }
+    if !isTerminal(os.Stdout) {
+        return ColorNever
+    }
+    return ColorAuto
+}
+```
+Abstraksi `ColorMode` memungkinkan pengujian unit tanpa memerlukan emulator terminal nyata (*mocking `ColorMode`*).
+
+### 4.3. Inline ANSI Reporter (`internal/reporter/inline.go`)
+- **POSIX Path Formatting:** Menggunakan `filepath.ToSlash(relPath)` untuk memastikan separator forward slash (`/`) konsisten lintas Linux, macOS, dan Windows.
+- **Visual Distinction:** Format terpisah untuk pemindaian bersih (*clean*) dan pemindaian dengan temuan (*violations*).
+
+### 4.4. JSON Document Reporter (`internal/reporter/json.go`)
+- Menggunakan `json.NewEncoder(w)` dengan `SetIndent("", "  ")`.
+- Menulis dokumen JSON tunggal lengkap yang mencakup `version`, `summary`, dan slice `diagnostics`.
 
 ---
 
-## 4. Mesin Resolusi Exit Code (`exit.go`)
-
-Exit code ditentukan secara deterministik berdasarkan ada tidaknya temuan dan flag:
+## 5. Mesin Resolusi Exit Code (`internal/cli/exit.go`)
 
 ```go
 func ResolveExitCode(res *ScanResult, failOnWarn bool) int {
@@ -139,4 +180,4 @@ func ResolveExitCode(res *ScanResult, failOnWarn bool) int {
     return 0
 }
 ```
-Jika terjadi kesalahan I/O fatal (seperti direktori tidak ditemukan atau file konfigurasi korup), dispatcher langsung mengembalikan exit code **2**.
+Kesalahan operasional (flag salah, berkas tidak ditemukan, argumen tidak sah) ditangani langsung di level CLI router dengan mengembalikan exit code **`2`**.

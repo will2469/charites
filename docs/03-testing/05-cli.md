@@ -2,63 +2,80 @@
 
 > **Kode Dokumen:** `TEST-05-CLI`
 > **Tahapan:** Fase 5 - Reporter Output & CLI Entrypoint
+> **Peran Pilar:** TEST = PROOF (Harness Pengujian, Matriks E2E & Snapshot Reporter)
 > **Status:** Ready for Review
 > **Standar Rujukan:** CLI Subprocess Testing & Golden Output Regression Testing
 
-Dokumen ini mendefinisikan strategi pengujian untuk antarmuka baris perintah (`internal/cli/*`), format keluaran presenter (`internal/reporter/*`), pengujian terintegrasi *subprocess* E2E (`tests/e2e/*`), dan verifikasi kontrak *exit code*.
+Dokumen ini mendefinisikan strategi pengujian untuk antarmuka baris perintah (`internal/cli/*`), format dokumen presenter laporan (`internal/reporter/*`), pengujian terintegrasi *subprocess* E2E (`tests/e2e/*`), dan verifikasi kontrak *exit code*.
 
 ---
 
-## 1. Skenario Pengujian Unit Dispatcher & CLI Flags (`internal/cli/`)
+## 1. Skenario Pengujian Unit Dispatcher & Flag (`internal/cli/`)
 
-### 1.1. Uji Routing Subcommand & Alias (`internal/cli/root_test.go`)
-- **Test Case 1 (Default Command Mapping):**
-  - Input argumen: `[]string{"."}` atau `[]string{"src/Button.tsx"}`.
-  - Ekspektasi: Ter-routing otomatis ke handler pemindaian `runScan()`.
-- **Test Case 2 (Subcommand Aliases - Ergonomi E):**
-  - Input argumen: `[]string{"check", "."}` dan `[]string{"run", "."}`.
-  - Ekspektasi: Menghasilkan konfigurasi `ScanOptions` dan alur eksekusi yang identik dengan `[]string{"scan", "."}`.
-- **Test Case 3 (Subcommand Version):**
-  - Input argumen: `[]string{"version"}` atau `[]string{"-v"}`.
-  - Ekspektasi: Menampilkan info versi dan mengembalikan exit code 0.
+### 1.1. Uji Routing Subcommand & Default Invocation (`root_test.go`)
+- **Test Case 1 (Empty Invocation Mapping):**
+  - Input: `[]string{}`.
+  - Ekspektasi: Ter-routing otomatis ke `RunScan([]string{"."})`.
+- **Test Case 2 (Subcommand Aliases):**
+  - Input: `[]string{"check", "."}` dan `[]string{"run", "."}`.
+  - Ekspektasi: Menghasilkan alur eksekusi identik dengan `[]string{"scan", "."}`.
+- **Test Case 3 (Unknown Command):**
+  - Input: `[]string{"foobar"}`.
+  - Ekspektasi: Menghasilkan exit code `2` dan pesan kesalahan di `stderr`.
 
-### 1.2. Uji Parsing Flag Ergonomi (A-D) (`internal/cli/scan_test.go`)
-- **Test Case 1 (Direct File Target - Ergonomi A):**
-  - Input: `charites scan src/pages/index.astro`.
-  - Ekspektasi: `opts.TargetPath == "src/pages/index.astro"` dan `opts.IsDirectFile == true`.
-- **Test Case 2 (Extension Filter - Ergonomi B):**
-  - Input: `charites scan . --ext=astro,tsx`.
-  - Ekspektasi: `opts.Extensions` memuat `[".astro", ".tsx"]`.
-- **Test Case 3 (Category & Rule Filter - Ergonomi C & D):**
-  - Input: `charites scan . --category=theme --rule=theme.hardcode-opacity-color`.
-  - Ekspektasi: `opts.CategoryFilter == "theme"` dan `opts.RuleFilter == "theme.hardcode-opacity-color"`.
+### 1.2. Uji Normalisasi & Validasi Flag (`scan_test.go`)
+- **Test Case 1 (Extension Normalization & Invalid Ext):**
+  - Input valid: `--ext=ASTRO,.tsx`. Ekspektasi: `[".astro", ".tsx"]`.
+  - Input tidak valid: `--ext=vue`. Ekspektasi: Exit code `2` dengan error `unsupported extension`.
+  - Input kosong: `--ext=`. Ekspektasi: Exit code `2` dengan error `empty extension flag`.
+- **Test Case 2 (Category & Rule Conflict):**
+  - Input konflik: `--category=theme --rule=a11y.alt-text`.
+  - Ekspektasi: Exit code `2` dengan error `rule does not belong to category`.
 
 ---
 
 ## 2. Skenario Pengujian Unit Reporter (`internal/reporter/`)
 
-### 2.1. Uji Coba Inline ANSI Reporter (`internal/reporter/inline_test.go`)
-- **Test Case 1 (ANSI Color Codes Rendering):**
-  - Input: `ScanResult` memuat 1 error dan 1 warning.
-  - Ekspektasi: Buffer keluaran memuat ANSI escape code merah (`\x1b[31;1m`) untuk error dan kuning (`\x1b[33;1m`) untuk warning.
-- **Test Case 2 (No-Color Invariant):**
-  - Kondisi: Mengaktifkan flag `--no-color` atau mengeset variabel lingkungan `NO_COLOR=1`.
-  - Ekspektasi: Buffer keluaran bersih dari karakter escape ANSI (`\x1b[`). Teks berupa string polos yang mudah dibaca.
-- **Test Case 3 (Footer Summary):**
-  - Ekspektasi: Mencetak baris ringkasan yang memuat jumlah berkas yang dipindai, waktu eksekusi dalam milidetik, dan total temuan.
+### 2.1. Uji Determinis Biner Reporter (`reporter_test.go`)
+```go
+func TestReporter_Determinism(t *testing.T) {
+    result := createSampleScanResult()
 
-### 2.2. Uji Coba JSON Stream Reporter (`internal/reporter/json_test.go`)
-- **Test Case 1 (Schema & Deserialization Invariant):**
-  - Input: `ScanResult` dengan data diagnostic lengkap.
-  - Ekspektasi: Output JSON berhasil di-unmarshal kembali ke struct Go tanpa error sintaks.
-- **Test Case 2 (Field Preservations):**
-  - Ekspektasi: Seluruh field (`file`, `line`, `column`, `rule`, `category`, `severity`, `message`, `hint`) tidak terpotong dan memiliki tipe data yang presisi.
+    // 1. Uji Determinisme JSON
+    var bufJSON1, bufJSON2 bytes.Buffer
+    jsonRep := reporter.NewJSONReporter()
+    _ = jsonRep.Render(&bufJSON1, result)
+    _ = jsonRep.Render(&bufJSON2, result)
+
+    if !bytes.Equal(bufJSON1.Bytes(), bufJSON2.Bytes()) {
+        t.Fatalf("JSON reporter output is not byte-for-byte identical")
+    }
+
+    // 2. Uji Determinisme Inline ANSI
+    var bufInline1, bufInline2 bytes.Buffer
+    inlineRep := reporter.NewInlineReporter(reporter.ColorNever)
+    _ = inlineRep.Render(&bufInline1, result)
+    _ = inlineRep.Render(&bufInline2, result)
+
+    if !bytes.Equal(bufInline1.Bytes(), bufInline2.Bytes()) {
+        t.Fatalf("Inline reporter output is not byte-for-byte identical")
+    }
+}
+```
+
+### 2.2. Golden Contract Snapshots (`tests/golden/reporters/`)
+Fase 5 mengunci kontrak visual dan format mesin melalui berkas snapshot referensi:
+1. `inline_clean.golden`: Format teks bersih saat 0 pelanggaran.
+2. `inline_violations.golden`: Format teks berwarna ANSI saat ditemukan error & warning.
+3. `inline_no_color.golden`: Format teks polos saat mode `ColorNever` aktif.
+4. `json_clean.golden`: Format dokumen JSON saat 0 pelanggaran.
+5. `json_violations.golden`: Format dokumen JSON lengkap dengan temuan diagnostic.
 
 ---
 
 ## 3. Pengujian Terintegrasi E2E Subprocess (`tests/e2e/cli_test.go`)
 
-Pengujian E2E mengompilasi binary `charites` ke direktori sementara dan mengeksekusinya via `os/exec`:
+Pengujian E2E mengompilasi binary `charites` dan memvalidasi seluruh matriks interaksi terminal:
 
 ```go
 package e2e_test
@@ -68,42 +85,59 @@ import (
     "testing"
 )
 
-func TestCLI_SubprocessExecution(t *testing.T) {
-    binPath := buildTestBinary(t)
+func TestCLI_Matrix(t *testing.T) {
+    bin := buildBinary(t)
 
-    // Test 1: Clean Directory -> Exit Code 0
-    t.Run("Clean_Directory_Exit_0", func(t *testing.T) {
-        cmd := exec.Command(binPath, "scan", "tests/fixtures/clean")
-        err := cmd.Run()
-        if err != nil {
-            t.Fatalf("expected exit code 0, got %v", err)
-        }
-    })
+    matrix := []struct {
+        name     string
+        args     []string
+        wantExit int
+    }{
+        {"Empty_Invocation_Defaults_To_Scan", []string{}, 0},
+        {"Subcommand_Check_Alias", []string{"check", "tests/fixtures/clean"}, 0},
+        {"Subcommand_Run_Alias", []string{"run", "tests/fixtures/clean"}, 0},
+        {"Version_Flag", []string{"-v"}, 0},
+        {"Clean_Repo_Exit_0", []string{"scan", "tests/fixtures/clean"}, 0},
+        {"Warning_Only_Defaults_To_0", []string{"scan", "tests/fixtures/warning_only"}, 0},
+        {"Warning_Only_With_FailOnWarn_Exits_1", []string{"scan", "tests/fixtures/warning_only", "--fail-on-warn"}, 1},
+        {"Violations_Found_Exits_1", []string{"scan", "tests/fixtures/violations"}, 1},
+        {"Unsupported_Ext_Exits_2", []string{"scan", ".", "--ext=vue"}, 2},
+        {"Category_Rule_Conflict_Exits_2", []string{"scan", ".", "--category=theme", "--rule=a11y.alt"}, 2},
+        {"Unknown_Flag_Exits_2", []string{"scan", ".", "--unknown-flag"}, 2},
+        {"Non_Existent_Target_Exits_2", []string{"scan", "non/existent/path"}, 2},
+    }
 
-    // Test 2: Violations Found -> Exit Code 1
-    t.Run("Violations_Found_Exit_1", func(t *testing.T) {
-        cmd := exec.Command(binPath, "scan", "tests/fixtures/violations")
-        err := cmd.Run()
-        if exitErr, ok := err.(*exec.ExitError); ok {
-            if exitErr.ExitCode() != 1 {
-                t.Fatalf("expected exit code 1, got %d", exitErr.ExitCode())
+    for _, tt := range matrix {
+        t.Run(tt.name, func(t *testing.T) {
+            cmd := exec.Command(bin, tt.args...)
+            err := cmd.Run()
+            gotExit := 0
+            if exitErr, ok := err.(*exec.ExitError); ok {
+                gotExit = exitErr.ExitCode()
             }
-        } else {
-            t.Fatalf("expected exit error, got nil")
-        }
-    })
-
-    // Test 3: Non-Existent Path -> Exit Code 2
-    t.Run("Fatal_Error_Exit_2", func(t *testing.T) {
-        cmd := exec.Command(binPath, "scan", "non/existent/path")
-        err := cmd.Run()
-        if exitErr, ok := err.(*exec.ExitError); ok {
-            if exitErr.ExitCode() != 2 {
-                t.Fatalf("expected exit code 2, got %d", exitErr.ExitCode())
+            if gotExit != tt.wantExit {
+                t.Fatalf("args %v: want exit code %d, got %d", tt.args, tt.wantExit, gotExit)
             }
-        } else {
-            t.Fatalf("expected exit error, got nil")
-        }
-    })
+        })
+    }
 }
 ```
+
+---
+
+## 4. Metodologi Benchmark Formatting Reporter (`TEST-05-BENCH-001`)
+
+Pengujian kinerja pelaporan diisolasi dari I/O terminal nyata:
+
+```go
+func BenchmarkReporter_JSON_Format(b *testing.B) {
+    result := generateMockResult(1000) // 1.000 findings
+    rep := reporter.NewJSONReporter()
+
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        _ = rep.Render(io.Discard, result)
+    }
+}
+```
+Metodologi ini menjamin pengukuran murni terhadap efisiensi serialisasi data Go tanpa gangguan fluktuasi emulator terminal atau sistem I/O disk.

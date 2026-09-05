@@ -2,10 +2,11 @@
 
 > **Kode Dokumen:** `SPEC-05-CLI`
 > **Tahapan:** Fase 5 - Reporter Output & CLI Entrypoint
+> **Peran Pilar:** SPEC = WHAT (Spesifikasi Antarmuka CLI, Format Reporter & Kontrak Exit Code)
 > **Status:** Ready for Review
 > **Standar Rujukan:** POSIX CLI Standards / 12-Factor App CLI / GNU Coding Standards
 
-Dokumen ini mendefinisikan spesifikasi antarmuka baris perintah (*Command-Line Interface* / CLI), sintaks subcommand, opsi ergonomi pemindaian (A-E), mekanisme deteksi TTY, format pelaporan (*inline ANSI* dan *JSON stream*), serta kontrak *exit codes*.
+Dokumen ini mendefinisikan spesifikasi antarmuka baris perintah (*Command-Line Interface* / CLI), sintaks subcommand, opsi ergonomi pemindaian (A-E), tata bahasa flag dan normalisasi, aturan resolusi warna/TTY, format dokumen pelaporan (*inline ANSI* dan *JSON Document*), serta kontrak *exit codes*.
 
 ---
 
@@ -18,99 +19,96 @@ Usage:
   charites [command] [flags] [path]
 
 Available Commands:
-  scan        Pindai file frontend untuk audit kualitas dan token semantik (Default)
+  scan        Pindai berkas frontend untuk audit kualitas dan token semantik (Default)
   check       Alias identik untuk 'scan'
   run         Alias identik untuk 'scan'
   version     Cetak versi kompilasi binary, commit git, dan Go runtime
   help        Bantuan penggunaan perintah
 ```
 
-### 1.1. Aturan Resolusi Perintah Bawaan (Default Command)
-Jika `charites` dipanggil langsung dengan argumen path atau flag tanpa subcommand (misal: `charites .` atau `charites src/Button.tsx`), sistem **MUST** mengarahkan eksekusi ke subcommand `scan`.
+### 1.1. Aturan Resolusi Perintah Bawaan (Default Command & Aliases)
+1. **Pemanggilan Kosong (0 Argumen):** Pemanggilan `charites` tanpa argumen sama sekali **MUST** secara otomatis mengeksekusi `charites scan .`.
+2. **Argumen Path / Flag Langsung:** Pemanggilan dengan path atau flag langsung (misal: `charites .`, `charites src/Button.tsx`, atau `charites --format=json`) **MUST** diarahkan ke subcommand `scan`.
+3. **Subcommand Aliases:** Subcommand `check` dan `run` memiliki perilaku, flag, dan output yang identik 100% dengan `scan`.
 
 ---
 
-## 2. Spesifikasi Opsi Pemindaian & Ergonomi CLI (Opsi A-E)
-
-Subcommand `scan` (beserta alias `check` dan `run`) **MUST** mendukung opsi berikut:
-
-### 2.1. Opsi A: Direct File Targeting
-- Pengguna dapat menentukan target berkas spesifik:
-  ```bash
-  charites scan src/components/Header.astro
-  ```
-- Scanner langsung mengevaluasi berkas tersebut tanpa melakukan penelusuran pohon direktori.
-
-### 2.2. Opsi B: Filter Ekstensi (`--ext`)
-- Menyaring berkas yang diproses berdasarkan ekstensi:
-  ```bash
-  charites scan . --ext=astro
-  charites scan . --ext=tsx,jsx
-  ```
-
-### 2.3. Opsi C: Filter Kategori (`--category`)
-- Membatasi evaluasi rule hanya pada domain/kategori tertentu:
-  ```bash
-  charites scan . --category=theme
-  charites scan . --category=a11y
-  ```
-
-### 2.4. Opsi D: Filter Single Rule (`--rule`)
-- Mengeksekusi satu rule spesifik berdasarkan Semgrep ID:
-  ```bash
-  charites scan . --rule=theme.hardcode-opacity-color
-  ```
-
-### 2.5. Opsi E: Subcommand Aliases
-- `charites check <path>` dan `charites run <path>` memiliki perilaku, flag, dan output yang identik 100% dengan `charites scan <path>`.
-
----
-
-## 3. Matriks Flag Subcommand `scan`
+## 2. Matriks Flag Subcommand `scan` & Aturan Normalisasi
 
 | Flag | Shorthand | Tipe | Nilai Bawaan | Deskripsi |
 | :--- | :---: | :---: | :---: | :--- |
-| `--format` | `-f` | `string` | `inline` | Format output: `inline` (ANSI) atau `json` |
-| `--ext` | `-e` | `string` | `astro,tsx,jsx` | Filter ekstensi yang dipindai (koma terpisah) |
+| `--format` | `-f` | `string` | `inline` | Format output: `inline` (ANSI) atau `json` (Dokumen JSON) |
+| `--ext` | `-e` | `string` | `astro,tsx,jsx` | Filter ekstensi yang dipindai (koma terpisah atau berulang) |
 | `--category` | `-c` | `string` | `""` (semua) | Filter kategori rule (`theme`, `a11y`, `perf`, dll.) |
-| `--rule` | `-r` | `string` | `""` (semua) | Filter satu Semgrep ID rule spesifik |
+| `--rule` | `-r` | `string` | `""` (semua) | Filter satu Charites Rule ID spesifik (`<category>.<slug>`) |
 | `--config` | | `string` | `charites.yaml` | Path kustom berkas konfigurasi |
-| `--ignore` | | `string` | `""` | Pola glob ignore tambahan via CLI |
+| `--ignore` | | `string` | `""` | Pola glob ignore tambahan (koma terpisah atau berulang) |
 | `--no-color` | | `bool` | `false` | Matikan pewarnaan ANSI di terminal |
 | `--fail-on-warn` | | `bool` | `false` | Return exit code 1 jika hanya ada warning |
 
+### 2.1. Normalisasi & Validasi Flag `--ext`
+- **Ekstensi yang Didukung:** `.astro`, `.tsx`, `.jsx`.
+- **Normalisasi:** Case-insensitive (`ASTRO` $\rightarrow$ `astro`), tanda titik di awal bersifat opsional (`astro` $\equiv$ `.astro`). Nilai dapat dipisahkan koma (`--ext=astro,tsx`) atau berulang (`--ext astro --ext tsx`).
+- **Penolakan Nilai Tidak Sah:**
+  - Jika pengguna memasukkan ekstensi yang tidak didukung (misal `--ext=vue` atau `--ext=foo`), CLI **MUST** menghentikan eksekusi dengan exit code `2` dan pesan error di `stderr`: `charites: error: unsupported extension "foo". Supported extensions: .astro, .tsx, .jsx`.
+  - Jika nilai flag kosong (`--ext=`), CLI **MUST** keluar dengan exit code `2`: `charites: error: empty extension flag`.
+
+### 2.2. Validasi Konflik Flag `--category` dan `--rule`
+- Jika pengguna menentukan kedua flag sekaligus (misal: `--category=theme --rule=a11y.alt-text`):
+  - Sistem melakukan validasi irisan (*intersection check*): apakah rule tersebut terdaftar di dalam kategori yang ditentukan?
+  - Jika rule tidak termasuk dalam kategori tersebut, CLI **MUST** keluar dengan exit code `2` dan pesan error di `stderr`: `charites: error: rule "a11y.alt-text" does not belong to category "theme"`.
+
+### 2.3. Tata Bahasa Flag `--ignore`
+- Pola ignore tambahan dapat diberikan via argumen `--ignore=pattern` atau berulang `--ignore p1 --ignore p2`.
+- Pola dievaluasi secara relatif terhadap root direktori pemindaian menggunakan sintaks glob `.charitesignore`.
+- Pola CLI ditambahkan ke aturan pengguna dan **DILARANG** membuka kembali (*override/negate*) direktori builtin hard exclusion.
+
+### 2.4. Presedensi Kebijakan Konfigurasi vs CLI Scope
+Sesuai kontrak [docs/00-CONTRACT.md](file:///home/will/Monorepo/charites/docs/00-CONTRACT.md):
+- Flag CLI `--rule` dan `--category` berfungsi sebagai **Candidate Scope** (pemilihan kandidat).
+- Konfigurasi `charites.yaml` berfungsi sebagai **Policy** (kebijakan penonaktifan dan override).
+- Jika konfigurasi menetapkan status `off` untuk rule tertentu, rule tersebut **TIDAK AKTIF** meskipun pengguna secara eksplisit menentukan `--rule` pada CLI.
+
 ---
 
-## 4. Spesifikasi Reporter Output
+## 3. Spesifikasi Reporter Output
 
-Charites menyediakan dua presenter output:
-
-### 4.1. Inline ANSI Reporter (`--format=inline`, Default)
-Ditujukan untuk kenyamanan mata pengembang di terminal interaktif:
+### 3.1. Inline ANSI Reporter (`--format=inline`, Default)
+Format teks interaktif untuk konsol terminal:
 
 ```text
 [ERROR] src/pages/index.astro:14:8 [theme.hardcode-opacity-color]
-  Hardcode opacity color (bg-primary/10) - wajib pakai semantic token dari global.css
-  Hint: Ganti dengan token semantik: primary/10 → primary-light
+  Hardcode opacity color: "bg-primary/10"
+  Hint: Use semantic token "primary-light".
 
 [WARN] src/components/Card.tsx:42:12 [theme.hardcode-color]
-  Hardcode hex color (#2563eb) - gunakan token warna dari global.css
-  Hint: Ganti dengan token semantik: #2563eb → bg-primary
+  Hardcode hex color: "#2563eb"
+  Hint: Use semantic token "bg-primary".
 
- Scanned 28 files in 18ms. Found 1 error, 1 warning.
+ 2 problems found (1 error, 1 warning)
+  Scanned 28 files in 18ms.
 ```
 
-- **Palet Warna ANSI:**
-  - `[ERROR]`: Merah tebal (*Bold Red*, ANSI 31;1).
-  - `[WARN]`: Kuning tebal (*Bold Yellow*, ANSI 33;1).
-  - `[INFO]`: Biru/Sian tebal (*Bold Cyan*, ANSI 36;1).
-  - File path & baris: Teks putih/terang dengan underline atau dim.
-  - Hint: Abu-abu redup (*Dim*, ANSI 2).
-- **Deteksi TTY & No-Color:**
-  Jika `stdout` bukan terminal interaktif (misal dialihkan ke file/pipe: `charites scan . > report.txt`), atau terdapat variabel lingkungan `NO_COLOR=1`, sistem **MUST** menonaktifkan kode escape ANSI secara otomatis.
+- **Format Repositori Bersih (Clean Scan):**
+  ```text
+   0 problems found (0 errors, 0 warnings)
+    Scanned 28 files in 12ms.
+  ```
+- **Kontrak Formatting:**
+  - Path berkas ditampilkan sebagai format relatif terhadap workspace dengan pemisah POSIX forward slash (`/`), bahkan di sistem operasi Windows.
+  - Teks menggunakan encoding UTF-8 dengan karakter newline trailing akhir (`\n`).
+  - Pewarnaan ANSI: Bold Red (`[ERROR]`), Bold Yellow (`[WARN]`), Bold Cyan (`[INFO]`), Dim (`Hint:`).
 
-### 4.2. JSON Stream Reporter (`--format=json`)
-Ditujukan untuk integrasi CI/CD, tool pelaporan otomatis, dan bot PR:
+### 3.2. Resolusi Warna ANSI & Deteksi TTY
+Pewarnaan ANSI escape codes dikendalikan oleh resolusi deterministik:
+- Pewarnaan ANSI **DIMATIKAN** (`ColorNever`) jika salah satu kondisi berikut terpenuhi:
+  1. Pengguna menyertakan flag `--no-color`.
+  2. Variabel lingkungan `NO_COLOR` ada dan tidak kosong (`os.Getenv("NO_COLOR") != ""`).
+  3. `stdout` bukan terminal interaktif TTY (misal: dialihkan ke pipe `|` atau file `>`).
+- Selain kondisi di atas, pewarnaan ANSI diaktifkan secara otomatis (`ColorAuto`).
+
+### 3.3. JSON Document Reporter (`--format=json`)
+Format dokumen JSON tunggal lengkap (*complete JSON document*) yang dicetak di akhir pemindaian untuk konsumsi mesin, PR bot, atau pipeline CI/CD:
 
 ```json
 {
@@ -131,21 +129,27 @@ Ditujukan untuk integrasi CI/CD, tool pelaporan otomatis, dan bot PR:
       "rule": "theme.hardcode-opacity-color",
       "category": "theme",
       "severity": "error",
-      "message": "Hardcode opacity color (bg-primary/10) - wajib pakai semantic token dari global.css",
-      "hint": "Ganti dengan token semantik: primary/10 → primary-light"
+      "message": "Hardcode opacity color: \"bg-primary/10\"",
+      "hint": "Use semantic token \"primary-light\"."
     }
   ]
 }
 ```
 
+- **Skema Waktu:** Durasi pemindaian dicatat dalam field `"duration_ms"` sebagai integer milidetik.
+- **Determinis Biner:** Urutan isi slice `diagnostics` mengikuti *total ordering* Fase 4 (`File` $\rightarrow$ `Line` $\rightarrow$ `Col` $\rightarrow$ `RuleID` $\rightarrow$ `Severity` $\rightarrow$ `Message` $\rightarrow$ `Hint`).
+
 ---
 
-## 5. Kontrak Exit Codes
+## 4. Taksonomi & Kontrak Exit Codes
 
-Untuk kepatuhan standar POSIX dan otomasi pipeline CI:
+Exit code adalah kontrak deterministik mesin dengan lingkungan sistem operasi dan runner CI/CD:
 
-| Exit Code | Kondisi Keluar | Keterangan |
+| Exit Code | Nama Status | Kondisi Pemicu |
 | :---: | :--- | :--- |
-| **`0`** | **CLEAN / SUCCESS** | Tidak ada pelanggaran bertingkat `error`. Jika ada `warning`, tetap `0` kecuali `--fail-on-warn` aktif. |
-| **`1`** | **VIOLATIONS DETECTED** | Ditemukan minimal satu pelanggaran bertingkat `error`, atau ada `warning` saat `--fail-on-warn` diaktifkan. |
-| **`2`** | **FATAL SYSTEM ERROR** | Kesalahan konfigurasi, argumen tidak valid, atau berkas target tidak dapat diakses. |
+| **`0`** | **CLEAN / SUCCESS** | Pemindaian selesai tanpa temuan bertingkat `error`. Temuan bertingkat `warning` diizinkan lewat, kecuali jika flag `--fail-on-warn` aktif. |
+| **`1`** | **VIOLATIONS FOUND** | Ditemukan minimal 1 temuan bertingkat `error`, ATAU ditemukan minimal 1 temuan bertingkat `warning` saat flag `--fail-on-warn` diaktifkan. |
+| **`2`** | **CLI / OPERATIONAL ERROR** | Kesalahan pemanggilan CLI (flag tidak dikenal, nilai flag tidak valid, ekstensi tidak didukung, konflik category/rule, path target tidak dapat diakses, atau sintaks `charites.yaml` korup). |
+| **`130`** | **TERMINATED BY SIGNAL** | Proses diinterupsi oleh pengguna via sinyal terminal (`SIGINT`/`SIGTERM`). |
+
+**Invarian Mutlak:** Temuan pelanggaran kode (diagnostic violation) **DILARANG KERAS** menghasilkan exit code `2`.
