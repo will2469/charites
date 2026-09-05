@@ -85,7 +85,7 @@ Untuk men-generate kerangka aturan baru secara otomatis:
 Skrip ini akan secara otomatis membuat:
 1. File implementasi rule di `internal/rules/<category>/<snake_slug>.go` (misal: `internal/rules/theme/hardcode_opacity_color.go`).
 2. 1-SSOT Tri-Corpus di `tests/correctness/<category>/<slug>/` (`positive/`, `negative/`, `adversarial/`, dan `rule_test.go`).
-3. Berkas dokumentasi 8-Pillars resmi di `wiki/<category>/<slug>.md`.
+3. Berkas dokumentasi 8-Pillars resmi di `wiki/<category>.<slug>.md`.
 
 ---
 
@@ -115,4 +115,4 @@ Setiap pembuatan rule baru di Charites wajib menuntaskan 6 langkah berurutan:
 - [ ] **Langkah 3: Implementasi Logika AST & Doc():** Lengkapi fungsi inspeksi AST pada `internal/rules/<category>/<snake_slug>.go` dan method `Doc() ir.RuleDocumentation`.
 - [ ] **Langkah 4: Kelengkapan Tri-Corpus:** Isi skenario P1-P5 (`positive/`), N1-N5 (`negative/` dengan `charites:ignore <category>.<slug>`), dan A1-A7 (`adversarial/`).
 - [ ] **Langkah 5: Verifikasi Pengujian:** Jalankan `go test -v ./tests/correctness/<category>/<slug>/...` hingga seluruh tes PASS.
-- [ ] **Langkah 6: Regenerasi Wiki Otomatis (Zero Manual Editing):** Jalankan `make wiki` untuk me-render `wiki/Home.md`, `wiki/<category>.md`, dan `wiki/<category>/<slug>.md` secara otomatis tanpa mengedit markdown manual.
+- [ ] **Langkah 6: Regenerasi Wiki Otomatis (Zero Manual Editing):** Jalankan `make wiki` untuk me-render `wiki/Home.md`, `wiki/_Sidebar.md`, `wiki/<category>.md`, dan `wiki/<category>.<slug>.md` secara otomatis tanpa mengedit markdown manual.

@@ -38,14 +38,14 @@ TITLE_CASE_NAME=$(echo "${SLUG//-/ }" | sed -e 's/\b\(.\)/\u\1/g')
 
 RULES_DIR="${REPO_ROOT}/internal/rules/${CATEGORY}"
 CORPUS_DIR="${REPO_ROOT}/tests/correctness/${CATEGORY}/${SLUG}"
-WIKI_FILE="${REPO_ROOT}/wiki/${CATEGORY}/${SLUG}.md"
+WIKI_FILE="${REPO_ROOT}/wiki/${CATEGORY}.${SLUG}.md"
 
 echo "=== Scaffolding Charites Rule: ${RULE_ID} ==="
 echo "Implementation: ${RULES_DIR}/${RULE_FILE_NAME}"
 echo "Tri-Corpus:     ${CORPUS_DIR}/"
 echo "Wiki Doc:       ${WIKI_FILE}"
 
-mkdir -p "${RULES_DIR}" "${REPO_ROOT}/wiki/${CATEGORY}"
+mkdir -p "${RULES_DIR}" "${REPO_ROOT}/wiki"
 mkdir -p "${CORPUS_DIR}/positive" "${CORPUS_DIR}/negative" "${CORPUS_DIR}/adversarial"
 
 # 1. Generate internal/rules/<category>_<slug>.go

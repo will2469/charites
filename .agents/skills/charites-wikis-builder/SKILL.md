@@ -21,25 +21,28 @@ metadata:
 
 ## 1. Topologi Direktori Wiki Resmi
 
-Sesuai arsitektur hierarkis Charites (Tiered Documentation Model):
+Sesuai arsitektur GitHub Wiki Gollum (Flat Root Namespace & Collapsible Sidebar Navigation):
 
 ```text
 wiki/
-├── Home.md                           # Master Catalog: Tabel kategori, rule counts & indeks seluruh rule
-├── theme.md                          # Domain Overview: Ringkasan kategori Theme & Design Tokens
-├── theme/
-│   └── hardcode-opacity-color.md     # Spesifikasi Lengkap 8-Pillars Rule
-├── a11y.md                           # Domain Overview: Ringkasan kategori Accessibility
-├── a11y/
-│   └── alt-text.md                   # Spesifikasi Lengkap 8-Pillars Rule
-├── responsive.md                     # Domain Overview: Ringkasan kategori Responsive Design
-├── responsive/
-│   └── container-query.md            # Spesifikasi Lengkap 8-Pillars Rule
-├── perf.md                           # Domain Overview: Ringkasan kategori Performance & Web Vitals
-├── perf/
-│   └── font-display.md               # Spesifikasi Lengkap 8-Pillars Rule
-└── seo.md                            # Domain Overview: Ringkasan kategori SEO & Metadata
+├── Home.md                                 # Master Catalog: Tabel kategori, rule counts & indeks seluruh rule
+├── _Sidebar.md                             # Navigasi Collapsible: <details open><summary><b>Category</b> (Count)</summary>
+├── theme.md                                # Domain Overview: Ringkasan kategori Theme & Design Tokens
+├── theme.hardcode-opacity-color.md         # Spesifikasi Lengkap 8-Pillars Rule (Flat Namespace)
+├── theme.hardcode-color.md                 # Spesifikasi Lengkap 8-Pillars Rule (Flat Namespace)
+├── a11y.md                                 # Domain Overview: Ringkasan kategori Accessibility
+├── a11y.alt-text.md                        # Spesifikasi Lengkap 8-Pillars Rule (Flat Namespace)
+├── responsive.md                           # Domain Overview: Ringkasan kategori Responsive Design
+├── responsive.touch-target.md              # Spesifikasi Lengkap 8-Pillars Rule (Flat Namespace)
+├── perf.md                                 # Domain Overview: Ringkasan kategori Performance & Web Vitals
+└── perf.inline-css.md                      # Spesifikasi Lengkap 8-Pillars Rule (Flat Namespace)
 ```
+
+> [!IMPORTANT]
+> **Invarian Format Tautan GitHub Wiki:**
+> 1. **Flat Namespace (`<category>.<slug>.md`):** Gollum (engine GitHub Wiki) memberlakukan flat root namespace. Subdirektori (`theme/foo.md`) tidak didukung sebagai halaman wiki dan akan di-redirect ke `raw.githubusercontent.com`. Seluruh rule wajib berada langsung di root `wiki/`.
+> 2. **Tanpa Ekstensi `.md` pada Tautan Internal:** Seluruh tautan internal wajib menghilangkan ekstensi `.md` (misal: `[theme.hardcode-color](theme.hardcode-color)` dan `[Home](Home)`). Menyertakan `.md` pada URL markdown membuat GitHub menganggapnya sebagai raw blob download.
+> 3. **Collapsible Sidebar Accordion:** Di `_Sidebar.md`, setiap kategori dibungkus dengan `<details open><summary><b>{{.Title}}</b> ({{.Count}} rules)</summary>...</details>` untuk mencegah bloat navigasi ketika ada ratusan rules.
 
 ---
 
@@ -54,8 +57,9 @@ Untuk mencegah desinkronisasi dokumentasi (*documentation drift*):
    ```
    Command ini mengeksekusi `internal/wiki/generator.go` yang me-render:
    - `wiki/Home.md` (menghitung jumlah rule per kategori secara otomatis dan mendaftar seluruh rule).
+   - `wiki/_Sidebar.md` (navigasi collapsible accordion dengan link extension-less).
    - `wiki/<category>.md` (membuat tabel index rule per kategori dengan tautan relatif ke spesifikasi rule).
-   - `wiki/<category>/<slug>.md` (me-render spesifikasi lengkap 8-Pillars langsung dari method `Doc()`).
+   - `wiki/<category>.<slug>.md` (me-render spesifikasi lengkap 8-Pillars langsung dari method `Doc()`).
 3. **Penyelarasan CI/CD & Testing:** Generator wiki divalidasi pada pengujian integrasi (`internal/wiki/generator_test.go`). Pengujian `TestGenerator_RegenerateWiki` menjamin output deterministik biner dan zero diff terhadap rule yang terdaftar.
 
 ---
