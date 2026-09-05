@@ -21,6 +21,11 @@ var (
 	_ Rule = (*theme.HardcodeShadowColorRule)(nil)
 	_ Rule = (*theme.BackdropBlurHardcodeRule)(nil)
 	_ Rule = (*theme.FocusRingHardcodeRule)(nil)
+	_ Rule = (*theme.UnpairedDarkVariantRule)(nil)
+	_ Rule = (*theme.ShadowWithoutBorderDarkRule)(nil)
+	_ Rule = (*theme.NestedOpacityContrastRule)(nil)
+	_ Rule = (*theme.ImageThemeHardcodeRule)(nil)
+	_ Rule = (*theme.SVGHardcodeFillRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -40,6 +45,11 @@ func builtinRules() []Rule {
 		theme.NewHardcodeShadowColorRule(),
 		theme.NewBackdropBlurHardcodeRule(),
 		theme.NewFocusRingHardcodeRule(),
+		theme.NewUnpairedDarkVariantRule(),
+		theme.NewShadowWithoutBorderDarkRule(),
+		theme.NewNestedOpacityContrastRule(),
+		theme.NewImageThemeHardcodeRule(),
+		theme.NewSVGHardcodeFillRule(),
 	}
 }
 

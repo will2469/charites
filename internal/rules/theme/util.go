@@ -603,3 +603,140 @@ func IsHardcodedFocusRing(base string) bool {
 		isArbitraryFocusRingBracket(base) ||
 		isPrimitiveFocusRing(base)
 }
+
+// IsElevatedShadow memeriksa apakah suatu class adalah bayangan elevasi kontainer (shadow, shadow-md, shadow-lg, shadow-xl, shadow-2xl).
+func IsElevatedShadow(base string) bool {
+	switch base {
+	case "shadow", "shadow-md", "shadow-lg", "shadow-xl", "shadow-2xl":
+		return true
+	default:
+		return false
+	}
+}
+
+// HasBorderOrRing memeriksa apakah dalam daftar class terdapat deklarasi border atau ring aktif.
+func HasBorderOrRing(classes []string) bool {
+	for _, class := range classes {
+		base := StripVariantsOnlyBase(class)
+		if isBorderClass(base) || isRingClass(base) {
+			return true
+		}
+	}
+	return false
+}
+
+func isBorderClass(base string) bool {
+	if base == "border" {
+		return true
+	}
+	if strings.HasPrefix(base, "border-") {
+		rem := base[7:]
+		switch rem {
+		case "0", "none", "transparent":
+			return false
+		default:
+			return true
+		}
+	}
+	return false
+}
+
+func isRingClass(base string) bool {
+	if base == "ring" {
+		return true
+	}
+	if strings.HasPrefix(base, "ring-") {
+		rem := base[5:]
+		switch rem {
+		case "0", "none", "transparent", "inset":
+			return false
+		default:
+			return true
+		}
+	}
+	return false
+}
+
+// HasDarkVariant memeriksa apakah dalam daftar class terdapat class yang diawali varian dark:
+func HasDarkVariant(classes []string) bool {
+	for _, class := range classes {
+		if strings.HasPrefix(class, "dark:") || strings.Contains(class, ":dark:") {
+			return true
+		}
+	}
+	return false
+}
+
+// HasContainerOpacity memeriksa apakah class kontainer memuat modifier opacity atau background slash opacity.
+func HasContainerOpacity(classes []string) (string, bool) {
+	for _, class := range classes {
+		base := StripVariantsOnlyBase(class)
+		if strings.HasPrefix(base, "opacity-") && len(base) > 8 {
+			return class, true
+		}
+		if strings.HasPrefix(base, "bg-") && strings.Contains(base, "/") {
+			return class, true
+		}
+	}
+	return "", false
+}
+
+// HasTextOrInnerOpacity memeriksa apakah elemen anak memuat teks dengan slash opacity atau modifier opacity.
+func HasTextOrInnerOpacity(classes []string) (string, bool) {
+	for _, class := range classes {
+		base := StripVariantsOnlyBase(class)
+		if strings.HasPrefix(base, "opacity-") && len(base) > 8 {
+			return class, true
+		}
+		if strings.HasPrefix(base, "text-") && strings.Contains(base, "/") {
+			return class, true
+		}
+	}
+	return "", false
+}
+
+// IsThemeGraphicAsset mendeteksi apakah path/URL gambar merujuk pada aset visual seperti SVG, logo, ilustrasi, diagram, atau chart.
+func IsThemeGraphicAsset(src string) bool {
+	lower := strings.ToLower(strings.Trim(strings.TrimSpace(src), "\"'`"))
+	if lower == "" {
+		return false
+	}
+	if strings.HasSuffix(lower, ".svg") {
+		return true
+	}
+	graphicKeywords := []string{"logo", "diagram", "illustration", "chart", "graphic", "scheme"}
+	for _, kw := range graphicKeywords {
+		if strings.Contains(lower, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// SVGElementNames adalah himpunan nama elemen SVG umum yang mendukung atribut pewarnaan vektor.
+var SVGElementNames = map[string]bool{
+	"svg": true, "path": true, "rect": true, "circle": true,
+	"polygon": true, "ellipse": true, "line": true, "polyline": true,
+	"stop": true, "g": true, "mask": true, "pattern": true, "text": true,
+}
+
+// IsSVGElement memeriksa apakah tag HTML/JSX merupakan elemen SVG.
+func IsSVGElement(tag string) bool {
+	return SVGElementNames[strings.ToLower(tag)]
+}
+
+// IsHardcodedSVGAttribute memeriksa apakah pasangan nama atribut dan nilai SVG memuat warna heksadesimal atau primitif hardcoded.
+func IsHardcodedSVGAttribute(attrName, attrVal string) bool {
+	name := strings.ToLower(strings.TrimSpace(attrName))
+	switch name {
+	case "fill", "stroke", "stop-color", "stopcolor":
+		val := strings.Trim(strings.TrimSpace(attrVal), "\"'`")
+		if val == "" || IsSafeColorValue(val) || strings.HasPrefix(val, "url(#") {
+			return false
+		}
+		if IsHexColor(val) || IsColorFunction(val) || IsMonochromeColor(val) || TailwindPrimitiveColors[val] {
+			return true
+		}
+	}
+	return false
+}

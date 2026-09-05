@@ -7,7 +7,7 @@
 ### Rule Categories
 
 <details open>
-<summary><b>Theme</b> (15 rules)</summary>
+<summary><b>Theme</b> (20 rules)</summary>
 
 * [**Theme Overview**](theme)
 * [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode)
@@ -21,10 +21,15 @@
 * [`theme.hardcode-shadow-color`](theme.hardcode-shadow-color)
 * [`theme.hardcode-size`](theme.hardcode-size)
 * [`theme.hardcode-z-index`](theme.hardcode-z-index)
+* [`theme.image-theme-hardcode`](theme.image-theme-hardcode)
 * [`theme.important-override`](theme.important-override)
 * [`theme.inline-style-hardcode`](theme.inline-style-hardcode)
+* [`theme.nested-opacity-contrast`](theme.nested-opacity-contrast)
 * [`theme.primitive-in-component`](theme.primitive-in-component)
 * [`theme.pseudo-hardcode-color`](theme.pseudo-hardcode-color)
+* [`theme.shadow-without-border-dark`](theme.shadow-without-border-dark)
+* [`theme.svg-hardcode-fill`](theme.svg-hardcode-fill)
+* [`theme.unpaired-dark-variant`](theme.unpaired-dark-variant)
 
 </details>
 

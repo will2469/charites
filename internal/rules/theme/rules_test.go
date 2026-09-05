@@ -616,3 +616,245 @@ func BenchmarkKelompok2_ZeroAllocClean(b *testing.B) {
 		})
 	}
 }
+
+func TestUnpairedDarkVariantRule(t *testing.T) {
+	rule := theme.NewUnpairedDarkVariantRule()
+
+	if rule.ID() != "theme.unpaired-dark-variant" {
+		t.Fatalf("unexpected ID: %s", rule.ID())
+	}
+	if rule.DefaultSeverity() != ir.SeverityWarn {
+		t.Fatalf("unexpected severity: %v", rule.DefaultSeverity())
+	}
+
+	t.Run("UnpairedDarkBgWithoutBase", func(t *testing.T) {
+		node := makeNode("dark:bg-zinc-900")
+		diags := rule.Evaluate(node)
+		if len(diags) != 1 {
+			t.Fatalf("expected 1 diag, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("InvertedContainerWithChildTextBlind", func(t *testing.T) {
+		child := makeNode("text-zinc-900")
+		parent := makeNode("bg-white", "dark:bg-zinc-900")
+		parent.Children = []*ir.Node{child}
+		child.Parent = parent
+
+		diags := rule.Evaluate(parent)
+		if len(diags) != 1 {
+			t.Fatalf("expected 1 diag on parent evaluating child, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("CompliantSemanticTokens", func(t *testing.T) {
+		child := makeNode("text-card-foreground")
+		parent := makeNode("bg-card")
+		parent.Children = []*ir.Node{child}
+		child.Parent = parent
+
+		diags := rule.Evaluate(parent)
+		if len(diags) != 0 {
+			t.Fatalf("expected 0 diags, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("CompliantPairedVariants", func(t *testing.T) {
+		child := makeNode("text-zinc-900", "dark:text-zinc-100")
+		parent := makeNode("bg-white", "dark:bg-zinc-900")
+		parent.Children = []*ir.Node{child}
+		child.Parent = parent
+
+		diags := rule.Evaluate(parent)
+		if len(diags) != 0 {
+			t.Fatalf("expected 0 diags, got %d: %+v", len(diags), diags)
+		}
+	})
+}
+
+func TestShadowWithoutBorderDarkRule(t *testing.T) {
+	rule := theme.NewShadowWithoutBorderDarkRule()
+
+	if rule.ID() != "theme.shadow-without-border-dark" {
+		t.Fatalf("unexpected ID: %s", rule.ID())
+	}
+
+	t.Run("ElevatedShadowWithoutBorder", func(t *testing.T) {
+		node := makeNode("bg-card", "shadow-xl", "rounded-xl", "p-6")
+		diags := rule.Evaluate(node)
+		if len(diags) != 1 {
+			t.Fatalf("expected 1 diag, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("ElevatedShadowWithBorder", func(t *testing.T) {
+		node := makeNode("bg-card", "border", "border-border", "shadow-xl", "rounded-xl", "p-6")
+		diags := rule.Evaluate(node)
+		if len(diags) != 0 {
+			t.Fatalf("expected 0 diags, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("ElevatedShadowWithRing", func(t *testing.T) {
+		node := makeNode("bg-zinc-900", "ring-1", "ring-border", "shadow-lg", "p-4")
+		diags := rule.Evaluate(node)
+		if len(diags) != 0 {
+			t.Fatalf("expected 0 diags, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("LowElevationShadowSmClean", func(t *testing.T) {
+		node := makeNode("bg-card", "shadow-sm", "p-4")
+		diags := rule.Evaluate(node)
+		if len(diags) != 0 {
+			t.Fatalf("expected 0 diags, got %d: %+v", len(diags), diags)
+		}
+	})
+}
+
+func TestNestedOpacityContrastRule(t *testing.T) {
+	rule := theme.NewNestedOpacityContrastRule()
+
+	if rule.ID() != "theme.nested-opacity-contrast" {
+		t.Fatalf("unexpected ID: %s", rule.ID())
+	}
+
+	t.Run("CompoundedOpacityViolation", func(t *testing.T) {
+		child := makeNode("text-foreground/50")
+		parent := makeNode("bg-muted/40", "opacity-80")
+		parent.Children = []*ir.Node{child}
+		child.Parent = parent
+
+		diags := rule.Evaluate(parent)
+		if len(diags) != 1 {
+			t.Fatalf("expected 1 diag, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("CompliantSolidTokens", func(t *testing.T) {
+		child := makeNode("text-muted-foreground")
+		parent := makeNode("bg-muted")
+		parent.Children = []*ir.Node{child}
+		child.Parent = parent
+
+		diags := rule.Evaluate(parent)
+		if len(diags) != 0 {
+			t.Fatalf("expected 0 diags, got %d: %+v", len(diags), diags)
+		}
+	})
+}
+
+func TestImageThemeHardcodeRule(t *testing.T) {
+	rule := theme.NewImageThemeHardcodeRule()
+
+	if rule.ID() != "theme.image-theme-hardcode" {
+		t.Fatalf("unexpected ID: %s", rule.ID())
+	}
+
+	t.Run("StaticSVGLogoViolation", func(t *testing.T) {
+		node := makeNodeWithAttr(map[string]string{"src": "/images/logo-black.svg", "alt": "Logo"})
+		node.Tag = "img"
+		diags := rule.Evaluate(node)
+		if len(diags) != 1 {
+			t.Fatalf("expected 1 diag, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("ThemePairedImgClean", func(t *testing.T) {
+		node := makeNodeWithAttr(map[string]string{"src": "/images/logo-light.svg", "alt": "Logo"}, "dark:hidden")
+		node.Tag = "img"
+		diags := rule.Evaluate(node)
+		if len(diags) != 0 {
+			t.Fatalf("expected 0 diags, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("InsidePictureClean", func(t *testing.T) {
+		picture := &ir.Node{Tag: "picture"}
+		img := makeNodeWithAttr(map[string]string{"src": "/images/logo.svg"})
+		img.Tag = "img"
+		img.Parent = picture
+		picture.Children = []*ir.Node{img}
+
+		diags := rule.Evaluate(img)
+		if len(diags) != 0 {
+			t.Fatalf("expected 0 diags, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("RegularPhotoClean", func(t *testing.T) {
+		node := makeNodeWithAttr(map[string]string{"src": "/photos/avatar.jpg", "alt": "Avatar"})
+		node.Tag = "img"
+		diags := rule.Evaluate(node)
+		if len(diags) != 0 {
+			t.Fatalf("expected 0 diags, got %d: %+v", len(diags), diags)
+		}
+	})
+}
+
+func TestSVGHardcodeFillRule(t *testing.T) {
+	rule := theme.NewSVGHardcodeFillRule()
+
+	if rule.ID() != "theme.svg-hardcode-fill" {
+		t.Fatalf("unexpected ID: %s", rule.ID())
+	}
+
+	t.Run("HardcodedHexFill", func(t *testing.T) {
+		node := makeNodeWithAttr(map[string]string{"fill": "#000000", "d": "M10 10"})
+		node.Tag = "path"
+		diags := rule.Evaluate(node)
+		if len(diags) != 1 {
+			t.Fatalf("expected 1 diag, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("HardcodedStopColor", func(t *testing.T) {
+		node := makeNodeWithAttr(map[string]string{"stop-color": "#3b82f6", "offset": "100%"})
+		node.Tag = "stop"
+		diags := rule.Evaluate(node)
+		if len(diags) != 1 {
+			t.Fatalf("expected 1 diag, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("CurrentColorClean", func(t *testing.T) {
+		node := makeNodeWithAttr(map[string]string{"fill": "currentColor", "stroke": "none"})
+		node.Tag = "path"
+		diags := rule.Evaluate(node)
+		if len(diags) != 0 {
+			t.Fatalf("expected 0 diags, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("CSSVarClean", func(t *testing.T) {
+		node := makeNodeWithAttr(map[string]string{"stop-color": "var(--primary)", "offset": "100%"})
+		node.Tag = "stop"
+		diags := rule.Evaluate(node)
+		if len(diags) != 0 {
+			t.Fatalf("expected 0 diags, got %d: %+v", len(diags), diags)
+		}
+	})
+}
+
+func BenchmarkKelompok3_ZeroAllocClean(b *testing.B) {
+	node := makeNode("bg-card", "border", "border-border", "text-card-foreground", "p-6", "rounded-xl")
+	rulesK3 := []struct {
+		name string
+		eval func(*ir.Node) []ir.Diagnostic
+	}{
+		{"UnpairedDarkVariant", theme.NewUnpairedDarkVariantRule().Evaluate},
+		{"ShadowWithoutBorderDark", theme.NewShadowWithoutBorderDarkRule().Evaluate},
+		{"NestedOpacityContrast", theme.NewNestedOpacityContrastRule().Evaluate},
+		{"ImageThemeHardcode", theme.NewImageThemeHardcodeRule().Evaluate},
+		{"SVGHardcodeFill", theme.NewSVGHardcodeFillRule().Evaluate},
+	}
+
+	for _, tc := range rulesK3 {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				_ = tc.eval(node)
+			}
+		})
+	}
+}
