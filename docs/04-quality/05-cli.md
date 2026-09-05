@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `QUAL-05-CLI`
 > **Tahapan:** Fase 5 - Reporter Output & CLI Entrypoint
 > **Peran Pilar:** QUALITY = QUALITY THRESHOLD (Ambang Batas Kualitas, Keamanan Terminal & Anggaran Sumber Daya)
-> **Status:** Ready for Review
+> **Status:** Ready / Approved for Implementation
 > **Standar Rujukan:** POSIX.1-2017 CLI Standards & The 12-Factor App CLI Ergonomics
 
 Dokumen ini mendefinisikan batasan kualitas untuk antarmuka CLI, penanganan pemisahan aliran data (*stream separation*), sanitasi karakter escape terminal, determinisme kode keluar, serta anggaran kinerja pelaporan.
@@ -56,6 +56,10 @@ Pengukuran wajib dilakukan secara terisolasi terhadap `io.Discard` untuk menghil
 | :--- | :---: | :--- |
 | **Line Coverage Paket CLI** | $\ge 85\%$ | `go test -cover ./internal/cli/...` |
 | **Line Coverage Paket Reporter** | $\ge 90\%$ | `go test -cover ./internal/reporter/...` |
+| **Verifikasi Data Race** | $0$ data race detected | `go test -race ./...` |
+| **Batas Kompleksitas Siklomatik** | $\le 12$ per fungsi | `gocyclo -over 12 ./internal/cli ./internal/reporter` |
 | **Subprocess E2E Tests** | 100% lulus | `go test -v ./tests/e2e/...` |
 | **Deterministic Byte Equality** | 100% identik biner | `TestReporter_Determinism` |
 | **Linter Compliance** | $0$ issues | `golangci-lint run ./internal/cli/... ./internal/reporter/...` |
+| **Cross-Platform Compilation** | 100% build pass (4 target) | `make cross-compile` |
+

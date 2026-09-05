@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `SPEC-05-CLI`
 > **Tahapan:** Fase 5 - Reporter Output & CLI Entrypoint
 > **Peran Pilar:** SPEC = WHAT (Spesifikasi Antarmuka CLI, Format Reporter & Kontrak Exit Code)
-> **Status:** Ready for Review
+> **Status:** Ready / Approved for Implementation
 > **Standar Rujukan:** POSIX CLI Standards / 12-Factor App CLI / GNU Coding Standards
 
 Dokumen ini mendefinisikan spesifikasi antarmuka baris perintah (*Command-Line Interface* / CLI), sintaks subcommand, opsi ergonomi pemindaian (A-E), tata bahasa flag dan normalisasi, aturan resolusi warna/TTY, format dokumen pelaporan (*inline ANSI* dan *JSON Document*), serta kontrak *exit codes*.
@@ -28,8 +28,25 @@ Available Commands:
 
 ### 1.1. Aturan Resolusi Perintah Bawaan (Default Command & Aliases)
 1. **Pemanggilan Kosong (0 Argumen):** Pemanggilan `charites` tanpa argumen sama sekali **MUST** secara otomatis mengeksekusi `charites scan .`.
-2. **Argumen Path / Flag Langsung:** Pemanggilan dengan path atau flag langsung (misal: `charites .`, `charites src/Button.tsx`, atau `charites --format=json`) **MUST** diarahkan ke subcommand `scan`.
-3. **Subcommand Aliases:** Subcommand `check` dan `run` memiliki perilaku, flag, dan output yang identik 100% dengan `scan`.
+2. **Argumen Path / Flag Langsung Tanpa Subcommand:**
+   - Pemanggilan dengan path langsung (misal: `charites .` atau `charites src/Button.tsx`) **MUST** diarahkan ke subcommand `scan` dengan path tersebut sebagai target.
+   - Pemanggilan dengan flag langsung (misal: `charites --format=json` atau `charites --ext=astro src/`) **MUST** diarahkan ke subcommand `scan` dengan meneruskan seluruh flag dan target path default `.` jika path tidak ditentukan.
+3. **Subcommand Aliases:** Subcommand `check` dan `run` memiliki perilaku, flag, output, dan kode keluar yang identik 100% dengan `scan`.
+4. **Subcommand Bantuan & Versi:**
+   - `charites version`, `charites -v`, `charites --version` mencetak string versi ke `stdout` dan mengembalikan exit code `0`.
+   - `charites help`, `charites -h`, `charites --help` mencetak petunjuk penggunaan ke `stdout` dan mengembalikan exit code `0`.
+5. **Perintah / Flag Tidak Dikenal:**
+   - Argumen subcommand yang tidak dikenal (misal: `charites foobar`) **MUST** mencetak pesan kesalahan ke `stderr` dan keluar dengan exit code `2`:
+     `charites: error: unknown command "foobar". Run 'charites --help' for usage.`
+   - Flag yang tidak dikenal (misal: `charites scan --unknown`) **MUST** mencetak pesan kesalahan ke `stderr` dan keluar dengan exit code `2`.
+6. **Batasan Target Path:**
+   - Subcommand `scan` menerima maksimal 1 target path posisi (`charites scan [flags] [path]`). Jika target path tidak disertakan, nilai bawaan adalah `.` (root workspace).
+   - Jika pengguna menyertakan lebih dari satu target path (misal `charites scan path1 path2`), CLI **MUST** keluar dengan exit code `2` dan pesan error di `stderr`:
+     `charites: error: multiple scan targets not supported. Specify a single path.`
+   - Jika path target tidak ada di filesystem, CLI **MUST** keluar dengan exit code `2` dan pesan error di `stderr`:
+     `charites: error: scan target "<path>" does not exist.`
+   - Jika path target berada di dalam direktori *builtin hard exclusion* (misal `charites scan node_modules/foo/Card.tsx`), sistem keamanan *direct-target safety* **MUST** menolak pemindaian dan keluar dengan exit code `2` dan pesan error di `stderr`:
+     `charites: error: scan target "<path>" is within excluded directory (builtin hard exclusion).`
 
 ---
 
@@ -50,24 +67,36 @@ Available Commands:
 - **Ekstensi yang Didukung:** `.astro`, `.tsx`, `.jsx`.
 - **Normalisasi:** Case-insensitive (`ASTRO` $\rightarrow$ `astro`), tanda titik di awal bersifat opsional (`astro` $\equiv$ `.astro`). Nilai dapat dipisahkan koma (`--ext=astro,tsx`) atau berulang (`--ext astro --ext tsx`).
 - **Penolakan Nilai Tidak Sah:**
-  - Jika pengguna memasukkan ekstensi yang tidak didukung (misal `--ext=vue` atau `--ext=foo`), CLI **MUST** menghentikan eksekusi dengan exit code `2` dan pesan error di `stderr`: `charites: error: unsupported extension "foo". Supported extensions: .astro, .tsx, .jsx`.
-  - Jika nilai flag kosong (`--ext=`), CLI **MUST** keluar dengan exit code `2`: `charites: error: empty extension flag`.
+  - Jika pengguna memasukkan ekstensi yang tidak didukung (misal `--ext=vue` atau `--ext=foo`), CLI **MUST** menghentikan eksekusi dengan exit code `2` dan pesan error di `stderr`:
+    `charites: error: unsupported extension "foo". Supported extensions: .astro, .tsx, .jsx.`
+  - Jika nilai flag kosong (`--ext=""` atau `--ext=`), CLI **MUST** keluar dengan exit code `2`:
+    `charites: error: empty extension flag.`
 
-### 2.2. Validasi Konflik Flag `--category` dan `--rule`
-- Jika pengguna menentukan kedua flag sekaligus (misal: `--category=theme --rule=a11y.alt-text`):
-  - Sistem melakukan validasi irisan (*intersection check*): apakah rule tersebut terdaftar di dalam kategori yang ditentukan?
-  - Jika rule tidak termasuk dalam kategori tersebut, CLI **MUST** keluar dengan exit code `2` dan pesan error di `stderr`: `charites: error: rule "a11y.alt-text" does not belong to category "theme"`.
+### 2.2. Validasi Konflik & Keberadaan Flag `--category` dan `--rule`
+- **Validasi Keberadaan Kategori:** Jika `--category` ditentukan dan kategori tersebut tidak terdaftar pada registry, CLI **MUST** keluar dengan exit code `2`:
+  `charites: error: unknown category "<category>".`
+- **Validasi Keberadaan Rule:** Jika `--rule` ditentukan dan Rule ID tersebut tidak terdaftar pada registry, CLI **MUST** keluar dengan exit code `2`:
+  `charites: error: unknown rule "<rule>".`
+- **Validasi Irisan (Intersection Check):** Jika pengguna menentukan kedua flag sekaligus (misal: `--category=theme --rule=a11y.alt-text`):
+  - Sistem melakukan validasi irisan: apakah rule tersebut terdaftar di dalam kategori yang ditentukan?
+  - Jika rule tidak termasuk dalam kategori tersebut, CLI **MUST** keluar dengan exit code `2` dan pesan error di `stderr`:
+    `charites: error: rule "a11y.alt-text" does not belong to category "theme".`
 
-### 2.3. Tata Bahasa Flag `--ignore`
+### 2.3. Validasi Flag `--format`
+- **Format yang Didukung:** `inline` (default) dan `json`.
+- Jika format tidak didukung (misal `--format=xml` atau `--format=yaml`), CLI **MUST** keluar dengan exit code `2` dan pesan error di `stderr`:
+  `charites: error: unsupported format "<format>". Supported formats: inline, json.`
+
+### 2.4. Validasi Flag `--config`
+- Jika path konfigurasi kustom ditentukan via `--config` namun berkas tidak ditemukan atau tidak dapat dibaca, CLI **MUST** keluar dengan exit code `2` dan pesan error di `stderr`:
+  `charites: error: config file not found: "<path>".`
+- Jika isi berkas konfigurasi tidak dapat di-parse karena sintaks tidak sah, CLI **MUST** keluar dengan exit code `2` dan pesan error parsing di `stderr`.
+
+### 2.5. Tata Bahasa Flag `--ignore` & Presedensi
 - Pola ignore tambahan dapat diberikan via argumen `--ignore=pattern` atau berulang `--ignore p1 --ignore p2`.
 - Pola dievaluasi secara relatif terhadap root direktori pemindaian menggunakan sintaks glob `.charitesignore`.
-- Pola CLI ditambahkan ke aturan pengguna dan **DILARANG** membuka kembali (*override/negate*) direktori builtin hard exclusion.
-
-### 2.4. Presedensi Kebijakan Konfigurasi vs CLI Scope
-Sesuai kontrak [docs/00-CONTRACT.md](https://github.com/will2469/charites/blob/main/docs/00-CONTRACT.md):
-- Flag CLI `--rule` dan `--category` berfungsi sebagai **Candidate Scope** (pemilihan kandidat).
-- Konfigurasi `charites.yaml` berfungsi sebagai **Policy** (kebijakan penonaktifan dan override).
-- Jika konfigurasi menetapkan status `off` untuk rule tertentu, rule tersebut **TIDAK AKTIF** meskipun pengguna secara eksplisit menentukan `--rule` pada CLI.
+- Pola CLI ditambahkan ke aturan pengguna dan **DILARANG** membuka kembali (*override/negate*) direktori builtin hard exclusion (`.git`, `node_modules`, `dist`, dll.). Negasi `!node_modules` diabaikan dan direktori tetap dikecualikan.
+- **Presedensi Kebijakan Konfigurasi vs CLI Scope:** Sesuai kontrak [docs/00-CONTRACT.md](https://github.com/will2469/charites/blob/main/docs/00-CONTRACT.md), flag CLI `--rule` dan `--category` berfungsi sebagai *Candidate Scope*. Konfigurasi `charites.yaml` berfungsi sebagai *Policy*. Jika konfigurasi menetapkan status `off` untuk rule tertentu, rule tersebut **TIDAK AKTIF** meskipun pengguna secara eksplisit menentukan `--rule` pada CLI.
 
 ---
 

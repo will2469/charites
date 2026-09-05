@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ROAD-05-CLI`
 > **Tahapan:** Fase 5 - Reporter Output & CLI Entrypoint
 > **Peran Pilar:** ROADMAP = PHASE GATE (Otoritas Gerbang Evaluasi Kelulusan Transisi)
-> **Status:** Ready for Execution
+> **Status:** Ready / Approved for Implementation
 
 Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi (*phase gate*) untuk **Fase 5 (Reporter Output & CLI Entrypoint)** sebelum tim diizinkan melangkah ke **Fase 6 (Validasi Penuh & Golden Tests)**. Sesuai prinsip tata kelola [docs/00-CONTRACT.md](https://github.com/will2469/charites/blob/main/docs/00-CONTRACT.md):
 - **SPEC** = WHAT (Spesifikasi Antarmuka CLI, Format Reporter & Kontrak Exit Code)
@@ -29,7 +29,45 @@ Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi
 
 ---
 
-## 2. Gerbang Evaluasi Kelulusan (Phase Gate DoD)
+## 2. Gerbang Kesiapan Implementasi (Readiness Gate DoD)
+
+Sebelum implementasi kode Fase 5 dimulai, seluruh pilar arsitektur wajib menyelesaikan rantai gerbang kesiapan (*readiness gate chain*):
+
+$$\mathbf{SPEC\ PASS} \longrightarrow \mathbf{ARCH\ PASS} \longrightarrow \mathbf{TEST\ PASS} \longrightarrow \mathbf{QUALITY\ PASS} \longrightarrow \mathbf{PHASE\ 5\ IMPLEMENTATION\ READY}$$
+
+- [x] **`ROAD-05-READINESS-001` (SPEC-05 Compliance = PASS):**
+  - Kontrak CLI dibekukan tanpa kebutuhan implisit (default command `scan .`, alias `check`/`run`).
+  - Normalisasi `--ext` (case-insensitive, optional leading dot, comma, repeated) dan penolakan nilai tidak sah (exit 2).
+  - Validasi keberadaan & irisan `--category` $\times$ `--rule` (exit 2 jika konflik).
+  - Presedensi `--ignore` & kepatuhan invarian builtin hard exclusions (kekebalan negasi `!`).
+  - Kontrak format `inline` ANSI dan `json` tunggal lengkap.
+  - Resolusi TTY dan `NO_COLOR` (Mode `ColorNever`).
+  - Total ordering 7-tingkat untuk determinisme output.
+  - Taksonomi exit code 0, 1, 2, 130 terkunci.
+
+- [x] **`ROAD-05-READINESS-002` (ARCH-05 Compliance = PASS):**
+  - Matriks kepemilikan komponen terpetakan secara ketat (`internal/cli/root.go`, `internal/cli/scan.go`, `internal/config`, `internal/scanner`, `internal/analyzer`, `internal/reporter`, `internal/cli/exit.go`).
+  - ARCH hanya menjelaskan HOW tanpa menambah behavior baru di luar SPEC.
+  - Zero External Dependencies invariant dipertahankan.
+
+- [x] **`ROAD-05-READINESS-003` (TEST-05 Compliance = PASS):**
+  - Matriks 13 skenario eksekutabel didefinisikan secara lengkap.
+  - Golden snapshot contracts (`inline_clean`, `inline_violations`, `inline_no_color`, `json_clean`, `json_violations`) terspesifikasi.
+  - Pengujian determinisme biner dan E2E subprocess exit code matrix terspesifikasi.
+
+- [x] **`ROAD-05-READINESS-004` (QUALITY-05 Compliance = PASS):**
+  - Ambang batas eksplisit dikunci: `internal/cli` $\ge 85\%$, `internal/reporter` $\ge 90\%$.
+  - 0 Data Race Invariant, $\le 12$ cyclomatic complexity per fungsi, linter compliance 0 issues.
+  - CI Baseline terverifikasi pada commit final Fase 4.
+
+- [x] **`ROAD-05-READINESS-005` (CI Evidence Verification = PASS):**
+  - Hasil CI lokal: `make all` PASS (Build + Race Test + Lint + Gofmt).
+  - Cross-compilation 4 target: `make cross-compile` PASS (`linux/amd64`, `linux/arm64`, `darwin/arm64`, `windows/amd64`).
+  - Bukti eksekusi terlampir pada commit `12d4ed2`.
+
+---
+
+## 3. Gerbang Evaluasi Kelulusan Fase (Exit Criteria DoD)
 
 Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi gerbang berikut berstatus **PASS**:
 
@@ -60,7 +98,7 @@ Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi 
 
 ---
 
-## 3. Gerbang Transisi ke Fase 6 (Validasi Penuh & Golden Tests)
+## 4. Gerbang Transisi ke Fase 6 (Validasi Penuh & Golden Tests)
 
 Begitu keempat gerbang di atas berstatus **PASS**:
 1. Buat git commit: `feat(cli): implement CLI entrypoint, ergonomic flags A-E, ANSI and JSON reporters, and E2E test suite`.

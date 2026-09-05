@@ -3,10 +3,12 @@
 > **Kode Dokumen:** `ARCH-05-CLI`
 > **Tahapan:** Fase 5 - Reporter Output & CLI Entrypoint
 > **Peran Pilar:** ARCH = HOW (Rancangan Arsitektur CLI, Dispatcher & Abstraksi Reporter)
-> **Status:** Ready for Review
+> **Status:** Ready / Approved for Implementation
 > **Standar Rujukan:** Unix Philosophy CLI & Decoupled Presentation Layer Architecture
 
 Dokumen ini mendefinisikan arsitektur internal dari paket antarmuka CLI (`internal/cli/*`), router dispatcher, validasi dan normalisasi flag, serta arsitektur presenter laporan (`internal/reporter/*`).
+
+Sesuai kontrak [docs/00-CONTRACT.md](https://github.com/will2469/charites/blob/main/docs/00-CONTRACT.md), dokumen ARCH hanya menjelaskan **HOW** (implementasi struktural) dan secara ketat dilarang menambah, mengurangi, atau memodifikasi perilaku fungsional yang telah ditetapkan oleh `SPEC-05-CLI`.
 
 ---
 
@@ -19,14 +21,14 @@ flowchart TD
     end
 
     subgraph Dispatcher ["Subcommand & Flag Normalizer"]
-        Root -->|Empty Args / scan / check / run| ScanCmd["cli/scan.go\n(RunScan Handler)"]
+        Root -->|Empty Args / scan / check / run / direct path/flag| ScanCmd["cli/scan.go\n(RunScan Handler)"]
         Root -->|version / -v / --version| VersionCmd["cli/version.go\n(RunVersion Handler)"]
         Root -->|help / -h / --help| HelpCmd["cli/help.go\n(RunHelp Handler)"]
         Root -->|Unknown Command| ErrorHandler["Stderr Error -> Exit 2"]
     end
 
     subgraph Controller ["Scan Orchestrator"]
-        ScanCmd --> Validator["Validate & Normalize Options\n(Ext Check, Category/Rule Conflict)"]
+        ScanCmd --> Validator["Validate & Normalize Options\n(Ext Check, Category/Rule Conflict, Format, Target Path)"]
         Validator --> Orchestrate["Execute Scan Pipeline\n(Config -> Scanner -> Engine)"]
     end
 
@@ -39,7 +41,7 @@ flowchart TD
     end
 
     subgraph Exit ["Process Termination"]
-        Inline --> ExitResolver["Exit Code Resolver\n(0 = Clean, 1 = Violations, 2 = Operational Error)"]
+        Inline --> ExitResolver["Exit Code Resolver\n(0 = Clean, 1 = Violations, 2 = Operational Error, 130 = Cancel)"]
         JSON --> ExitResolver
         ExitResolver --> OSExit["os.Exit(code)"]
     end
@@ -47,7 +49,23 @@ flowchart TD
 
 ---
 
-## 2. Arsitektur Dispatcher & Router Subcommand (`internal/cli/`)
+## 2. Matriks Kepemilikan Komponen (Component Ownership Matrix)
+
+Setiap kebutuhan pada `SPEC-05-CLI` dipetakan ke komponen implementasi dengan batasan tanggung jawab yang terisolasi:
+
+| Komponen Arsitektur | Berkas Sumber | Tanggung Jawab Kepemilikan (*Ownership*) | Masukan (*Input*) | Keluaran / Dampak |
+| :--- | :--- | :--- | :--- | :--- |
+| **Command Dispatcher** | `internal/cli/root.go` | Parsing argv tingkat atas, routing pemanggilan 0 argumen ke `scan .`, routing direct path/flag ke `scan`, alias `check`/`run`, penolakan unknown commands (exit 2). | `args []string`, `stdout`, `stderr` | Exit code `int` |
+| **Scan Controller** | `internal/cli/scan.go` | Definisi `flag.FlagSet`, parsing flag ergonomi, validasi/normalisasi `--ext`, validasi irisan `--category` $\times$ `--rule`, validasi `--format`, orkestrasi pipeline pemindaian. | `args []string`, `stdout`, `stderr` | Exit code `int` |
+| **Config Resolver** | `internal/config/config.go` | Pemuatan `charites.yaml` / custom path, penegakan Default: YES, resolusi 3-tier precedence (Policy `off` mengalahkan CLI), penggabungan pola `--ignore`. | Path config, CLI flags | `*config.Config`, `[]config.ActiveRule` |
+| **Scanner & Pool** | `internal/scanner/` | Traversal direktori `Walker`, proteksi symlink & limit 10 MB, proteksi target langsung, eksekusi paralel worker pool terisolasi. | Target path, extensions, matcher | `[]ir.Diagnostic`, `error` |
+| **AST Engine** | `internal/analyzer/` | Parsing AST, traversal node AST via iterator Go 1.26, evaluasi rule murni, penekanan inline ignore `ctx.IsIgnored()`. | Files, active rules, context | `[]ir.Diagnostic` |
+| **Presentation Layer** | `internal/reporter/` | Abstraksi `Reporter`, DTO `ScanResult`/`ScanSummary`, resolusi `ColorMode` (TTY, `--no-color`, `NO_COLOR`), rendering teks ANSI inline dan dokumen JSON lengkap. | `*ScanResult`, `io.Writer` | Formatted output stream |
+| **Exit Code Resolver** | `internal/cli/exit.go` | Pemetaan deterministik hasil pemindaian ke exit codes POSIX (0, 1, 2, 130) tanpa mencampuradukkan error operasional dan violation. | `*ScanSummary`, `failOnWarn bool` | Exit code `int` |
+
+---
+
+## 3. Arsitektur Dispatcher & Router Subcommand (`internal/cli/root.go`)
 
 Untuk menjaga dependensi eksternal tetap nol (Zero Dependency Invariant):
 - Menggunakan standar Go `flag.FlagSet` yang diisolasi per-subcommand.
@@ -87,20 +105,29 @@ func Execute(args []string) int {
 
 ---
 
-## 3. Validasi & Normalisasi Flag Pemindaian (`internal/cli/scan.go`)
+## 4. Validasi & Normalisasi Flag Pemindaian (`internal/cli/scan.go`)
 
-### 3.1. Normalisasi Flag `--ext`
+### 4.1. Normalisasi Flag `--ext`
 - Input dibersihkan: huruf kecil (*lowercase*), spasi dipangkas (*trimmed*), dan tanda titik awal dipastikan ada.
 - Verifikasi ekstensi terdaftar (`.astro`, `.tsx`, `.jsx`).
 - Jika terdapat ekstensi tidak dikenal atau string kosong, fungsi mencetak error ke `stderr` dan mengembalikan exit code `2`.
 
-### 3.2. Validasi Konflik `--category` dan `--rule`
+### 4.2. Validasi Keberadaan & Konflik `--category` dan `--rule`
+- Jika `--category` ditentukan, sistem memvalidasi keberadaannya di registri.
+- Jika `--rule` ditentukan, sistem memvalidasi keberadaan rule ID di registri.
 - Jika kedua flag disertakan, sistem memeriksa apakah kategori rule cocok dengan nilai `--category`.
 - Jika terjadi ketidaksesuaian, sistem menolak eksekusi dengan exit code `2`.
 
+### 4.3. Validasi Flag `--format`
+- Format divalidasi hanya menerima `inline` atau `json`. Nilai lain ditolak dengan exit code `2`.
+
+### 4.4. Validasi Path Target & Direct-Target Safety
+- Path diperiksa keberadaannya via `os.Stat`. Jika tidak ada, exit code `2`.
+- Path diperiksa dengan `matcher.HasBuiltinAncestor(target)`. Jika berada di dalam builtin exclusions, ditolak dengan exit code `2`.
+
 ---
 
-## 4. Arsitektur Presenter Laporan (`internal/reporter/`)
+## 5. Arsitektur Presenter Laporan (`internal/reporter/`)
 
 ### 4.1. Data Transfer Objects (DTO) & Interface Reporter (`reporter.go`)
 
@@ -157,17 +184,17 @@ func ResolveColorMode(noColorFlag bool) ColorMode {
 ```
 Abstraksi `ColorMode` memungkinkan pengujian unit tanpa memerlukan emulator terminal nyata (*mocking `ColorMode`*).
 
-### 4.3. Inline ANSI Reporter (`internal/reporter/inline.go`)
+### 5.3. Inline ANSI Reporter (`internal/reporter/inline.go`)
 - **POSIX Path Formatting:** Menggunakan `filepath.ToSlash(relPath)` untuk memastikan separator forward slash (`/`) konsisten lintas Linux, macOS, dan Windows.
 - **Visual Distinction:** Format terpisah untuk pemindaian bersih (*clean*) dan pemindaian dengan temuan (*violations*).
 
-### 4.4. JSON Document Reporter (`internal/reporter/json.go`)
+### 5.4. JSON Document Reporter (`internal/reporter/json.go`)
 - Menggunakan `json.NewEncoder(w)` dengan `SetIndent("", "  ")`.
 - Menulis dokumen JSON tunggal lengkap yang mencakup `version`, `summary`, dan slice `diagnostics`.
 
 ---
 
-## 5. Mesin Resolusi Exit Code (`internal/cli/exit.go`)
+## 6. Mesin Resolusi Exit Code (`internal/cli/exit.go`)
 
 ```go
 func ResolveExitCode(res *ScanResult, failOnWarn bool) int {
@@ -181,3 +208,4 @@ func ResolveExitCode(res *ScanResult, failOnWarn bool) int {
 }
 ```
 Kesalahan operasional (flag salah, berkas tidak ditemukan, argumen tidak sah) ditangani langsung di level CLI router dengan mengembalikan exit code **`2`**.
+Sesuai kontrak `SPEC-05-CLI`, temuan pelanggaran diagnostik dilarang keras menghasilkan exit code `2`.
