@@ -13,3 +13,325 @@ The `{{ .Category }}` category contains static analysis rules for code quality, 
 {{- end }}
 
 ---
+
+{{- if eq .Category "theme" }}
+## How the Theme & Design Token Analysis Pipeline Works
+
+The `theme` static analysis engine cross-examines component utility classes directly against the project's design token single source of truth (`global.css`):
+
+```mermaid
+flowchart LR
+    subgraph Inputs ["1. Workspace Inputs"]
+        CSS["global.css (SSOT Tokens)"]
+        Components["Component Files (*.astro, *.tsx)"]
+    end
+
+    subgraph TokenEngine ["2. Token Subsystem (internal/token)"]
+        CSS --> Lexer["CSS Lexer (theme/lexer.go)"]
+        Lexer --> Parser["Verbatim CSS Parser (theme/parser.go)"]
+        Parser --> Graph["Directed Token Graph (graph.go)"]
+        Graph --> CycleCheck{"Cycle & DoS Protection (visited-set + budget)"}
+        CycleCheck --> Specificity["Scope Specificity (:root vs .dark)"]
+        Specificity --> Context["Read-Only Context Facade (context.go)"]
+    end
+
+    subgraph Evaluation ["3. Theme Rule Evaluation (internal/rules/theme)"]
+        Components --> AST["Leaf IR AST Traversal"]
+        AST --> Extractor["Class Attribute Extractor"]
+        Extractor --> Strip["Variant Stripper (hover:, dark:, sm:)"]
+        Strip --> Modifier["Opacity Modifier Parser (/10)"]
+        Modifier --> Convention["TokenConvention Adapter"]
+        Context -.-> Convention
+        Convention --> Banana{"Banana Test (Token Exists in Graph?)"}
+    end
+
+    subgraph Output ["4. Results"]
+        Banana -- "No Token in Graph" --> Safe["Pass (Valid Custom Color)"]
+        Banana -- "Token Exists" --> IgnoreCheck{"charites:ignore Directive"}
+        IgnoreCheck -- "Suppressed" --> Safe
+        IgnoreCheck -- "Active" --> Diag["Diagnostic: theme.* with Suggestion"]
+    end
+```
+
+### Pipeline Flow:
+1. **SSOT Token Extraction:** Discovers `global.css` via upward directory traversal and extracts custom properties (`--color-*`).
+2. **Directed Dependency Graph:** Constructs a directed graph of all tokens, resolving chained `var(--...)` references.
+3. **Safety & DoS Invariants:** Protects against cyclic references using visited-set detection (`ErrCycleDetected`) and bounds recursion with a strict node evaluation budget (`ErrEvaluationBudgetExceeded`).
+4. **Scope & Specificity Resolution:** Calculates selector specificity, isolating `:root` base variables from scoped overrides like `.dark`.
+5. **Class & Variant Normalization:** Traverses template AST nodes, extracting utility classes and stripping responsive (`sm:`, `md:`), state (`hover:`, `focus:`), and theme (`dark:`) prefixes.
+6. **TokenConvention & The Banana Test:** Verifies that a replacement semantic token genuinely exists in the project's token dependency graph before flagging hardcoded modifiers. Arbitrary custom colors without official tokens pass cleanly without false positives.
+7. **Directive Suppression & Reporting:** Evaluates inline `charites:ignore` directives before producing diagnostics for ANSI terminal, JSON streaming, or MCP clients.
+
+---
+
+## How Theme Tests Work (Verification Harness)
+
+The `theme` subsystem is verified across multiple rigorous testing layers:
+
+```mermaid
+flowchart TD
+    subgraph ThemeVerification ["Theme Subsystem Verification Architecture"]
+        subgraph SubsystemTests ["1. Subsystem & Unit Tests"]
+            T1["CSS Lexer & Parser (internal/token/theme/parser_test.go)"]
+            T2["Token Graph Cycles & Budget (internal/token/graph_test.go)"]
+            T3["Specificity & Upward Discovery (internal/token/extractor_test.go)"]
+        end
+        subgraph IntegrationTests ["2. Monorepo Integration Tests"]
+            I1["Upward Discovery from Deep Directories (tests/token_integration_test.go)"]
+            I2["Multi-Scope Theme Switching (:root vs .dark)"]
+            I3["E2E CLI Scan Parity"]
+        end
+        subgraph GoldenCorpus ["3. 1-SSOT Golden Tri-Corpus"]
+            G1["Positive (P1-P5): Obvious, indirect, helper, nested, alias violations"]
+            G2["Negative (N1-N5): Valid tokens, ignores, third-party, Banana Test"]
+            G3["Adversarial (A1-A7): Cycles, ternaries, obfuscations, template literals"]
+        end
+        subgraph Fuzzing ["4. Continuous Fuzz Testing"]
+            F1["Native Go 1.26 Fuzzing (tests/fuzz/css_fuzz_test.go)"]
+            F2["14,000+ Synthetic CSS Mutations: Zero Crash Guarantee"]
+        end
+    end
+
+    SubsystemTests --> IntegrationTests
+    IntegrationTests --> GoldenCorpus
+    GoldenCorpus --> Fuzzing
+```
+
+1. **Subsystem Unit Tests (`internal/token/`):**
+   - Lexer and parser guarantee verbatim source slicing without synthetic whitespace bugs.
+   - Graph tests verify deterministic cycle detection (`ErrCycleDetected`) and recursion termination (`ErrEvaluationBudgetExceeded`).
+   - Specificity tests verify that `.dark` correctly overrides `:root` without leaking into unrelated scopes.
+2. **Monorepo Integration Tests (`tests/token_integration_test.go`):**
+   - Validates that scanning components in deeply nested subdirectories reliably locates `global.css` at the monorepo root.
+   - Tests CLI scans with JSON output envelopes to ensure zero schema drift.
+3. **1-SSOT Golden Tri-Corpus (`tests/correctness/theme.*/`):**
+   - **Positive Fixtures:** Confirms that prohibited slash opacity modifiers on existing tokens produce accurate diagnostic spans and lines.
+   - **Negative Fixtures:** Confirms zero false positives on compliant token usage and untokenized custom colors (the Banana Test).
+   - **Adversarial Fixtures:** Confirms resilience against line-height modifiers (e.g. `text-lg/7`), layout fractions (e.g. `w-1/2`), and template strings.
+4. **Native Go Fuzzing (`tests/fuzz/css_fuzz_test.go`):**
+   - Subjected to thousands of random, malformed CSS mutations across parallel workers to guarantee zero panics, deadlocks, or unbounded memory growth.
+
+---
+
+## Guide: Designing a Compliant Theme for Charites
+
+To ensure seamless theme enforcement, projects should structure their design tokens following W3C DTCG and CSS Color Module Level 4 specifications:
+
+### 1. Standard File Placement & Auto-Discovery:
+Charites automatically discovers design tokens by walking up from component directories looking for:
+- `src/styles/global.css` (or `styles/global.css`, `src/global.css`, `global.css`)
+- `tokens.json` (W3C DTCG design tokens format)
+
+If your project stores theme tokens in a non-standard directory, configure `theme` in `charites.yaml`:
+```yaml
+# charites.yaml
+theme: src/custom/theme.css # or tokens/tokens.json
+```
+
+### 2. Declaring Semantic Opacity Variants (Eliminating Slash Modifiers):
+Avoid arbitrary slash modifiers in markup (e.g. `bg-primary/10`, `bg-brand/10`) by declaring pre-calibrated opacity variants directly in `global.css`:
+
+```css
+/* src/styles/global.css */
+:root {
+  /* 1. Base Semantic Tokens */
+  --color-brand: oklch(0.85 0.18 95);
+  --color-brand-foreground: oklch(0.20 0.05 95);
+
+  /* 2. Pre-calibrated Opacity/Elevation Variants (Replaces /10 and /5) */
+  --color-brand-light: oklch(0.95 0.05 95);   /* Official replacement for brand/10 */
+  --color-brand-subtle: oklch(0.98 0.02 95);  /* Official replacement for brand/5 */
+}
+
+/* 3. Dark Mode Contrast Calibration */
+.dark {
+  --color-brand: oklch(0.80 0.16 95);
+  --color-brand-foreground: oklch(0.15 0.04 95);
+
+  --color-brand-light: oklch(0.30 0.08 95);
+  --color-brand-subtle: oklch(0.22 0.04 95);
+}
+```
+
+### 3. Fallback Taxonomy & Warning Behavior:
+Charites evaluates slash modifiers against your repository's actual declarations:
+
+| Scenario | State in `global.css` | Code in Component | Verdict & Remediation |
+| :--- | :--- | :--- | :--- |
+| **Official Token Exists** | `--color-brand` & `--color-brand-light` exist | `bg-brand/10` | **`ERROR`**: Hardcoded opacity modifier detected.<br>→ *Remediation:* Replace with `bg-brand-light`. |
+| **Unmapped Opacity Variant** | `--color-brand` exists, but `--color-brand-light` does NOT | `bg-brand/10` | **`WARN`**: Unmapped opacity on registered token.<br>→ *Remediation:* Register `--color-brand-light` in `global.css`, or suppress with `<!-- charites:ignore -->` if intentional. |
+| **Untokenized / External Color** | `--color-external` is NOT in `global.css` | `bg-external/10` | **`PASS`** *(Banana Test)*: Untokenized custom colors pass silently without false positives. |
+| **Missing Theme SSOT** | No `global.css` found in workspace | Any classes | **`PASS`** *(Zero-Config Permissive)*: Runs in passive mode with an advisory tip to create `global.css` or configure `theme:` in `charites.yaml`. |
+
+{{- else if eq .Category "a11y" }}
+## How the Accessibility & Contrast Analysis Pipeline Works
+
+The `a11y` static analysis engine evaluates template markup and cross-references resolved design tokens for WCAG 2.2 accessibility compliance:
+
+```mermaid
+flowchart LR
+    subgraph Inputs ["1. Workspace Inputs"]
+        Components["Component Markup (*.astro, *.tsx)"]
+        TokenCtx["Token Context Facade (internal/token)"]
+    end
+
+    subgraph ASTInspection ["2. Semantic AST Traversal"]
+        Components --> Visitor["AST Visitor Engine"]
+        Visitor --> Interactive["Interactive Elements (button, a, input)"]
+        Visitor --> Media["Media & Landmark Elements (img, svg, nav)"]
+    end
+
+    subgraph Verification ["3. A11y & Contrast Evaluation"]
+        Interactive --> ARIA["ARIA Attributes & Role Invariants"]
+        Interactive --> Focus["Keyboard & Focus Traps"]
+        Media --> AltText["Alt-Text & Accessible Names"]
+        Interactive --> Colors["Color Class Extractor"]
+        TokenCtx -.-> Colors
+        Colors --> Contrast["WCAG 2.2 Contrast Ratio (>= 4.5:1 / 3:1)"]
+    end
+
+    subgraph Output ["4. Results"]
+        ARIA --> Results{"WCAG Conformance Check"}
+        Focus --> Results
+        AltText --> Results
+        Contrast --> Results
+        Results -- "Compliant" --> Safe["Pass"]
+        Results -- "Violation" --> Diag["Diagnostic: a11y.*"]
+    end
+```
+
+### Pipeline Flow:
+1. **Semantic DOM Traversal:** Inspects interactive elements, form controls, images, and landmark regions.
+2. **Token-Aware Contrast Calculation:** Resolves foreground and background color classes into concrete color values using `token.Context`, computing relative luminance ratios without requiring a headless browser.
+3. **Standards Conformance:** Enforces WCAG 2.2 AA standards (minimum 4.5:1 for normal text, 3:1 for large text and UI controls).
+4. **Accessible Structure Validation:** Validates image `alt` attributes, accessible button names, and form label associations.
+
+---
+
+## How Accessibility Tests Work (Verification Harness)
+
+Accessibility rules are verified against comprehensive test suites:
+1. **1-SSOT Golden Tri-Corpus (`tests/correctness/a11y.*/`):**
+   - **Positive:** Flags contrast ratios dropping below 4.5:1 under light or dark themes, missing alt text, and unlabelled icon buttons.
+   - **Negative:** Confirms clean passes for semantic HTML5 controls and mathematically verified token pairings.
+   - **Adversarial:** Asserts resilience against dynamic aria-labels, visually hidden decorative elements, and complex nested layouts.
+
+{{- else if eq .Category "responsive" }}
+## How the Responsive Layout Analysis Pipeline Works
+
+The `responsive` engine analyzes layout structures, touch target ergonomics, and modern CSS container queries:
+
+```mermaid
+flowchart LR
+    subgraph Inputs ["1. Workspace Inputs"]
+        Components["Component Files (*.astro, *.tsx)"]
+    end
+
+    subgraph Inspection ["2. Layout & Touch Traversal"]
+        Components --> AST["Leaf IR Traversal"]
+        AST --> TouchNodes["Interactive Controls (button, a, tap targets)"]
+        AST --> LayoutNodes["Container & Grid Layouts"]
+    end
+
+    subgraph Evaluation ["3. Responsive Rule Evaluation"]
+        TouchNodes --> Fitts["Fitts's Law Evaluator (min 44x44px bounding area)"]
+        LayoutNodes --> Containers["Container Query Enforcer (@container vs rigid viewport)"]
+        LayoutNodes --> Overflow["Mobile Overflow & Scroll-Jank Detector"]
+    end
+
+    subgraph Output ["4. Results"]
+        Fitts --> Decision{"Touch & Layout Ergonomics Check"}
+        Containers --> Decision
+        Overflow --> Decision
+        Decision -- "Compliant" --> Safe["Pass"]
+        Decision -- "Violation" --> Diag["Diagnostic: responsive.*"]
+    end
+```
+
+### Pipeline Flow:
+1. **Touch Target Sizing:** Evaluates interactive controls against Fitts's Law, verifying minimum tap target dimensions of 44x44px (`min-h-[44px] min-w-[44px]`).
+2. **Container Query Governance:** Enforces modular `@container` queries over fragile page-level viewport media queries (`sm:`, `md:`, `lg:`).
+3. **Viewport & Overflow Analysis:** Identifies fixed-width containers that cause mobile horizontal scrollbars or layout breakage.
+
+---
+
+## How Responsive Tests Work (Verification Harness)
+
+Responsive rules are verified against:
+1. **1-SSOT Golden Tri-Corpus (`tests/correctness/responsive.*/`):**
+   - **Positive:** Flags undersized interactive buttons, hardcoded viewport constraints, and overflowing data tables.
+   - **Negative:** Confirms passes for fluid container query layouts and 44x44px compliant controls.
+   - **Adversarial:** Tests nested grid layouts with responsive variant overrides.
+
+{{- else if eq .Category "perf" }}
+## How the Performance & Web Vitals Analysis Pipeline Works
+
+The `perf` engine audits component code for Core Web Vitals (LCP, CLS, INP) and client-side hydration efficiency:
+
+```mermaid
+flowchart LR
+    subgraph Inputs ["1. Workspace Inputs"]
+        Components["Component Files (*.astro, *.tsx)"]
+    end
+
+    subgraph Inspection ["2. Asset & Script Inspection"]
+        Components --> AST["Leaf IR Traversal"]
+        AST --> Images["Media Elements (img, video, picture)"]
+        AST --> Scripts["Script & Hydration Boundaries"]
+    end
+
+    subgraph Evaluation ["3. Core Web Vitals Evaluation"]
+        Images --> LCP["LCP Optimizer (fetchpriority='high', anti-lazy hero)"]
+        Images --> CLS["CLS Preventer (explicit width/height & aspect-ratio)"]
+        Scripts --> INP["INP Guard (render-blocking scripts & thread delays)"]
+    end
+
+    subgraph Output ["4. Results"]
+        LCP --> Decision{"CWV Compliance Check"}
+        CLS --> Decision
+        INP --> Decision
+        Decision -- "Compliant" --> Safe["Pass"]
+        Decision -- "Violation" --> Diag["Diagnostic: perf.*"]
+    end
+```
+
+### Pipeline Flow:
+1. **LCP Optimization:** Ensures above-the-fold hero images use `fetchpriority="high"` and do not specify `loading="lazy"`.
+2. **CLS Shift Prevention:** Requires explicit `width` and `height` attributes or CSS `aspect-ratio` on all visual media elements.
+3. **INP & Thread Guard:** Detects synchronous scripts and un-deferred client islands that delay the main thread.
+
+---
+
+## How Performance Tests Work (Verification Harness)
+
+Performance rules are verified against:
+1. **1-SSOT Golden Tri-Corpus (`tests/correctness/perf.*/`):**
+   - **Positive:** Flags lazy-loaded hero images, un-dimensioned layout shifting media, and blocking scripts.
+   - **Negative:** Confirms passes for properly prioritized media and zero-JS Astro SSR components.
+   - **Adversarial:** Tests dynamic attribute bindings and responsive source sets (`srcset`).
+
+{{- else }}
+## How the {{ .Title }} Analysis Pipeline Works
+
+The `{{ .Category }}` engine applies static analysis checks against component source code:
+
+```mermaid
+flowchart LR
+    TargetFiles["Target Files (*.astro, *.tsx)"] --> Parser["Leaf IR AST Parser"]
+    Parser --> Engine["Rule Evaluator Engine"]
+    Engine --> Check{"Evaluate Invariant"}
+    Check -- "Compliant" --> Safe["Pass"]
+    Check -- "Violation" --> Diag["Diagnostic: {{ .Category }}.*"]
+```
+
+### Pipeline Flow:
+1. **AST Node Traversal:** Scans target template files into normalized intermediate representation.
+2. **Invariant Assertion:** Validates structural and semantic invariants.
+3. **Diagnostic Reporting:** Emits structured diagnostics for non-compliant patterns.
+
+---
+
+## How {{ .Title }} Tests Work (Verification Harness)
+
+All rules in `{{ .Category }}` are verified using the canonical 1-SSOT Tri-Corpus (`tests/correctness/{{ .Category }}.*/`) encompassing Positive (P1-P5), Negative (N1-N5), and Adversarial (A1-A7) fixture matrices.
+{{- end }}

@@ -45,34 +45,44 @@ flowchart TD
 
 ## 4. Building Block View (C4 Level 3: Component Decomposition)
 
-Arsitektur Charites mengadopsi model **Compiler Pipeline** klasik yang dibagi menjadi 6 subsistem independen:
+Arsitektur Charites mengadopsi model **Compiler Pipeline** terpadu yang dibagi menjadi 7 subsistem independen:
 
 ```mermaid
-flowchart LR
-    Scanner["1. Scanner\n(Walker & Pool)"] -->|"Raw Bytes"| Parser["2. Parser\n(Tailwind, Astro, TSX)"]
+flowchart TD
+    Scanner["1. Scanner\n(Walker & Pool)"] -->|"Raw Target Bytes"| Parser["2. Parser\n(Astro, TSX, HTML)"]
     Parser -->|"Raw AST"| IR["3. IR Builder\n(Normalisasi ke ir.Node)"]
-    IR -->|"ir.Node Stream"| Analyzer["4. Analyzer Engine\n(Traversal & Context)"]
-    Analyzer <-->|"Evaluate(node)"| Rules["5. Rules Registry\n(Pure Rules)"]
-    Analyzer -->|"[]Diagnostic"| Reporter["6. Reporters\n(Inline, JSON, MCP)"]
+
+    DiskCSS[("Filesystem\n(global.css, tokens)")] -->|"Auto-Discovery"| Token["4. Token Subsystem\n(Parser, Graph, Query API)"]
+
+    IR -->|"ir.Node Stream"| Analyzer["5. Analyzer Engine\n(Traversal & Context)"]
+    Token -.->|"SSOT Token Context"| Rules
+    Analyzer <-->|"Evaluate(node)"| Rules["6. Rules Registry\n(Rules & Conventions)"]
+    Analyzer -->|"[]Diagnostic"| Reporter["7. Reporters\n(Inline, JSON, MCP)"]
 ```
 
 ### Rincian Sub-komponen:
 
 1. **`internal/scanner`**:
-   - `walker.go`: Membaca pohon direktori secara rekursif dengan filter cepat berbasis `.ignore`.
-   - `pool.go`: Mengelola sejumlah $N$ goroutine worker (biasanya sejumlah `runtime.NumCPU()`).
+   - `walker.go`: Membaca pohon direktori secara rekursif dengan filter cepat berbasis `.charitesignore`.
+   - `pool.go`: Mengelola sejumlah $N$ goroutine worker (sejumlah `runtime.NumCPU()`).
 2. **`internal/parser`**:
-   - `tailwind/`: Mengekstrak daftar semantic token dari `@theme` di `global.css`.
    - `astro/`: Memisahkan blok frontmatter JS/TS (di antara pembatas `---`) dan blok template HTML/JSX.
    - `tsx/`: Mengekstrak tag elemen JSX, nama atribut, dan nilai ekspresi literal.
+   - `tailwind/`: Parser utilitas pelengkap untuk normalisasi class tailwind.
 3. **`internal/ir` (Intermediate Representation)**:
    - Menghubungkan output parser yang heterogen menjadi struktur data terpadu `ir.Node`.
-4. **`internal/analyzer`**:
+4. **`internal/token` (Single Source of Truth Design Token)**:
+   - `theme/`: Generic CSS Lexer & Parser (Layer 1) dengan pemotongan string sumber verbatim untuk preservasi spasi dan karakter khusus.
+   - `token.go`: Model data deklarasi token `Token` dengan bobot spesifisitas selektor CSS (`Specificity`) dan kondisi at-rule (`AtRule`).
+   - `graph.go`: Directed Token Dependency Graph (Layer 2) dengan pelacakan relasi `var(--...)`, deteksi siklus sirkular via `visited map[ID]bool`, dan perlindungan batas evaluasi `MaxNodes` (DoS defense).
+   - `context.go`: Antarmuka query read-only (Layer 3: `Context`) untuk isolasi fakta murni dari engine aturan.
+   - `extractor.go`: Mesin auto-discovery SSOT dari filesystem dengan upward directory walking.
+5. **`internal/analyzer`**:
    - Traversal engine yang mengiterasi seluruh `ir.Node` dan mendistribusikan node ke rules yang relevan.
    - Menampung seluruh temuan `Diagnostic` ke dalam `Context`.
-5. **`internal/rules`**:
-   - Registry modul rule. Berisi aturan logika murni (Rule #1: `hardcode_opacity_color.go` / `theme.hardcode-opacity-color`).
-6. **`internal/reporter` & `internal/mcp`**:
+6. **`internal/rules`**:
+   - Registry modul rule. Berisi aturan logika murni dan adapter konvensi semantik (Layer 4: `TokenConvention` di `rules/theme/convention.go`).
+7. **`internal/reporter` & `internal/mcp`**:
    - Mengubah slice `[]Diagnostic` menjadi representasi teks berwarna ANSI terminal, JSON terstruktur, atau pesan respon MCP `tools/call`.
 
 ---

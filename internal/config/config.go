@@ -22,6 +22,7 @@ type ActiveRule struct {
 type Config struct {
 	Format   string            `json:"format" yaml:"format"`
 	ScanPath string            `json:"scan_path" yaml:"scan_path"`
+	Theme    string            `json:"theme" yaml:"theme"`   // Custom path ke SSOT tema (CSS/JSON) jika di luar path standar
 	Rules    map[string]string `json:"rules" yaml:"rules"`   // "rule-id": "off" | "warn" | "error" | "info"
 	Ignore   []string          `json:"ignore" yaml:"ignore"` // Pola path tambahan
 }
@@ -106,6 +107,8 @@ func parseTopLevel(trimmed string, cfg *Config, currentSection *string) {
 			cfg.Format = val
 		case "scan_path":
 			cfg.ScanPath = val
+		case "theme":
+			cfg.Theme = val
 		}
 	}
 }

@@ -24,8 +24,101 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 ---
 
+## How the Static Analysis Pipeline Works
+
+Charites processes project source code and design tokens through a unified 4-stage pipeline:
+
+```mermaid
+flowchart LR
+    subgraph Discovery ["1. Source & SSOT Discovery"]
+        TargetFiles["Target Files (*.astro, *.tsx)"]
+        TokensSSOT["Design Tokens SSOT (global.css, tokens.json)"]
+    end
+
+    subgraph Pipeline ["2. Extraction & Graph"]
+        TargetFiles --> Scanner["Fast Walker & Worker Pool (internal/scanner)"]
+        Scanner --> Parser["AST & IR Builder (internal/parser)"]
+        TokensSSOT --> TokenEngine["Token Subsystem (internal/token)"]
+        TokenEngine --> Graph["Directed Token Dependency Graph"]
+    end
+
+    subgraph Engine ["3. Static Analysis Across Categories"]
+        Parser --> Analyzer["IR Traversal Engine (internal/analyzer)"]
+        Graph --> Context["Read-Only Token Context Facade"]
+        Analyzer <--> RulesTheme["Theme Rules (internal/rules/theme)"]
+        Analyzer <--> RulesA11y["A11y Rules (internal/rules/a11y)"]
+        Analyzer <--> RulesResp["Responsive & Perf Rules"]
+        Context -.-> RulesTheme
+        Context -.-> RulesA11y
+    end
+
+    subgraph Output ["4. Reporting"]
+        RulesTheme --> Reporter["Reporter Engine (Terminal ANSI, JSON, MCP)"]
+        RulesA11y --> Reporter
+        RulesResp --> Reporter
+    end
+```
+
+### Pipeline Flow:
+1. **Target Discovery & AST Construction:** `internal/scanner` discovers and walks workspace source files in parallel, streaming `.astro` and `.tsx` components to `internal/parser` to construct normalized `ir.Node` structures.
+2. **Multi-Format SSOT Token Graph:** `internal/token` auto-discovers design token sources across both CSS (`global.css`, `index.css`, `@theme`) and JSON manifests (`tokens.json` W3C DTCG format). It parses custom properties (`--*`), nested themes (`:root`, `.dark`), and variable references (`var(--...)`), constructing a design-agnostic `Directed Token Dependency Graph` with visited-set cycle detection and recursion budget limits.
+3. **Stateless Traversal & Multi-Category Evaluation:** `internal/analyzer` coordinates parallel IR node traversal across modular rule domains:
+   - **Theme Governance (`internal/rules/theme`):** Validates utility classes, stripping variants and ensuring opacity/color modifications use official semantic tokens declared in the graph.
+   - **Accessibility Verification (`internal/rules/a11y`):** Replaces legacy regex heuristics (migrated from `charites-legacy/a11y-checker.ts`) with AST-grounded validation of label/input bindings, heading hierarchies, missing alt-text, and token-resolved WCAG 2.2 color contrast ratios.
+   - **Responsive & Performance (`internal/rules/{responsive,perf}`):** Enforces Fitts's Law touch target ergonomics (>= 44x44px), modern `@container` queries, and Core Web Vitals (LCP, CLS, INP).
+4. **Multi-Channel Delivery:** Diagnostics are deterministically rendered for ANSI terminal output, streaming JSON envelopes, or MCP JSON-RPC 2.0 tool calls.
+
+---
+
+## How Testing Works Across Charites (The 4-Layer Verification Harness)
+
+Charites enforces correctness, resilience, and zero false positives across four interconnected testing tiers:
+
+```mermaid
+flowchart TD
+    subgraph Suite ["The 4-Layer Verification Harness"]
+        subgraph L1 ["Layer 1: Unit & Subsystem Tests"]
+            U1["CSS Lexer & Parser Tests (internal/token/theme)"]
+            U2["Token Graph Cycles & DoS Budget (internal/token)"]
+            U3["Extractor & Scope Specificity (internal/token)"]
+            U4["IR Parser & AST Visitors (internal/parser)"]
+        end
+        subgraph L2 ["Layer 2: 1-SSOT Golden Tri-Corpus"]
+            G1["Positive (P1-P5): Verified true positives with exact line & span"]
+            G2["Negative (N1-N5): Zero false positives on valid tokens & Banana Test"]
+            G3["Adversarial (A1-A7): Resilience to cyclic vars, ternaries, obfuscation"]
+        end
+        subgraph L3 ["Layer 3: Monorepo Integration"]
+            I1["Upward Directory Discovery: global.css from nested subdirectories"]
+            I2["Multi-Scope Theme Switching: :root vs .dark resolution"]
+            I3["E2E CLI Parity: Terminal ANSI, Streaming JSON, MCP JSON-RPC 2.0"]
+        end
+        subgraph L4 ["Layer 4: Continuous Fuzz Testing"]
+            F1["Native Go 1.26 Fuzzing (tests/fuzz/css_fuzz_test.go)"]
+            F2["14,000+ Synthetic CSS Mutations: Zero Panics, Zero OOM, Zero Leaks"]
+        end
+    end
+
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+```
+
+### Testing Tier Flow:
+1. **Layer 1 (Subsystem Units):** Validates deterministic lexing, zero-panic parsing, graph cycle detection (`ErrCycleDetected`), and traversal recursion budget limits (`ErrEvaluationBudgetExceeded`).
+2. **Layer 2 (1-SSOT Golden Tri-Corpus):** Every static analysis rule is tested against an exhaustive 17-pattern matrix in `tests/correctness/<rule-id>/`:
+   - **Positive (P1-P5):** Obvious, indirect, helper-wrapped, deeply nested, and aliased violations.
+   - **Negative (N1-N5):** Valid tokens, explicit ignore directives, third-party libraries, standard HTML, and untokenized custom values (the Banana Test).
+   - **Adversarial (A1-A7):** Template literal interpolations, ternary conditionals, spread props, dynamic classes, variable shadowing, and cyclic references.
+3. **Layer 3 (Monorepo Integration):** Validates end-to-end multi-scope token resolution (`:root` vs `.dark`), upward directory walks, and CLI output rendering in `tests/token_integration_test.go`.
+4. **Layer 4 (Continuous Fuzzing):** Employs native Go 1.26 fuzzing (`tests/fuzz/css_fuzz_test.go`) over tens of thousands of malformed mutations to guarantee memory safety and crash resilience.
+
+---
+
 ## Architectural Principles
 
 1. **Deterministic Execution:** Pure-function AST visitors without file system or network I/O during evaluation.
-2. **1-SSOT Tri-Corpus Assurance:** Every rule is validated against a 3-part golden test corpus (`positive/`, `negative/`, `adversarial/`).
-3. **Canonical Semgrep Identifiers:** All rules follow the `<category>.<slug>` standard.
+2. **SSOT Token Evidence:** Static rules only enforce semantic token replacements that genuinely exist in the project's token dependency graph.
+3. **1-SSOT Tri-Corpus Assurance:** Every rule is validated against a 3-part golden test corpus (`positive/`, `negative/`, `adversarial/`).
+4. **Canonical Semgrep Identifiers:** All rules follow the `<category>.<slug>` standard.
+

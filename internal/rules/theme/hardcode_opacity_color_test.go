@@ -7,7 +7,7 @@ import (
 
 	"github.com/will2469/charites/internal/ir"
 	"github.com/will2469/charites/internal/rules/theme"
-	themeengine "github.com/will2469/charites/internal/theme"
+	themeengine "github.com/will2469/charites/internal/token"
 )
 
 func TestHardcodeOpacityColorRule_Metadata(t *testing.T) {

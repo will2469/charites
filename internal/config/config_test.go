@@ -63,6 +63,7 @@ func parseTestConfig(t *testing.T) *config.Config {
 	yamlContent := `
 format: inline
 scan_path: ./src
+theme: ./custom/theme.css
 rules:
   theme.opacity: warn
   theme.color: "off"
@@ -83,8 +84,8 @@ func TestResolveActiveRules_OverridesAndPrecedence(t *testing.T) {
 	reg := setupRegistry()
 	cfg := parseTestConfig(t)
 
-	if cfg.Format != "inline" || cfg.ScanPath != "./src" {
-		t.Errorf("unexpected top-level values: format=%q, scan_path=%q", cfg.Format, cfg.ScanPath)
+	if cfg.Format != "inline" || cfg.ScanPath != "./src" || cfg.Theme != "./custom/theme.css" {
+		t.Errorf("unexpected top-level values: format=%q, scan_path=%q, theme=%q", cfg.Format, cfg.ScanPath, cfg.Theme)
 	}
 	if len(cfg.Ignore) != 2 || cfg.Ignore[0] != "dist/**" || cfg.Ignore[1] != "build/**" {
 		t.Errorf("unexpected ignore list: %+v", cfg.Ignore)

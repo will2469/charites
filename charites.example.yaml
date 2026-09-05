@@ -8,6 +8,11 @@
 format: inline # inline | json
 scan_path: .
 
+# Custom theme SSOT path (optional)
+# Auto-discovered by default from: styles/global.css, src/styles/global.css, tokens.json.
+# Specify here if your design tokens live in a non-standard location or custom folder.
+# theme: src/styles/global.css
+
 # Custom ignore patterns (in addition to .charitesignore)
 ignore:
   - "legacy/**"

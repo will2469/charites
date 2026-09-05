@@ -153,7 +153,14 @@ charites/
 │   │   ├── doc.go                 # Interface DocumentedRule untuk SSOT dokumentasi
 │   │   ├── builtin.go             # Registrasi rule bawaan & interface assertions
 │   │   └── theme/                 # Paket domain theme
+│   │       ├── convention.go      # TokenConvention adapter (DefaultCharitesConvention memverifikasi fakta eksistensi)
 │   │       └── hardcode_opacity_color.go # Rule #1 proving ground
+│   ├── token/                     # SSOT Design Token Subsystem & Dependency Graph
+│   │   ├── token.go               # Struct Token (ID, Name, RawValue, Scope, Specificity, References)
+│   │   ├── graph.go               # Directed Token Dependency Graph (Cycle detection, evaluation budget)
+│   │   ├── context.go             # Read-Only Query API Facade (Tokens(), ByName(), ByPrefix(), Resolve())
+│   │   ├── extractor.go           # Auto-discovery SSOT & AST-to-Graph builder (Design-agnostic facts)
+│   │   └── theme/                 # Generic CSS Lexer & Parser AST (verbatim source slicing)
 │   ├── analyzer/                  # Mesin traversal AST terisolasi
 │   │   ├── context.go             # Buffer diagnostik per-berkas & inline ignore filter
 │   │   └── engine.go              # Loop traversal IR dengan iterator Go 1.26

@@ -5,60 +5,81 @@ import (
 	"sync"
 
 	"github.com/will2469/charites/internal/ir"
-	themeengine "github.com/will2469/charites/internal/theme"
+	themeengine "github.com/will2469/charites/internal/token"
 )
 
 var (
-	discoveredTheme     *themeengine.Context
+	discoveredTheme     themeengine.Context
 	discoveredThemeOnce sync.Once
 )
 
-func getDiscoveredTheme() *themeengine.Context {
+func getDiscoveredTheme() themeengine.Context {
 	discoveredThemeOnce.Do(func() {
 		ctx, err := themeengine.DiscoverAndLoad("", "")
 		if err == nil && ctx != nil {
 			discoveredTheme = ctx
 		} else {
-			discoveredTheme = themeengine.NewContext()
+			discoveredTheme = themeengine.NewEmptyContext()
 		}
 	})
 	return discoveredTheme
 }
 
 // ReplacementFor mengembalikan token semantik pengganti untuk pasangan warna/opacity tertentu secara read-only
-// dari Context yang terdeteksi dari CSS SSOT.
+// dari Context yang terdeteksi dari CSS SSOT menggunakan konvensi default.
 func ReplacementFor(token string) (string, bool) {
-	return getDiscoveredTheme().ReplacementForSlash(token)
+	slashIdx := strings.IndexByte(token, '/')
+	if slashIdx == -1 {
+		return "", false
+	}
+	colorBase := token[:slashIdx]
+	opacity := token[slashIdx+1:]
+	cands, ok := NewDefaultCharitesConvention().FindOpacityReplacement(colorBase, opacity, getDiscoveredTheme())
+	if !ok || len(cands) == 0 {
+		return "", false
+	}
+	return cands[0].Name, true
 }
 
 // HardcodeOpacityColorRule mengimplementasikan aturan static analysis "theme.hardcode-opacity-color".
 type HardcodeOpacityColorRule struct {
-	themeCtx *themeengine.Context
+	themeCtx   themeengine.Context
+	convention TokenConvention
 }
 
 // NewHardcodeOpacityColorRule membuat instance baru HardcodeOpacityColorRule dengan Context yang ditemukan otomatis.
 func NewHardcodeOpacityColorRule() *HardcodeOpacityColorRule {
 	return &HardcodeOpacityColorRule{
-		themeCtx: getDiscoveredTheme(),
+		themeCtx:   getDiscoveredTheme(),
+		convention: NewDefaultCharitesConvention(),
 	}
 }
 
 // NewHardcodeOpacityColorRuleWithTheme membuat instance baru HardcodeOpacityColorRule dengan dynamic Context.
-func NewHardcodeOpacityColorRuleWithTheme(themeCtx *themeengine.Context) *HardcodeOpacityColorRule {
+func NewHardcodeOpacityColorRuleWithTheme(themeCtx themeengine.Context) *HardcodeOpacityColorRule {
 	if themeCtx == nil {
 		themeCtx = getDiscoveredTheme()
 	}
 	return &HardcodeOpacityColorRule{
-		themeCtx: themeCtx,
+		themeCtx:   themeCtx,
+		convention: NewDefaultCharitesConvention(),
 	}
 }
 
 // WithTheme menetapkan context tema dinamis ke rule.
-func (r *HardcodeOpacityColorRule) WithTheme(themeCtx *themeengine.Context) *HardcodeOpacityColorRule {
+func (r *HardcodeOpacityColorRule) WithTheme(themeCtx themeengine.Context) *HardcodeOpacityColorRule {
 	if themeCtx == nil {
 		themeCtx = getDiscoveredTheme()
 	}
 	r.themeCtx = themeCtx
+	return r
+}
+
+// WithConvention menetapkan adapter konvensi semantik ke rule.
+func (r *HardcodeOpacityColorRule) WithConvention(conv TokenConvention) *HardcodeOpacityColorRule {
+	if conv != nil {
+		r.convention = conv
+	}
 	return r
 }
 
@@ -180,7 +201,7 @@ func (r *HardcodeOpacityColorRule) Evaluate(node *ir.Node) []ir.Diagnostic {
 		return nil
 	}
 
-	//nolint:prealloc // zero-alloc on clean nodes required by QUAL-03 allocation invariant
+	//nolint:prealloc // zero-alloc on clean nodes required by QUAL-03
 	var diags []ir.Diagnostic
 	for _, class := range node.Classes {
 		if strings.IndexByte(class, '/') == -1 {
@@ -202,15 +223,29 @@ func (r *HardcodeOpacityColorRule) Evaluate(node *ir.Node) []ir.Diagnostic {
 			continue
 		}
 
+		slashIdx := strings.IndexByte(colorSlash, '/')
+		if slashIdx == -1 {
+			continue
+		}
+		colorBase := colorSlash[:slashIdx]
+		opacity := colorSlash[slashIdx+1:]
+
 		tCtx := r.themeCtx
 		if tCtx == nil {
 			tCtx = getDiscoveredTheme()
 		}
 
-		replacement, ok := tCtx.ReplacementForSlash(colorSlash)
-		if !ok {
+		conv := r.convention
+		if conv == nil {
+			conv = NewDefaultCharitesConvention()
+		}
+
+		cands, ok := conv.FindOpacityReplacement(colorBase, opacity, tCtx)
+		if !ok || len(cands) == 0 {
 			continue
 		}
+
+		replacement := cands[0].Name
 
 		diags = append(diags, ir.Diagnostic{
 			Line:     node.Span.Line,
