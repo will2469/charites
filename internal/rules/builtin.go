@@ -15,6 +15,12 @@ var (
 	_ Rule = (*theme.InlineStyleHardcodeRule)(nil)
 	_ Rule = (*theme.PseudoHardcodeColorRule)(nil)
 	_ Rule = (*theme.ImportantOverrideRule)(nil)
+	_ Rule = (*theme.HardcodeSizeRule)(nil)
+	_ Rule = (*theme.HardcodeBorderRadiusRule)(nil)
+	_ Rule = (*theme.HardcodeZIndexRule)(nil)
+	_ Rule = (*theme.HardcodeShadowColorRule)(nil)
+	_ Rule = (*theme.BackdropBlurHardcodeRule)(nil)
+	_ Rule = (*theme.FocusRingHardcodeRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -28,6 +34,12 @@ func builtinRules() []Rule {
 		theme.NewInlineStyleHardcodeRule(),
 		theme.NewPseudoHardcodeColorRule(),
 		theme.NewImportantOverrideRule(),
+		theme.NewHardcodeSizeRule(),
+		theme.NewHardcodeBorderRadiusRule(),
+		theme.NewHardcodeZIndexRule(),
+		theme.NewHardcodeShadowColorRule(),
+		theme.NewBackdropBlurHardcodeRule(),
+		theme.NewFocusRingHardcodeRule(),
 	}
 }
 

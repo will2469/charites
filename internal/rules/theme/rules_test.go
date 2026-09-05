@@ -354,6 +354,219 @@ func TestImportantOverrideRule(t *testing.T) {
 	}
 }
 
+func TestHardcodeSizeRule(t *testing.T) {
+	rule := theme.NewHardcodeSizeRule()
+
+	if rule.ID() != "theme.hardcode-size" {
+		t.Fatalf("unexpected ID: %s", rule.ID())
+	}
+	if rule.Category() != "theme" {
+		t.Fatalf("unexpected category: %s", rule.Category())
+	}
+	if rule.DefaultSeverity() != ir.SeverityWarn {
+		t.Fatalf("unexpected severity: %v", rule.DefaultSeverity())
+	}
+
+	tests := []struct {
+		name    string
+		classes []string
+		want    int
+	}{
+		{"ArbitraryPadding", []string{"p-[19px]"}, 1},
+		{"ArbitraryWidth", []string{"w-[320px]"}, 1},
+		{"ArbitraryTextSize", []string{"text-[15px]"}, 1},
+		{"ArbitraryGap", []string{"gap-[13px]"}, 1},
+		{"ArbitraryPropertyWidth", []string{"[width:100px]"}, 1},
+		{"ArbitraryPropertyPadding", []string{"[padding:19px]"}, 1},
+		{"StandardSpacing", []string{"p-5", "w-80", "text-base", "gap-3"}, 0},
+		{"StandardFractions", []string{"w-full", "w-1/2"}, 0},
+		{"CSSVariableSize", []string{"p-[var(--spacing-custom)]", "w-[var(--container-max)]"}, 0},
+		{"BananaNonSpatial", []string{"scale-[1.5]", "duration-[300ms]", "rotate-[45deg]"}, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			node := makeNode(tc.classes...)
+			diags := rule.Evaluate(node)
+			if len(diags) != tc.want {
+				t.Fatalf("got %d diagnostics, want %d", len(diags), tc.want)
+			}
+		})
+	}
+}
+
+func TestHardcodeBorderRadiusRule(t *testing.T) {
+	rule := theme.NewHardcodeBorderRadiusRule()
+
+	if rule.ID() != "theme.hardcode-border-radius" {
+		t.Fatalf("unexpected ID: %s", rule.ID())
+	}
+	if rule.DefaultSeverity() != ir.SeverityWarn {
+		t.Fatalf("unexpected severity: %v", rule.DefaultSeverity())
+	}
+
+	tests := []struct {
+		name    string
+		classes []string
+		want    int
+	}{
+		{"ArbitraryRadiusPx", []string{"rounded-[7px]"}, 1},
+		{"ArbitraryRadiusRem", []string{"rounded-[0.5rem]"}, 1},
+		{"DirectionalRadius", []string{"rounded-t-[10px]"}, 1},
+		{"ArbitraryPropertyRadius", []string{"[border-radius:8px]"}, 1},
+		{"StandardTokens", []string{"rounded-none", "rounded-sm", "rounded", "rounded-md", "rounded-lg", "rounded-full"}, 0},
+		{"StandardDirectional", []string{"rounded-t-xl", "rounded-b-none"}, 0},
+		{"CSSVariableRadius", []string{"rounded-[var(--radius)]"}, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			node := makeNode(tc.classes...)
+			diags := rule.Evaluate(node)
+			if len(diags) != tc.want {
+				t.Fatalf("got %d diagnostics, want %d", len(diags), tc.want)
+			}
+		})
+	}
+}
+
+func TestHardcodeZIndexRule(t *testing.T) {
+	rule := theme.NewHardcodeZIndexRule()
+
+	if rule.ID() != "theme.hardcode-z-index" {
+		t.Fatalf("unexpected ID: %s", rule.ID())
+	}
+	if rule.DefaultSeverity() != ir.SeverityWarn {
+		t.Fatalf("unexpected severity: %v", rule.DefaultSeverity())
+	}
+
+	tests := []struct {
+		name    string
+		classes []string
+		want    int
+	}{
+		{"ArbitraryLargeZ", []string{"z-[9999]"}, 1},
+		{"ArbitraryZHundred", []string{"z-[100]"}, 1},
+		{"ArbitraryPropertyZ", []string{"[z-index:1000]"}, 1},
+		{"StandardZScale", []string{"z-0", "z-10", "z-20", "z-30", "z-40", "z-50"}, 0},
+		{"ZAuto", []string{"z-auto"}, 0},
+		{"CSSVariableZ", []string{"z-[var(--z-modal)]"}, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			node := makeNode(tc.classes...)
+			diags := rule.Evaluate(node)
+			if len(diags) != tc.want {
+				t.Fatalf("got %d diagnostics, want %d", len(diags), tc.want)
+			}
+		})
+	}
+}
+
+func TestHardcodeShadowColorRule(t *testing.T) {
+	rule := theme.NewHardcodeShadowColorRule()
+
+	if rule.ID() != "theme.hardcode-shadow-color" {
+		t.Fatalf("unexpected ID: %s", rule.ID())
+	}
+	if rule.DefaultSeverity() != ir.SeverityWarn {
+		t.Fatalf("unexpected severity: %v", rule.DefaultSeverity())
+	}
+
+	tests := []struct {
+		name    string
+		classes []string
+		want    int
+	}{
+		{"ArbitraryShadowHex", []string{"shadow-[0_4px_10px_#00000040]"}, 1},
+		{"ArbitraryShadowRGBA", []string{"shadow-[0_10px_15px_rgba(0,0,0,0.1)]"}, 1},
+		{"ArbitraryPropertyShadow", []string{"[box-shadow:0_4px_6px_#000]"}, 1},
+		{"StandardShadows", []string{"shadow-sm", "shadow", "shadow-md", "shadow-lg", "shadow-xl", "shadow-none"}, 0},
+		{"CSSVariableShadowColor", []string{"shadow-[0_4px_6px_var(--shadow-color)]"}, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			node := makeNode(tc.classes...)
+			diags := rule.Evaluate(node)
+			if len(diags) != tc.want {
+				t.Fatalf("got %d diagnostics, want %d", len(diags), tc.want)
+			}
+		})
+	}
+}
+
+func TestBackdropBlurHardcodeRule(t *testing.T) {
+	rule := theme.NewBackdropBlurHardcodeRule()
+
+	if rule.ID() != "theme.backdrop-blur-hardcode" {
+		t.Fatalf("unexpected ID: %s", rule.ID())
+	}
+	if rule.DefaultSeverity() != ir.SeverityWarn {
+		t.Fatalf("unexpected severity: %v", rule.DefaultSeverity())
+	}
+
+	tests := []struct {
+		name    string
+		classes []string
+		want    int
+	}{
+		{"ArbitraryBackdropBlur", []string{"backdrop-blur-[5px]"}, 1},
+		{"ArbitraryFilterBlur", []string{"blur-[12px]"}, 1},
+		{"ArbitraryPropertyBackdropBlur", []string{"[backdrop-filter:blur(7px)]"}, 1},
+		{"StandardBackdropBlur", []string{"backdrop-blur-sm", "backdrop-blur-md", "backdrop-blur-lg", "backdrop-blur-none"}, 0},
+		{"StandardBlur", []string{"blur-sm", "blur-md", "blur-none"}, 0},
+		{"CSSVariableBlur", []string{"backdrop-blur-[var(--blur-glass)]"}, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			node := makeNode(tc.classes...)
+			diags := rule.Evaluate(node)
+			if len(diags) != tc.want {
+				t.Fatalf("got %d diagnostics, want %d", len(diags), tc.want)
+			}
+		})
+	}
+}
+
+func TestFocusRingHardcodeRule(t *testing.T) {
+	rule := theme.NewFocusRingHardcodeRule()
+
+	if rule.ID() != "theme.focus-ring-hardcode" {
+		t.Fatalf("unexpected ID: %s", rule.ID())
+	}
+	if rule.DefaultSeverity() != ir.SeverityWarn {
+		t.Fatalf("unexpected severity: %v", rule.DefaultSeverity())
+	}
+
+	tests := []struct {
+		name    string
+		classes []string
+		want    int
+	}{
+		{"ArbitraryHexRing", []string{"focus:ring-[#3b82f6]"}, 1},
+		{"PrimitiveColorRing", []string{"ring-blue-500"}, 1},
+		{"PrimitiveOffsetMonochrome", []string{"ring-offset-white"}, 1},
+		{"PrimitiveOutline", []string{"outline-blue-500"}, 1},
+		{"ArbitraryOutlineHex", []string{"outline-[#3b82f6]"}, 1},
+		{"SemanticRing", []string{"focus-visible:ring-ring", "focus:ring-ring", "ring-ring", "ring-primary"}, 0},
+		{"SemanticOffset", []string{"ring-offset-background"}, 0},
+		{"RingWidthsAndKeywords", []string{"ring", "ring-1", "ring-2", "ring-4", "ring-offset-2", "outline-none"}, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			node := makeNode(tc.classes...)
+			diags := rule.Evaluate(node)
+			if len(diags) != tc.want {
+				t.Fatalf("got %d diagnostics, want %d", len(diags), tc.want)
+			}
+		})
+	}
+}
+
 func BenchmarkKelompok1_ZeroAllocClean(b *testing.B) {
 	node := makeNode("p-4", "flex", "items-center", "justify-between", "rounded-lg", "shadow-sm")
 	allRules := []struct {
@@ -371,6 +584,30 @@ func BenchmarkKelompok1_ZeroAllocClean(b *testing.B) {
 	}
 
 	for _, tc := range allRules {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				_ = tc.eval(node)
+			}
+		})
+	}
+}
+
+func BenchmarkKelompok2_ZeroAllocClean(b *testing.B) {
+	node := makeNode("p-4", "w-80", "text-base", "gap-3", "rounded-md", "z-10", "shadow-md", "backdrop-blur-sm", "focus-visible:ring-2", "focus-visible:ring-ring")
+	rulesK2 := []struct {
+		name string
+		eval func(*ir.Node) []ir.Diagnostic
+	}{
+		{"HardcodeSize", theme.NewHardcodeSizeRule().Evaluate},
+		{"HardcodeBorderRadius", theme.NewHardcodeBorderRadiusRule().Evaluate},
+		{"HardcodeZIndex", theme.NewHardcodeZIndexRule().Evaluate},
+		{"HardcodeShadowColor", theme.NewHardcodeShadowColorRule().Evaluate},
+		{"BackdropBlurHardcode", theme.NewBackdropBlurHardcodeRule().Evaluate},
+		{"FocusRingHardcode", theme.NewFocusRingHardcodeRule().Evaluate},
+	}
+
+	for _, tc := range rulesK2 {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {

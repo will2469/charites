@@ -8,7 +8,7 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 | Category | Rules Count | Documentation |
 | :--- | :---: | :--- |
-| `theme` | 9 | [`theme.md`](theme.md) |
+| `theme` | 15 | [`theme.md`](theme.md) |
 
 ---
 
@@ -16,11 +16,17 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 | Rule ID | Category | Severity | Description | Documentation |
 | :--- | :---: | :---: | :--- | :--- |
+| `theme.backdrop-blur-hardcode` | `theme` | `WARN` | Detects hardcoded arbitrary blur and backdrop-blur scalars in Tailwind utility classes | [`theme/backdrop-blur-hardcode.md`](theme/backdrop-blur-hardcode.md) |
+| `theme.focus-ring-hardcode` | `theme` | `WARN` | Detects hardcoded primitive palette or arbitrary hex colors on focus rings and outlines | [`theme/focus-ring-hardcode.md`](theme/focus-ring-hardcode.md) |
 | `theme.gradient-hardcode` | `theme` | `WARN` | Detects hardcoded primitive, arbitrary hex, or monochrome colors in gradient stops | [`theme/gradient-hardcode.md`](theme/gradient-hardcode.md) |
 | `theme.hardcode-border-color` | `theme` | `WARN` | Detects hardcoded border and divider colors using primitive palettes, raw hex literals, or static monochrome | [`theme/hardcode-border-color.md`](theme/hardcode-border-color.md) |
+| `theme.hardcode-border-radius` | `theme` | `WARN` | Detects hardcoded arbitrary border-radius scalars in Tailwind utility classes | [`theme/hardcode-border-radius.md`](theme/hardcode-border-radius.md) |
 | `theme.hardcode-color` | `theme` | `WARN` | Detects hardcoded arbitrary hex or rgb color literals in Tailwind utility classes and arbitrary properties | [`theme/hardcode-color.md`](theme/hardcode-color.md) |
 | `theme.hardcode-monochrome` | `theme` | `WARN` | Detects hardcoded monochrome utilities (white/black) that fail to adapt across light and dark themes | [`theme/hardcode-monochrome.md`](theme/hardcode-monochrome.md) |
 | `theme.hardcode-opacity-color` | `theme` | `ERROR` | Detects utility classes with hardcoded slash opacity modifiers that have official semantic token replacements | [`theme/hardcode-opacity-color.md`](theme/hardcode-opacity-color.md) |
+| `theme.hardcode-shadow-color` | `theme` | `WARN` | Detects hardcoded color literals embedded in box-shadow declarations | [`theme/hardcode-shadow-color.md`](theme/hardcode-shadow-color.md) |
+| `theme.hardcode-size` | `theme` | `WARN` | Detects hardcoded arbitrary size, spacing, or typography scalars in Tailwind utility classes | [`theme/hardcode-size.md`](theme/hardcode-size.md) |
+| `theme.hardcode-z-index` | `theme` | `WARN` | Detects hardcoded arbitrary z-index scalars that trigger stacking context wars | [`theme/hardcode-z-index.md`](theme/hardcode-z-index.md) |
 | `theme.important-override` | `theme` | `ERROR` | Detects !important modifiers on color utility classes that break theme cascade and specificity hierarchy | [`theme/important-override.md`](theme/important-override.md) |
 | `theme.inline-style-hardcode` | `theme` | `ERROR` | Detects hardcoded color literals inside HTML/JSX style attributes that prevent theme cascade | [`theme/inline-style-hardcode.md`](theme/inline-style-hardcode.md) |
 | `theme.primitive-in-component` | `theme` | `ERROR` | Detects direct usage of Tailwind primitive palette colors in component classes instead of semantic tokens | [`theme/primitive-in-component.md`](theme/primitive-in-component.md) |

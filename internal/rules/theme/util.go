@@ -62,6 +62,35 @@ func StripVariants(token string) ([]string, string) {
 	return variants, curr
 }
 
+// StripVariantsOnlyBase mengembalikan utility dasar tanpa mengalokasikan slice varian.
+// Mengembalikan substring langsung tanpa alokasi memori (0 B/op, 0 allocs/op).
+func StripVariantsOnlyBase(token string) string {
+	if !strings.Contains(token, ":") {
+		return token
+	}
+
+	lastColon := -1
+	inBracket := false
+	for i := 0; i < len(token); i++ {
+		b := token[i]
+		switch b {
+		case '[':
+			inBracket = true
+		case ']':
+			inBracket = false
+		case ':':
+			if !inBracket {
+				lastColon = i
+			}
+		}
+	}
+
+	if lastColon == -1 {
+		return token
+	}
+	return token[lastColon+1:]
+}
+
 // SplitAlphaModifier memisahkan utilitas dari modifier slash alpha (seperti "text-white/[0.06]").
 func SplitAlphaModifier(token string) (base string, alpha string, hasAlpha bool) {
 	// Abaikan slash yang berada di dalam arbitrary bracket (misal: "[color:rgb(0/0/0)]")
@@ -328,4 +357,249 @@ func ExtractInlineStyleHardcodedColor(styleVal string) (string, bool) {
 	}
 
 	return "", false
+}
+
+// HasHardcodedScalarUnit memeriksa apakah nilai string memuat unit skalar (px, rem, em, pt) tanpa var(--...).
+func HasHardcodedScalarUnit(val string) bool {
+	if strings.Contains(val, "var(--") {
+		return false
+	}
+	for _, unit := range []string{"px", "rem", "em", "pt"} {
+		if strings.HasSuffix(val, unit) {
+			numPart := val[:len(val)-len(unit)]
+			if len(numPart) > 0 && isNumericString(numPart) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isNumericString(s string) bool {
+	hasDigit := false
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if b >= '0' && b <= '9' {
+			hasDigit = true
+		} else if b != '.' && b != '-' {
+			return false
+		}
+	}
+	return hasDigit
+}
+
+// SpatialSizePrefixes adalah daftar prefix Tailwind yang mengatur ukuran spasial dan tipografi.
+var SpatialSizePrefixes = []string{
+	"min-w-[", "max-w-[", "min-h-[", "max-h-[",
+	"gap-x-[", "gap-y-[", "space-x-[", "space-y-[",
+	"inset-x-[", "inset-y-[",
+	"size-[", "gap-[", "inset-[",
+	"px-[", "py-[", "pt-[", "pb-[", "pl-[", "pr-[", "ps-[", "pe-[",
+	"mx-[", "my-[", "mt-[", "mb-[", "ml-[", "mr-[", "ms-[", "me-[",
+	"w-[", "h-[", "p-[", "m-[",
+	"top-[", "bottom-[", "left-[", "right-[",
+	"leading-[", "tracking-[",
+}
+
+// SpatialPropertyNames adalah daftar nama properti CSS yang mengatur dimensi dan spacing.
+var SpatialPropertyNames = map[string]bool{
+	"width": true, "height": true, "min-width": true, "max-width": true,
+	"min-height": true, "max-height": true,
+	"padding": true, "padding-top": true, "padding-bottom": true, "padding-left": true, "padding-right": true,
+	"margin": true, "margin-top": true, "margin-bottom": true, "margin-left": true, "margin-right": true,
+	"gap": true, "column-gap": true, "row-gap": true,
+	"top": true, "bottom": true, "left": true, "right": true,
+	"font-size": true, "line-height": true, "letter-spacing": true,
+}
+
+// IsHardcodedSizeUtility mendeteksi apakah token menggunakan utility dimensi, spacing, posisi, atau tipografi hardcode.
+func IsHardcodedSizeUtility(base string) bool {
+	if prop, val, ok := ParseArbitraryProperty(base); ok {
+		if SpatialPropertyNames[strings.ToLower(prop)] {
+			return HasHardcodedScalarUnit(val)
+		}
+		return false
+	}
+
+	// Tangani typography text-[...px] / text-[...rem]
+	if strings.HasPrefix(base, "text-[") && strings.HasSuffix(base, "]") {
+		inner := base[6 : len(base)-1]
+		if !IsHexColor(inner) && !IsColorFunction(inner) && HasHardcodedScalarUnit(inner) {
+			return true
+		}
+		return false
+	}
+
+	for _, prefix := range SpatialSizePrefixes {
+		if strings.HasPrefix(base, prefix) && strings.HasSuffix(base, "]") {
+			inner := base[len(prefix) : len(base)-1]
+			if HasHardcodedScalarUnit(inner) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// BorderRadiusPrefixes adalah daftar prefix border radius Tailwind.
+var BorderRadiusPrefixes = []string{
+	"rounded-tl-[", "rounded-tr-[", "rounded-bl-[", "rounded-br-[",
+	"rounded-ss-[", "rounded-se-[", "rounded-es-[", "rounded-ee-[",
+	"rounded-t-[", "rounded-b-[", "rounded-l-[", "rounded-r-[",
+	"rounded-s-[", "rounded-e-[",
+	"rounded-[",
+}
+
+// IsHardcodedBorderRadius mendeteksi radius sudut arbitrer.
+func IsHardcodedBorderRadius(base string) bool {
+	if prop, val, ok := ParseArbitraryProperty(base); ok {
+		p := strings.ToLower(prop)
+		if p == "border-radius" || (strings.HasPrefix(p, "border-") && strings.HasSuffix(p, "-radius")) {
+			return HasHardcodedScalarUnit(val)
+		}
+		return false
+	}
+
+	for _, prefix := range BorderRadiusPrefixes {
+		if strings.HasPrefix(base, prefix) && strings.HasSuffix(base, "]") {
+			inner := base[len(prefix) : len(base)-1]
+			if strings.Contains(inner, "var(--") {
+				return false
+			}
+			return HasHardcodedScalarUnit(inner) || isNumericString(inner)
+		}
+	}
+	return false
+}
+
+// IsHardcodedZIndex mendeteksi z-index arbitrer skalar.
+func IsHardcodedZIndex(base string) bool {
+	if prop, val, ok := ParseArbitraryProperty(base); ok {
+		if strings.ToLower(prop) == "z-index" {
+			return !strings.Contains(val, "var(--") && isNumericString(val)
+		}
+		return false
+	}
+
+	if strings.HasPrefix(base, "z-[") && strings.HasSuffix(base, "]") {
+		inner := base[3 : len(base)-1]
+		if strings.Contains(inner, "var(--") {
+			return false
+		}
+		return isNumericString(inner)
+	}
+	return false
+}
+
+// IsHardcodedShadowColor mendeteksi apakah bayangan arbitrer menyematkan warna hardcode.
+func IsHardcodedShadowColor(base string) bool {
+	if prop, val, ok := ParseArbitraryProperty(base); ok {
+		if strings.ToLower(prop) == "box-shadow" {
+			return CheckHardcodedColorValue(val)
+		}
+		return false
+	}
+
+	if strings.HasPrefix(base, "shadow-[") && strings.HasSuffix(base, "]") {
+		inner := base[8 : len(base)-1]
+		if strings.Contains(inner, "#") {
+			return true
+		}
+		if strings.Contains(inner, "rgb(") || strings.Contains(inner, "rgba(") ||
+			strings.Contains(inner, "hsl(") || strings.Contains(inner, "hsla(") ||
+			strings.Contains(inner, "oklch(") || strings.Contains(inner, "oklab(") {
+			return true
+		}
+	}
+	return false
+}
+
+// IsHardcodedBackdropBlur mendeteksi blur atau backdrop-blur arbitrer.
+func IsHardcodedBackdropBlur(base string) bool {
+	if prop, val, ok := ParseArbitraryProperty(base); ok {
+		p := strings.ToLower(prop)
+		if p == "backdrop-filter" || p == "filter" {
+			if idx := strings.Index(val, "blur("); idx != -1 {
+				inner := val[idx+5:]
+				if closeIdx := strings.IndexByte(inner, ')'); closeIdx != -1 {
+					inner = strings.TrimSpace(inner[:closeIdx])
+					return HasHardcodedScalarUnit(inner) || isNumericString(inner)
+				}
+			}
+		}
+		return false
+	}
+
+	if strings.HasPrefix(base, "backdrop-blur-[") && strings.HasSuffix(base, "]") {
+		inner := base[15 : len(base)-1]
+		return HasHardcodedScalarUnit(inner) || isNumericString(inner)
+	}
+	if strings.HasPrefix(base, "blur-[") && strings.HasSuffix(base, "]") {
+		inner := base[6 : len(base)-1]
+		return HasHardcodedScalarUnit(inner) || isNumericString(inner)
+	}
+	return false
+}
+
+// SafeRingTokens adalah daftar token ring atau outline bawaan yang aman.
+var SafeRingTokens = map[string]bool{
+	"ring": true, "ring-1": true, "ring-2": true, "ring-4": true, "ring-8": true,
+	"ring-inset":    true,
+	"ring-offset-0": true, "ring-offset-1": true, "ring-offset-2": true, "ring-offset-4": true, "ring-offset-8": true,
+	"outline-none": true, "outline-0": true, "outline-1": true, "outline-2": true, "outline-4": true, "outline-8": true,
+	"outline-dashed": true, "outline-dotted": true, "outline-double": true,
+	"ring-ring": true, "ring-primary": true, "ring-border": true, "ring-background": true,
+	"ring-offset-background": true, "ring-offset-ring": true,
+}
+
+// FocusRingBracketPrefixes adalah daftar prefix kurung siku arbitrer untuk ring dan outline fokus.
+var FocusRingBracketPrefixes = []string{"ring-[", "ring-offset-[", "outline-["}
+
+func isArbitraryFocusRingBracket(base string) bool {
+	for _, prefix := range FocusRingBracketPrefixes {
+		if strings.HasPrefix(base, prefix) && strings.HasSuffix(base, "]") {
+			inner := base[len(prefix) : len(base)-1]
+			if strings.Contains(inner, "var(--") {
+				return false
+			}
+			return IsHexColor(inner) || IsColorFunction(inner)
+		}
+	}
+	return false
+}
+
+func isPrimitiveFocusRing(base string) bool {
+	if strings.HasPrefix(base, "ring-offset-") {
+		rem := base[12:]
+		return IsMonochromeColor(rem) || IsTailwindPrimitiveColor(rem)
+	}
+	if strings.HasPrefix(base, "ring-") {
+		return IsTailwindPrimitiveColor(base[5:])
+	}
+	if strings.HasPrefix(base, "outline-") {
+		return IsTailwindPrimitiveColor(base[8:])
+	}
+	return false
+}
+
+func isArbitraryFocusRingProperty(base string) bool {
+	prop, val, ok := ParseArbitraryProperty(base)
+	if !ok {
+		return false
+	}
+	p := strings.ToLower(prop)
+	if !strings.HasPrefix(p, "ring-") && !strings.HasPrefix(p, "outline-") {
+		return false
+	}
+	return CheckHardcodedColorValue(val)
+}
+
+// IsHardcodedFocusRing mendeteksi ring atau outline fokus dengan warna mentah / primitif.
+func IsHardcodedFocusRing(base string) bool {
+	if SafeRingTokens[base] {
+		return false
+	}
+	return isArbitraryFocusRingProperty(base) ||
+		isArbitraryFocusRingBracket(base) ||
+		isPrimitiveFocusRing(base)
 }
