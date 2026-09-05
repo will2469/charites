@@ -9,6 +9,7 @@ import (
 
 	"github.com/will2469/charites/internal/ir"
 	"github.com/will2469/charites/internal/rules"
+	"github.com/will2469/charites/internal/token"
 )
 
 // ActiveRule membungkus rule singleton dengan EffectiveSeverity hasil resolusi konfigurasi.
@@ -18,13 +19,17 @@ type ActiveRule struct {
 	EffectiveSeverity ir.Severity
 }
 
+// ConventionConfig merepresentasikan konfigurasi inferensi semantik token di charites.yaml.
+type ConventionConfig = token.ConventionConfig
+
 // Config merepresentasikan konfigurasi proyek dari charites.yaml.
 type Config struct {
-	Format   string            `json:"format" yaml:"format"`
-	ScanPath string            `json:"scan_path" yaml:"scan_path"`
-	Theme    string            `json:"theme" yaml:"theme"`   // Custom path ke SSOT tema (CSS/JSON) jika di luar path standar
-	Rules    map[string]string `json:"rules" yaml:"rules"`   // "rule-id": "off" | "warn" | "error" | "info"
-	Ignore   []string          `json:"ignore" yaml:"ignore"` // Pola path tambahan
+	Format     string            `json:"format" yaml:"format"`
+	ScanPath   string            `json:"scan_path" yaml:"scan_path"`
+	Theme      string            `json:"theme" yaml:"theme"`           // Custom path ke SSOT tema (CSS/JSON) jika di luar path standar
+	Convention ConventionConfig  `json:"convention" yaml:"convention"` // Konfigurasi konvensi semantik token
+	Rules      map[string]string `json:"rules" yaml:"rules"`           // "rule-id": "off" | "warn" | "error" | "info"
+	Ignore     []string          `json:"ignore" yaml:"ignore"`         // Pola path tambahan
 }
 
 // Load membaca dan mem-parse berkas konfigurasi dari path yang diberikan.
@@ -58,6 +63,11 @@ func Parse(data []byte) (*Config, error) {
 	cfg := &Config{
 		Rules:  make(map[string]string),
 		Ignore: make([]string, 0),
+		Convention: ConventionConfig{
+			OpacityMappings: make(map[string][]string),
+			Fallbacks:       make(map[string][]string),
+			Prefixes:        make([]string, 0),
+		},
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -81,6 +91,22 @@ func Parse(data []byte) (*Config, error) {
 		if indent == 0 {
 			parseTopLevel(trimmed, cfg, &currentSection)
 		} else {
+			if strings.HasSuffix(trimmed, ":") && strings.HasPrefix(currentSection, "convention") {
+				sub := cleanValue(strings.TrimSuffix(trimmed, ":"))
+				if indent <= 2 {
+					currentSection = "convention." + sub
+				} else {
+					switch {
+					case strings.HasPrefix(currentSection, "convention.opacity_mappings"):
+						currentSection = "convention.opacity_mappings." + sub
+					case strings.HasPrefix(currentSection, "convention.fallbacks"):
+						currentSection = "convention.fallbacks." + sub
+					default:
+						currentSection = "convention." + sub
+					}
+				}
+				continue
+			}
 			parseIndentedSection(trimmed, currentSection, cfg)
 		}
 	}
@@ -114,8 +140,8 @@ func parseTopLevel(trimmed string, cfg *Config, currentSection *string) {
 }
 
 func parseIndentedSection(trimmed, currentSection string, cfg *Config) {
-	switch currentSection {
-	case "rules":
+	switch {
+	case currentSection == "rules":
 		if k, v, found := strings.Cut(trimmed, ":"); found {
 			ruleID := strings.TrimSpace(k)
 			val := cleanValue(v)
@@ -123,14 +149,96 @@ func parseIndentedSection(trimmed, currentSection string, cfg *Config) {
 				cfg.Rules[ruleID] = val
 			}
 		}
-	case "ignore":
+	case currentSection == "ignore":
 		if strings.HasPrefix(trimmed, "-") {
 			val := cleanValue(strings.TrimPrefix(trimmed, "-"))
 			if val != "" {
 				cfg.Ignore = append(cfg.Ignore, val)
 			}
 		}
+	case strings.HasPrefix(currentSection, "convention"):
+		parseConventionSection(trimmed, currentSection, cfg)
 	}
+}
+
+func parseConventionSection(trimmed, currentSection string, cfg *Config) {
+	if cfg.Convention.OpacityMappings == nil {
+		cfg.Convention.OpacityMappings = make(map[string][]string)
+	}
+	if cfg.Convention.Fallbacks == nil {
+		cfg.Convention.Fallbacks = make(map[string][]string)
+	}
+
+	switch {
+	case currentSection == "convention":
+		if k, v, found := strings.Cut(trimmed, ":"); found {
+			subKey := strings.TrimSpace(k)
+			val := cleanValue(v)
+			if subKey == "prefixes" {
+				cfg.Convention.Prefixes = parseStringList(val)
+			}
+		}
+	case currentSection == "convention.opacity_mappings":
+		if k, v, found := strings.Cut(trimmed, ":"); found {
+			op := cleanValue(k)
+			val := strings.TrimSpace(v)
+			if val != "" {
+				cfg.Convention.OpacityMappings[op] = parseStringList(val)
+			}
+		}
+	case strings.HasPrefix(currentSection, "convention.opacity_mappings."):
+		op := strings.TrimPrefix(currentSection, "convention.opacity_mappings.")
+		if strings.HasPrefix(trimmed, "-") {
+			val := cleanValue(strings.TrimPrefix(trimmed, "-"))
+			if val != "" {
+				cfg.Convention.OpacityMappings[op] = append(cfg.Convention.OpacityMappings[op], val)
+			}
+		}
+	case currentSection == "convention.fallbacks":
+		if k, v, found := strings.Cut(trimmed, ":"); found {
+			base := cleanValue(k)
+			val := strings.TrimSpace(v)
+			if val != "" {
+				cfg.Convention.Fallbacks[base] = parseStringList(val)
+			}
+		}
+	case strings.HasPrefix(currentSection, "convention.fallbacks."):
+		base := strings.TrimPrefix(currentSection, "convention.fallbacks.")
+		if strings.HasPrefix(trimmed, "-") {
+			val := cleanValue(strings.TrimPrefix(trimmed, "-"))
+			if val != "" {
+				cfg.Convention.Fallbacks[base] = append(cfg.Convention.Fallbacks[base], val)
+			}
+		}
+	case currentSection == "convention.prefixes":
+		if strings.HasPrefix(trimmed, "-") {
+			val := cleanValue(strings.TrimPrefix(trimmed, "-"))
+			if val != "" {
+				cfg.Convention.Prefixes = append(cfg.Convention.Prefixes, val)
+			}
+		} else {
+			cfg.Convention.Prefixes = parseStringList(trimmed)
+		}
+	}
+}
+
+func parseStringList(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	if strings.HasPrefix(raw, "[") && strings.HasSuffix(raw, "]") {
+		raw = raw[1 : len(raw)-1]
+	}
+	parts := strings.Split(raw, ",")
+	var result []string
+	for _, p := range parts {
+		cleaned := cleanValue(p)
+		if cleaned != "" {
+			result = append(result, cleaned)
+		}
+	}
+	return result
 }
 
 // cleanValue membersihkan tanda kutip (single/double) dan spasi dari nilai konfigurasi.

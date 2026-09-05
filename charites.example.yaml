@@ -22,3 +22,17 @@ ignore:
 rules:
   theme.hardcode-opacity-color: error
   theme.hardcode-color: warn
+
+# Token naming convention & semantic inference (optional, design-agnostic)
+# Allows your team/design system to define custom opacity mappings, aliases, and property prefixes.
+# convention:
+#   prefixes:
+#     - "--color-"
+#     - "--"
+#   opacity_mappings:
+#     "10": ["-light", "-soft"]
+#     "20": ["-light"]
+#     "5": ["-subtle"]
+#     "8": ["-subtle"]
+#   fallbacks:
+#     secondary: ["muted"]

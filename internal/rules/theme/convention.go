@@ -20,23 +20,103 @@ type TokenConvention interface {
 	) ([]TokenCandidate, bool)
 }
 
-// DefaultCharitesConvention mengimplementasikan konvensi bawaan Charites & DTCG:
-//   - Opacity 10 & 20 -> mencari varian "-light" (misal: "primary-light", "--color-primary-light")
-//   - Opacity 5 & 8   -> mencari varian "-subtle" (misal: "primary-subtle", "--color-primary-subtle")
-//   - Fallback secondary: jika base "secondary" dan "secondary-light" tidak ada di graph,
-//     tetapi "muted-light" ada di graph, merekomendasikan "muted-light".
-//
-// Catatan: Adapter ini HANYA mengembalikan kandidat JIKA token tersebut benar-benar ADA
-// di dalam TokenGraph proyek pengguna (fakta membuktikan eksistensi token).
-type DefaultCharitesConvention struct{}
-
-// NewDefaultCharitesConvention membuat instance konvensi bawaan Charites.
-func NewDefaultCharitesConvention() *DefaultCharitesConvention {
-	return &DefaultCharitesConvention{}
+// ConfigurableConvention mengimplementasikan TokenConvention yang dapat dikonfigurasi penuh
+// (design-agnostic) melalui charites.yaml atau adapter proyek khusus.
+type ConfigurableConvention struct {
+	opacityMappings map[string][]string
+	fallbacks       map[string][]string
+	prefixes        []string
 }
 
-// FindOpacityReplacement mencari token pengganti semantik resmi untuk base color dan modifier opacity.
-func (c *DefaultCharitesConvention) FindOpacityReplacement(
+// ConventionOption mendefinisikan fungsi opsi konfigurasi untuk ConfigurableConvention.
+type ConventionOption func(*ConfigurableConvention)
+
+// WithOpacityMapping mendaftarkan pemetaan nilai modifier opacity ke daftar suffix kandidat token.
+func WithOpacityMapping(opacity string, suffixes ...string) ConventionOption {
+	return func(c *ConfigurableConvention) {
+		c.opacityMappings[opacity] = append(c.opacityMappings[opacity], suffixes...)
+	}
+}
+
+// WithFallback mendaftarkan alias dasar fallback untuk nama warna dasar tertentu.
+func WithFallback(base string, fallbackBases ...string) ConventionOption {
+	return func(c *ConfigurableConvention) {
+		c.fallbacks[base] = append(c.fallbacks[base], fallbackBases...)
+	}
+}
+
+// WithPrefixes menetapkan daftar prefix custom property CSS yang dicari di token graph.
+func WithPrefixes(prefixes ...string) ConventionOption {
+	return func(c *ConfigurableConvention) {
+		c.prefixes = prefixes
+	}
+}
+
+// NewConfigurableConvention membuat instance baru ConfigurableConvention dengan opsi kustom.
+func NewConfigurableConvention(opts ...ConventionOption) *ConfigurableConvention {
+	c := &ConfigurableConvention{
+		opacityMappings: make(map[string][]string),
+		fallbacks:       make(map[string][]string),
+		prefixes:        []string{"--color-", "--"},
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
+// NewDefaultCharitesConvention membuat instance konvensi bawaan Charites & DTCG.
+// Catatan: Ini adalah konfigurasi awal ramah-pengembang dan BUKAN kebenaran semantik absolut;
+// dapat dioverride sepenuhnya via konfigurasi proyek charites.yaml.
+func NewDefaultCharitesConvention() *ConfigurableConvention {
+	return NewConfigurableConvention(
+		WithOpacityMapping("10", "-light"),
+		WithOpacityMapping("20", "-light"),
+		WithOpacityMapping("5", "-subtle"),
+		WithOpacityMapping("8", "-subtle"),
+		WithFallback("secondary", "muted"),
+		WithPrefixes("--color-", "--"),
+	)
+}
+
+// NewConventionFromConfig membuat instance TokenConvention berdasarkan konfigurasi charites.yaml.
+func NewConventionFromConfig(cfg themeengine.ConventionConfig) *ConfigurableConvention {
+	c := NewDefaultCharitesConvention()
+
+	if len(cfg.OpacityMappings) > 0 {
+		c.opacityMappings = make(map[string][]string, len(cfg.OpacityMappings))
+		for op, suffixes := range cfg.OpacityMappings {
+			c.opacityMappings[op] = suffixes
+		}
+	}
+
+	if len(cfg.Fallbacks) > 0 {
+		c.fallbacks = make(map[string][]string, len(cfg.Fallbacks))
+		for b, fbs := range cfg.Fallbacks {
+			c.fallbacks[b] = fbs
+		}
+	}
+
+	if len(cfg.Prefixes) > 0 {
+		c.prefixes = cfg.Prefixes
+	}
+
+	return c
+}
+
+// AddOpacityMapping menambahkan pemetaan opacity baru secara dinamis.
+func (c *ConfigurableConvention) AddOpacityMapping(opacity string, suffixes ...string) {
+	c.opacityMappings[opacity] = append(c.opacityMappings[opacity], suffixes...)
+}
+
+// AddFallback menambahkan relasi fallback baru secara dinamis.
+func (c *ConfigurableConvention) AddFallback(base string, fallbackBases ...string) {
+	c.fallbacks[base] = append(c.fallbacks[base], fallbackBases...)
+}
+
+// FindOpacityReplacement mencari token pengganti semantik resmi untuk base color dan modifier opacity
+// berdasarkan aturan pemetaan yang dikonfigurasi.
+func (c *ConfigurableConvention) FindOpacityReplacement(
 	base string,
 	opacity string,
 	ctx themeengine.Context,
@@ -45,13 +125,8 @@ func (c *DefaultCharitesConvention) FindOpacityReplacement(
 		return nil, false
 	}
 
-	var suffixes []string
-	switch opacity {
-	case "10", "20":
-		suffixes = []string{"-light"}
-	case "5", "8":
-		suffixes = []string{"-subtle"}
-	default:
+	suffixes, exists := c.opacityMappings[opacity]
+	if !exists || len(suffixes) == 0 {
 		return nil, false
 	}
 
@@ -62,11 +137,13 @@ func (c *DefaultCharitesConvention) FindOpacityReplacement(
 			return []TokenCandidate{cand}, true
 		}
 
-		// 2. Fallback secondary -> muted
-		if base == "secondary" {
-			mutedCand := "muted" + suffix
-			if cand, ok := c.lookupCandidate(mutedCand, ctx); ok {
-				return []TokenCandidate{cand}, true
+		// 2. Cek basis fallback yang terkonfigurasi (misal: secondary -> muted, banana -> kuning)
+		if fbs, ok := c.fallbacks[base]; ok {
+			for _, fb := range fbs {
+				fbCand := fb + suffix
+				if cand, ok := c.lookupCandidate(fbCand, ctx); ok {
+					return []TokenCandidate{cand}, true
+				}
 			}
 		}
 	}
@@ -74,21 +151,23 @@ func (c *DefaultCharitesConvention) FindOpacityReplacement(
 	return nil, false
 }
 
-func (c *DefaultCharitesConvention) lookupCandidate(shortName string, ctx themeengine.Context) (TokenCandidate, bool) {
-	// Cek bentuk custom property: "--color-<name>", "--<name>"
-	variants := []string{
-		"--color-" + shortName,
-		"--" + shortName,
-	}
-
-	for _, v := range variants {
-		if tok, ok := ctx.LookupToken(v); ok {
-			// Token eksis di graph SSOT pengguna! (0 heap allocations)
+func (c *ConfigurableConvention) lookupCandidate(shortName string, ctx themeengine.Context) (TokenCandidate, bool) {
+	for _, p := range c.prefixes {
+		fullName := p + shortName
+		if tok, ok := ctx.LookupToken(fullName); ok {
 			return TokenCandidate{
 				Name:     shortName,
 				RawValue: tok.RawValue,
 			}, true
 		}
+	}
+
+	// Cek tanpa prefix (jika token dideklarasikan langsung sebagai shortName)
+	if tok, ok := ctx.LookupToken(shortName); ok {
+		return TokenCandidate{
+			Name:     shortName,
+			RawValue: tok.RawValue,
+		}, true
 	}
 
 	return TokenCandidate{}, false

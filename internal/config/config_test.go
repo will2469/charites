@@ -197,3 +197,57 @@ func TestResolveActiveRules_RuleFilterNotFound(t *testing.T) {
 		t.Errorf("expected 0 rules, got %d", len(active))
 	}
 }
+
+func TestConfig_ParseConvention(t *testing.T) {
+	// 1. Inline format
+	inlineYAML := `
+convention:
+  prefixes: ["--custom-", "--"]
+  opacity_mappings:
+    "10": ["-light", "-subtle"]
+    "20": ["-light"]
+  fallbacks:
+    secondary: ["muted"]
+`
+	cfgInline, err := config.Parse([]byte(inlineYAML))
+	if err != nil {
+		t.Fatalf("failed parsing inline convention: %v", err)
+	}
+	if len(cfgInline.Convention.Prefixes) != 2 || cfgInline.Convention.Prefixes[0] != "--custom-" {
+		t.Errorf("unexpected prefixes: %+v", cfgInline.Convention.Prefixes)
+	}
+	if len(cfgInline.Convention.OpacityMappings["10"]) != 2 {
+		t.Errorf("unexpected opacity mappings for 10: %+v", cfgInline.Convention.OpacityMappings["10"])
+	}
+	if len(cfgInline.Convention.Fallbacks["secondary"]) != 1 || cfgInline.Convention.Fallbacks["secondary"][0] != "muted" {
+		t.Errorf("unexpected fallbacks for secondary: %+v", cfgInline.Convention.Fallbacks["secondary"])
+	}
+
+	// 2. Multi-line bullet format
+	bulletYAML := `
+convention:
+  prefixes:
+    - "--my-theme-"
+    - "--brand-"
+  opacity_mappings:
+    "15":
+      - "-tint"
+      - "-soft"
+  fallbacks:
+    accent:
+      - "highlight"
+`
+	cfgBullet, err := config.Parse([]byte(bulletYAML))
+	if err != nil {
+		t.Fatalf("failed parsing bullet convention: %v", err)
+	}
+	if len(cfgBullet.Convention.Prefixes) != 2 || cfgBullet.Convention.Prefixes[0] != "--my-theme-" {
+		t.Errorf("unexpected prefixes: %+v", cfgBullet.Convention.Prefixes)
+	}
+	if len(cfgBullet.Convention.OpacityMappings["15"]) != 2 || cfgBullet.Convention.OpacityMappings["15"][0] != "-tint" {
+		t.Errorf("unexpected opacity mappings for 15: %+v", cfgBullet.Convention.OpacityMappings["15"])
+	}
+	if len(cfgBullet.Convention.Fallbacks["accent"]) != 1 || cfgBullet.Convention.Fallbacks["accent"][0] != "highlight" {
+		t.Errorf("unexpected fallbacks for accent: %+v", cfgBullet.Convention.Fallbacks["accent"])
+	}
+}

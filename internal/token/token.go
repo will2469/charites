@@ -23,6 +23,13 @@ type Condition struct {
 	IsLight  bool              // true jika kondisi mewajibkan light mode
 }
 
+// ConventionConfig merepresentasikan konfigurasi inferensi semantik token dari charites.yaml.
+type ConventionConfig struct {
+	OpacityMappings map[string][]string `json:"opacity_mappings,omitempty" yaml:"opacity_mappings,omitempty"`
+	Fallbacks       map[string][]string `json:"fallbacks,omitempty" yaml:"fallbacks,omitempty"`
+	Prefixes        []string            `json:"prefixes,omitempty" yaml:"prefixes,omitempty"`
+}
+
 // ParseCondition mengurai string prelude at-rule (@media, @supports, @container)
 // menjadi struktur Condition dengan ekstraksi fitur terstruktur.
 func ParseCondition(atName, query string) Condition {
