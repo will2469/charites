@@ -5,7 +5,7 @@
 > **Peran Pilar:** ROADMAP = PHASE GATE (Otoritas Gerbang Evaluasi Kelulusan Transisi)
 > **Status:** Ready for Execution
 
-Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) serta deklarasi pembekuan pipa compiler (*pipeline freeze gate*) untuk **Fase 6 (Validasi Penuh & Golden Snapshots)** sebelum melangkah ke **Fase 7 (Ekosistem MCP & Wiki Generator)** dan **Fase 8 (Ekspansi 30+ Rules)**. Sesuai prinsip tata kelola [docs/00-CONTRACT.md](file:///home/will/Monorepo/charites/docs/00-CONTRACT.md):
+Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) serta deklarasi pembekuan pipa compiler (*pipeline freeze gate*) untuk **Fase 6 (Validasi Penuh & Golden Snapshots)** sebelum melangkah ke **Fase 7 (Ekosistem MCP & Wiki Generator)** dan **Fase 8 (Ekspansi 30+ Rules)**. Sesuai prinsip tata kelola [docs/00-CONTRACT.md](https://github.com/will2469/charites/blob/main/docs/00-CONTRACT.md):
 - **SPEC** = WHAT (Spesifikasi Validasi Pipa Lengkap, Korpus Fixture & Golden Snapshots)
 - **ARCH** = HOW (Arsitektur Runner Snapshot, Harness Fuzzing & Pembekuan Pipa)
 - **TEST** = PROOF (Suite Uji Regresi Golden Master & Native Fuzzing CI)

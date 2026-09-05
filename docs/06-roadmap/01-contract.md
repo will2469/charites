@@ -55,5 +55,5 @@ Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi 
 
 Begitu keempat gerbang di atas berstatus **PASS**:
 1. Rekam checkpoint git commit: `feat(ir): complete Phase 1 unified node, diagnostic contracts and iterator verification`.
-2. Buka dokumen [docs/01-spec/02-parser.md](file:///home/will/Monorepo/charites/docs/01-spec/02-parser.md) untuk memulai spesifikasi parser AST Tailwind CSS v4 `@theme`, Astro, dan React/TSX (**Fase 2**).
+2. Buka dokumen [docs/01-spec/02-parser.md](https://github.com/will2469/charites/blob/main/docs/01-spec/02-parser.md) untuk memulai spesifikasi parser AST Tailwind CSS v4 `@theme`, Astro, dan React/TSX (**Fase 2**).
 

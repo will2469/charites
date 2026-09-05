@@ -64,7 +64,7 @@ Available Commands:
 - Pola CLI ditambahkan ke aturan pengguna dan **DILARANG** membuka kembali (*override/negate*) direktori builtin hard exclusion.
 
 ### 2.4. Presedensi Kebijakan Konfigurasi vs CLI Scope
-Sesuai kontrak [docs/00-CONTRACT.md](file:///home/will/Monorepo/charites/docs/00-CONTRACT.md):
+Sesuai kontrak [docs/00-CONTRACT.md](https://github.com/will2469/charites/blob/main/docs/00-CONTRACT.md):
 - Flag CLI `--rule` dan `--category` berfungsi sebagai **Candidate Scope** (pemilihan kandidat).
 - Konfigurasi `charites.yaml` berfungsi sebagai **Policy** (kebijakan penonaktifan dan override).
 - Jika konfigurasi menetapkan status `off` untuk rule tertentu, rule tersebut **TIDAK AKTIF** meskipun pengguna secara eksplisit menentukan `--rule` pada CLI.

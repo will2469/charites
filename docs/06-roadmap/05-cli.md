@@ -5,7 +5,7 @@
 > **Peran Pilar:** ROADMAP = PHASE GATE (Otoritas Gerbang Evaluasi Kelulusan Transisi)
 > **Status:** Ready for Execution
 
-Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi (*phase gate*) untuk **Fase 5 (Reporter Output & CLI Entrypoint)** sebelum tim diizinkan melangkah ke **Fase 6 (Validasi Penuh & Golden Tests)**. Sesuai prinsip tata kelola [docs/00-CONTRACT.md](file:///home/will/Monorepo/charites/docs/00-CONTRACT.md):
+Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi (*phase gate*) untuk **Fase 5 (Reporter Output & CLI Entrypoint)** sebelum tim diizinkan melangkah ke **Fase 6 (Validasi Penuh & Golden Tests)**. Sesuai prinsip tata kelola [docs/00-CONTRACT.md](https://github.com/will2469/charites/blob/main/docs/00-CONTRACT.md):
 - **SPEC** = WHAT (Spesifikasi Antarmuka CLI, Format Reporter & Kontrak Exit Code)
 - **ARCH** = HOW (Rancangan Arsitektur CLI, Dispatcher & Abstraksi Reporter)
 - **TEST** = PROOF (Harness Pengujian, Matriks E2E & Snapshot Reporter)

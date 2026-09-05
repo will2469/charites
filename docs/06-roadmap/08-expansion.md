@@ -5,7 +5,7 @@
 > **Peran Pilar:** ROADMAP = PHASE GATE (Otoritas Gerbang Evaluasi Kelulusan Transisi)
 > **Status:** Ready for Review
 
-Dokumen ini menetapkan *checklist* baku pengerjaan rule baru (*Standard Rule Authoring Checklist*), gerbang transisi kelulusan template otorisasi rule, serta peta jalan ekspansi bertahap (*batch expansion roadmap*). Sesuai prinsip tata kelola [docs/00-CONTRACT.md](file:///home/will/Monorepo/charites/docs/00-CONTRACT.md):
+Dokumen ini menetapkan *checklist* baku pengerjaan rule baru (*Standard Rule Authoring Checklist*), gerbang transisi kelulusan template otorisasi rule, serta peta jalan ekspansi bertahap (*batch expansion roadmap*). Sesuai prinsip tata kelola [docs/00-CONTRACT.md](https://github.com/will2469/charites/blob/main/docs/00-CONTRACT.md):
 - **SPEC** = WHAT (Spesifikasi Kontrak Penulisan Rule & Template Studi Kasus)
 - **ARCH** = HOW (Rancangan Arsitektur Ekstensibilitas, Rule SSOT & 3 Touchpoints)
 - **TEST** = PROOF (Harness Pengujian, Matriks Semantik Ekspektasi & Tri-Corpus)

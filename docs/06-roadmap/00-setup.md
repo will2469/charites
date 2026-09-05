@@ -60,5 +60,5 @@ Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi 
 
 Begitu seluruh kriteria evaluasi gerbang `ROAD-00-GATE-001` s/d `ROAD-00-GATE-004` di atas tercentang hijau:
 1. Rekam checkpoint git commit: `feat(init): complete Phase 0 repository setup, CLI entrypoint and toolchain baseline`.
-2. Buka dokumen [docs/01-spec/01-contract.md](file:///home/will/Monorepo/charites/docs/01-spec/01-contract.md) untuk memulai implementasi kontrak data Intermediate Representation (**Fase 1**).
+2. Buka dokumen [docs/01-spec/01-contract.md](https://github.com/will2469/charites/blob/main/docs/01-spec/01-contract.md) untuk memulai implementasi kontrak data Intermediate Representation (**Fase 1**).
 

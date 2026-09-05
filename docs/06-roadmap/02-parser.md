@@ -57,5 +57,5 @@ Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi 
 
 Begitu keempat gerbang di atas berstatus **PASS**:
 1. Rekam checkpoint git commit: `feat(parser): complete Phase 2 frontend parsers, recovery semantics and AST-to-IR tree builder`.
-2. Buka dokumen [docs/01-spec/03-rules.md](file:///home/will/Monorepo/charites/docs/01-spec/03-rules.md) untuk memulai implementasi kernel rule dan pembuktian Rule #1: **`theme.hardcode-opacity-color`** (**Fase 3**).
+2. Buka dokumen [docs/01-spec/03-rules.md](https://github.com/will2469/charites/blob/main/docs/01-spec/03-rules.md) untuk memulai implementasi kernel rule dan pembuktian Rule #1: **`theme.hardcode-opacity-color`** (**Fase 3**).
 

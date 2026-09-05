@@ -5,7 +5,7 @@
 > **Peran Pilar:** ROADMAP = PHASE GATE (Otoritas Gerbang Evaluasi Kelulusan Transisi)
 > **Status:** Ready for Execution
 
-Dokumen ini menetapkan deliverable wajib, kriteria kelulusan (*exit criteria*), dan gerbang transisi (*phase gate*) untuk **Fase 7 (Ekosistem Lanjutan: MCP Server, Wiki Generator & Secure Installer)** sebelum melangkah ke fase penutup **Fase 8 (Ekspansi 30+ Rules & Dokumentasi Ensiklopedia)**. Sesuai prinsip tata kelola [docs/00-CONTRACT.md](file:///home/will/Monorepo/charites/docs/00-CONTRACT.md):
+Dokumen ini menetapkan deliverable wajib, kriteria kelulusan (*exit criteria*), dan gerbang transisi (*phase gate*) untuk **Fase 7 (Ekosistem Lanjutan: MCP Server, Wiki Generator & Secure Installer)** sebelum melangkah ke fase penutup **Fase 8 (Ekspansi 30+ Rules & Dokumentasi Ensiklopedia)**. Sesuai prinsip tata kelola [docs/00-CONTRACT.md](https://github.com/will2469/charites/blob/main/docs/00-CONTRACT.md):
 - **SPEC** = WHAT (Spesifikasi Protokol MCP, Generator Wiki & Keamanan Pasokan)
 - **ARCH** = HOW (Rancangan Protokol Stdio, Router MCP, Generator Wiki & Keamanan Pemasang)
 - **TEST** = PROOF (Harness Pengujian, Matriks Protokol MCP & Validasi Pemasang)
