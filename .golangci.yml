@@ -8,6 +8,8 @@ linters:
     - errcheck
     - govet
     - staticcheck
+    - gosimple
+    - ineffassign
     - revive
     - gocritic
     - gosec
