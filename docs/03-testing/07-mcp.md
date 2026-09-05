@@ -1,88 +1,78 @@
 # 03-TESTING: 07 - MCP Server Protocol, Wiki Generator & Installer Verification Plan
 
 > **Kode Dokumen:** `TEST-07-MCP`
-> **Tahapan:** Fase 7 - Ekosistem Lanjutan (MCP Server & Wiki Generator)
+> **Tahapan:** Fase 7 - Ekosistem Lanjutan (MCP Server, Wiki Generator & Secure Installer)
+> **Peran Pilar:** TEST = PROOF (Harness Pengujian, Matriks Protokol MCP & Validasi Pemasang)
 > **Status:** Ready for Review
 > **Standar Rujukan:** JSON-RPC 2.0 Conformance Testing & Shellcheck Automation
 
-Dokumen ini mendefinisikan strategi pengujian untuk server **Model Context Protocol (MCP)** berbasis Stdio, pengujian integritas ekspor **Wiki Generator**, serta validasi skrip instalasi shell.
+Dokumen ini mendefinisikan strategi pengujian menyeluruh untuk server **Model Context Protocol (MCP)** berbasis Stdio, pengujian integritas ekspor **Wiki Generator**, serta validasi keamanan skrip instalasi shell.
 
 ---
 
-## 1. Skenario Pengujian Server MCP (`internal/mcp/`)
+## 1. Matriks Pengujian Protokol Server MCP (`internal/mcp/`)
 
-Pengujian MCP memverifikasi kepatuhan terhadap standar JSON-RPC 2.0 dengan menyuntikkan aliran byte ke `stdin` mock dan membaca `stdout` mock:
+Pengujian menyuntikkan aliran byte ke `stdin` mock dan memvalidasi `stdout` mock baris per baris:
 
-### 1.1. Pengujian Handshake & Discovery (`internal/mcp/stdio_test.go`)
-- **Test Case 1 (Inisialisasi Protokol):**
-  - Input: `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`.
-  - Ekspektasi: Respon memuat `protocolVersion: "2026-07-28"` dan `serverInfo.name: "charites-mcp"`.
-- **Test Case 2 (Tools Listing):**
-  - Input: `{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`.
-  - Ekspektasi: Respon memuat 3 tool resmi: `charites_scan`, `charites_explain_rule`, dan `charites_list_rules`.
-
-### 1.2. Pengujian Eksekusi Tool Call
-- **Test Case 3 (`charites_scan` Execution):**
-  - Input:
-    ```json
-    {
-      "jsonrpc": "2.0",
-      "id": 3,
-      "method": "tools/call",
-      "params": {
-        "name": "charites_scan",
-        "arguments": { "path": "tests/fixtures/astro_opacity" }
-      }
-    }
-    ```
-  - Ekspektasi: Respon mengembalikan payload JSON diagnostik yang mendeteksi pelanggaran opacity.
-- **Test Case 4 (`charites_explain_rule` Execution):**
-  - Input: Tool call dengan argumen `rule_id: "theme.hardcode-opacity-color"`.
-  - Ekspektasi: Respon memuat string markdown deskripsi rule dan rekomendasi token semantik dari `global.css`.
-- **Test Case 5 (Unknown Method / Bad Request):**
-  - Input: `{"jsonrpc":"2.0","id":99,"method":"non_existent_method"}`.
-  - Ekspektasi: Mengembalikan error code JSON-RPC `-32601` (*Method not found*).
-
-### 1.3. Invarian Kemurnian Output (Zero Stream Contamination)
-- Seluruh byte yang keluar dari `os.Stdout` wajib di-decode menggunakan `json.NewDecoder`. Jika terdapat baris yang gagal di-decode, pengujian dinyatakan **FAIL**.
+| ID Kasus Uji | Kondisi Masukan JSON-RPC | Ekspektasi Respon / Kode Status |
+| :--- | :--- | :--- |
+| **`MCP-TEST-001`** | Handshake normal: `initialize` lalu `notifications/initialized` | Respon sukses dengan `protocolVersion: "2026-07-28"` |
+| **`MCP-TEST-002`** | `tools/list` atau `tools/call` dipanggil sebelum `initialize` | Error `-32002` (*Server not initialized*) |
+| **`MCP-TEST-003`** | `initialize` dipanggil kedua kali setelah server `READY` | Error `-32600` (*Invalid Request: already initialized*) |
+| **`MCP-TEST-004`** | JSON sintaks cacat (malformed JSON string) | Error `-32700` (*Parse Error*) |
+| **`MCP-TEST-005`** | Frame pesan melebihi batas 4 Megabytes | Error `-32700` (*Parse Error / Frame Exceeded*) |
+| **`MCP-TEST-006`** | Request tanpa field `"jsonrpc": "2.0"` | Error `-32600` (*Invalid Request*) |
+| **`MCP-TEST-007`** | Method RPC tidak dikenal (misal `foo/bar`) | Error `-32601` (*Method not found*) |
+| **`MCP-TEST-008`** | Tool call dengan nama tool tidak terdaftar | Error `-32601` (*Tool not found*) |
+| **`MCP-TEST-009`** | Tool call `charites_scan` tanpa parameter `path` | Error `-32602` (*Invalid Params: missing required path*) |
+| **`MCP-TEST-010`** | `charites_scan` dengan path traversal `../../etc/passwd` | Error `-32602` (*Invalid Params: path traversal denied*) |
+| **`MCP-TEST-011`** | Preservasi Request ID presisi (string `"req-abc"` dan integer `42`) | Respon memuat field `id` yang identik 100% tanpa konversi float |
+| **`MCP-TEST-012`** | Klien mengirim notifikasi pembatalan `notifications/cancelled` | Proses pemindaian dihentikan dan context dibatalkan bersih |
+| **`MCP-TEST-013`** | Invarian Kemurnian Output (Zero Stream Contamination) | Setiap baris di `stdout` lolos parsing JSON-RPC tunggal (0 polusi teks) |
 
 ---
 
 ## 2. Skenario Pengujian Wiki Generator (`internal/wiki/`)
 
-Pengujian memastikan generator markdown menghasilkan struktur dokumentasi yang rapi dan dapat ditautkan:
-
 ```go
-func TestWikiGenerator_Export(t *testing.T) {
-    tmpDir := t.TempDir()
+func TestWikiGenerator_DynamicCategoriesAndAtomic(t *testing.T) {
+    tmpTarget := t.TempDir()
     reg := rules.NewRegistry()
     _ = reg.Register(theme.NewHardcodeOpacityColorRule())
 
-    err := wiki.Generate(reg, tmpDir)
+    // 1. Uji Penemuan Kategori Dinamis
+    err := wiki.Generate(reg, tmpTarget)
     if err != nil {
         t.Fatalf("failed to generate wiki: %v", err)
     }
 
-    // 1. Verifikasi Home.md
-    homeContent, err := os.ReadFile(filepath.Join(tmpDir, "Home.md"))
-    if err != nil || !strings.Contains(string(homeContent), "theme.hardcode-opacity-color") {
+    homeContent, _ := os.ReadFile(filepath.Join(tmpTarget, "Home.md"))
+    if !strings.Contains(string(homeContent), "theme.hardcode-opacity-color") {
         t.Errorf("Home.md missing rule entry")
     }
 
-    // 2. Verifikasi theme.md
-    themeContent, err := os.ReadFile(filepath.Join(tmpDir, "theme.md"))
-    if err != nil || !strings.Contains(string(themeContent), "primary-light") {
-        t.Errorf("theme.md missing remediation hint")
+    // 2. Uji Determinisme Biner (Dua kali generasi menghasilkan byte identik)
+    secondTarget := t.TempDir()
+    _ = wiki.Generate(reg, secondTarget)
+
+    firstBytes, _ := os.ReadFile(filepath.Join(tmpTarget, "theme.md"))
+    secondBytes, _ := os.ReadFile(filepath.Join(secondTarget, "theme.md"))
+    if !bytes.Equal(firstBytes, secondBytes) {
+        t.Errorf("Wiki output is not byte-for-byte identical across runs")
     }
 }
 ```
 
 ---
 
-## 3. Pengujian Kualitas Skrip Installer (`scripts/install.sh`)
+## 3. Pengujian Kualitas & Keamanan Skrip Pemasang (`scripts/install.sh`)
 
-1. **Static Analysis Shellcheck:**
+1. **Analisis Statis Shellcheck:**
    - Menjalankan linter shell: `shellcheck -s sh scripts/install.sh`.
-   - Menjamin skrip bebas dari deklarasi bashism yang tidak kompatibel dengan `/bin/sh` murni.
-2. **Uji Coba Deteksi Platform:**
-   - Memvalidasi pemetaan `uname -s` dan `uname -m` ke target binary GitHub Releases (`charites-linux-amd64.tar.gz`, `charites-darwin-arm64.tar.gz`).
+   - Wajib bebas 100% dari peringatan bashism (*pure POSIX sh compliance*).
+2. **Uji Coba Penolakan Checksum Palsu:**
+   - Menyediakan tarball dummy dengan hash yang tidak sesuai dengan `checksums.txt`.
+   - Skrip pemasang **WAJIB** menolak ekstraksi dan keluar dengan exit code `1`.
+3. **Uji Coba Pencegahan Path Traversal:**
+   - Menyediakan tarball tiruan yang memuat entri path `../usr/bin`.
+   - Skrip **WAJIB** menggagalkan instalasi dan menghapus folder sementara.
