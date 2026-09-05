@@ -37,8 +37,8 @@ func TestGenerator_Generate(t *testing.T) {
 	if !strings.Contains(homeContent, "theme") {
 		t.Errorf("Home.md missing 'theme' category")
 	}
-	if !strings.Contains(homeContent, "theme.hardcode-opacity-color.md") {
-		t.Errorf("Home.md missing 'theme.hardcode-opacity-color.md'")
+	if !strings.Contains(homeContent, "[`theme.hardcode-opacity-color`](theme.hardcode-opacity-color)") {
+		t.Errorf("Home.md missing link to theme.hardcode-opacity-color")
 	}
 
 	// 2. Verify theme.md
@@ -51,8 +51,8 @@ func TestGenerator_Generate(t *testing.T) {
 	if !strings.Contains(themeContent, "# Theme Rules (`theme`)") {
 		t.Errorf("theme.md missing header")
 	}
-	if !strings.Contains(themeContent, "theme.hardcode-opacity-color.md") {
-		t.Errorf("theme.md missing link to theme.hardcode-opacity-color.md")
+	if !strings.Contains(themeContent, "[`theme.hardcode-opacity-color`](theme.hardcode-opacity-color)") {
+		t.Errorf("theme.md missing link to theme.hardcode-opacity-color")
 	}
 
 	// 3. Verify theme.hardcode-opacity-color.md
@@ -73,7 +73,7 @@ func TestGenerator_Generate(t *testing.T) {
 		t.Fatalf("_Sidebar.md was not generated: %v", readErr)
 	}
 	sidebarContent := string(sidebarBytes)
-	if !strings.Contains(sidebarContent, "* [**Home**](Home.md)") {
+	if !strings.Contains(sidebarContent, "* [**Home**](Home)") {
 		t.Errorf("_Sidebar.md missing Home link")
 	}
 	if !strings.Contains(sidebarContent, "<details open>") {
@@ -82,7 +82,10 @@ func TestGenerator_Generate(t *testing.T) {
 	if !strings.Contains(sidebarContent, "<summary><b>Theme</b> (15 rules)") {
 		t.Errorf("_Sidebar.md missing Theme category summary")
 	}
-	if !strings.Contains(sidebarContent, "* [`theme.hardcode-opacity-color`](theme.hardcode-opacity-color.md)") {
+	if !strings.Contains(sidebarContent, "* [**Theme Overview**](theme)") {
+		t.Errorf("_Sidebar.md missing Theme Overview link")
+	}
+	if !strings.Contains(sidebarContent, "* [`theme.hardcode-opacity-color`](theme.hardcode-opacity-color)") {
 		t.Errorf("_Sidebar.md missing rule entry in sidebar")
 	}
 }

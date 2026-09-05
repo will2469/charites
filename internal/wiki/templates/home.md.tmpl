@@ -9,7 +9,7 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 | Category | Rules Count | Documentation |
 | :--- | :---: | :--- |
 {{- range .Categories }}
-| `{{ .Name }}` | {{ .Count }} | [`{{ .Name }}.md`]({{ .Name }}.md) |
+| `{{ .Name }}` | {{ .Count }} | [`{{ .Name }}`]({{ .Name }}) |
 {{- end }}
 
 ---
@@ -19,7 +19,7 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 | Rule ID | Category | Severity | Description | Documentation |
 | :--- | :---: | :---: | :--- | :--- |
 {{- range .Rules }}
-| `{{ .ID }}` | `{{ .Category }}` | `{{ .Severity }}` | {{ .Description }} | [`{{ .ID }}.md`]({{ .ID }}.md) |
+| `{{ .ID }}` | `{{ .Category }}` | `{{ .Severity }}` | {{ .Description }} | [`{{ .ID }}`]({{ .ID }}) |
 {{- end }}
 
 ---

@@ -1,15 +1,16 @@
-# [Charites Wiki](Home.md)
+# [Charites Wiki](Home)
 
-* [**Home**](Home.md)
+* [**Home**](Home)
 
 ---
 
 ### Rule Categories
 {{range .Categories}}
 <details open>
-<summary><b>{{.Title}}</b> ({{.Count}} rules) - <a href="{{.Name}}.md">Overview</a></summary>
+<summary><b>{{.Title}}</b> ({{.Count}} rules)</summary>
 
-{{range .Rules}}* [`{{.ID}}`]({{.ID}}.md)
+* [**{{.Title}} Overview**]({{.Name}})
+{{range .Rules}}* [`{{.ID}}`]({{.ID}})
 {{end}}
 </details>
 {{end}}
