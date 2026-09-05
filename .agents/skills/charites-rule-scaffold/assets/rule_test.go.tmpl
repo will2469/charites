@@ -1,0 +1,30 @@
+package correctness
+
+import (
+	"path/filepath"
+	"testing"
+
+	"github.com/will2469/charites/internal/rules"
+	"github.com/will2469/charites/internal/testutil"
+)
+
+func TestRule_{{STRUCT_NAME}}(t *testing.T) {
+	rule := rules.New{{STRUCT_NAME}}()
+
+	baseDir := filepath.Join(".", "tests", "correctness", "{{RULE_ID}}")
+
+	t.Run("Positive_P1_P5", func(t *testing.T) {
+		posDir := filepath.Join(baseDir, "positive")
+		testutil.AssertPositiveFixtures(t, rule, posDir)
+	})
+
+	t.Run("Negative_N1_N5", func(t *testing.T) {
+		negDir := filepath.Join(baseDir, "negative")
+		testutil.AssertNegativeFixtures(t, rule, negDir)
+	})
+
+	t.Run("Adversarial_A1_A7", func(t *testing.T) {
+		advDir := filepath.Join(baseDir, "adversarial")
+		testutil.AssertAdversarialFixtures(t, rule, advDir)
+	})
+}

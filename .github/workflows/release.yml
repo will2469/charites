@@ -1,0 +1,130 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name for release (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  build-binaries:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            binary_name: charites
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            binary_name: charites
+          - os: ubuntu-latest
+            goos: darwin
+            goarch: arm64
+            binary_name: charites
+          - os: ubuntu-latest
+            goos: windows
+            goarch: amd64
+            binary_name: charites.exe
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Compile Binary (Pure Go, CGO Disabled)
+        shell: bash
+        run: |
+          mkdir -p dist
+          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          LDFLAGS="-s -w -X main.version=${RELEASE_TAG} -X main.commit=${{ github.sha }} -X main.date=${BUILD_DATE}"
+
+          export CGO_ENABLED=0
+          export GOOS=${{ matrix.goos }}
+          export GOARCH=${{ matrix.goarch }}
+
+          go build -trimpath -ldflags="${LDFLAGS}" -o dist/${{ matrix.binary_name }} ./cmd/charites
+
+      - name: Package Archive (Unix)
+        if: matrix.goos != 'windows'
+        shell: bash
+        run: |
+          ARCHIVE_NAME="charites_${RELEASE_TAG}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz"
+          cd dist
+          cp ../README.md ../LICENSE .
+          tar -czvf "../${ARCHIVE_NAME}" "${{ matrix.binary_name }}" README.md LICENSE
+          cd ..
+          sha256sum "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+
+      - name: Package Archive (Windows)
+        if: matrix.goos == 'windows'
+        shell: bash
+        run: |
+          ARCHIVE_NAME="charites_${RELEASE_TAG}_${{ matrix.goos }}_${{ matrix.goarch }}.zip"
+          cd dist
+          cp ../README.md ../LICENSE .
+          7z a "../${ARCHIVE_NAME}" "${{ matrix.binary_name }}" README.md LICENSE
+          cd ..
+          sha256sum "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: binary-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            charites_*.*
+          retention-days: 2
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate Combined Checksums
+        shell: bash
+        run: |
+          cd artifacts
+          cat *.sha256 > checksums.txt
+          rm -f *.sha256
+          ls -la
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "Charites ${{ env.RELEASE_TAG }}"
+          body_path: release_notes.md
+          files: |
+            artifacts/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false

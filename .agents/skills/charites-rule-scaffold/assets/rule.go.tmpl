@@ -1,0 +1,68 @@
+package rules
+
+import (
+	"fmt"
+
+	"github.com/will2469/charites/internal/ir"
+)
+
+// {{STRUCT_NAME}} implements the "{{RULE_ID}}" static analysis rule.
+type {{STRUCT_NAME}} struct {
+	severity ir.Severity
+}
+
+// New{{STRUCT_NAME}} creates a new instance of the rule analyzer.
+func New{{STRUCT_NAME}}() *{{STRUCT_NAME}} {
+	return &{{STRUCT_NAME}}{
+		severity: ir.Severity{{SEVERITY_TITLE}},
+	}
+}
+
+// ID returns the canonical Semgrep-style rule identifier.
+func (r *{{STRUCT_NAME}}) ID() string {
+	return "{{RULE_ID}}"
+}
+
+// Category returns the rule category.
+func (r *{{STRUCT_NAME}}) Category() string {
+	return "{{CATEGORY}}"
+}
+
+// DefaultSeverity returns the base severity level.
+func (r *{{STRUCT_NAME}}) DefaultSeverity() ir.Severity {
+	return r.severity
+}
+
+// Description returns a brief explanation of the rule's purpose.
+func (r *{{STRUCT_NAME}}) Description() string {
+	return "{{DESCRIPTION}}"
+}
+
+// Analyze inspects the Leaf IR root node and returns diagnostics for violations.
+func (r *{{STRUCT_NAME}}) Analyze(file *ir.File) []ir.Diagnostic {
+	var diagnostics []ir.Diagnostic
+
+	for node := range ir.Walk(file.Root) {
+		// Rule inspection logic here
+		if r.isViolation(node) {
+			diagnostics = append(diagnostics, ir.Diagnostic{
+				RuleID:   r.ID(),
+				Severity: r.severity,
+				Message:  fmt.Sprintf("{{RULE_ID}}: violation detected at %s", node.Name),
+				File:     file.Path,
+				Line:     node.Span.StartLine,
+				Column:   node.Span.StartCol,
+				EndLine:  node.Span.EndLine,
+				EndCol:   node.Span.EndCol,
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+func (r *{{STRUCT_NAME}}) isViolation(node *ir.Node) bool {
+	// TODO: implement specific node pattern matching
+	_ = node
+	return false
+}

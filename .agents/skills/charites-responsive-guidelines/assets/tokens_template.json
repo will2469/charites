@@ -1,0 +1,52 @@
+{
+	"$schema": "https://design-tokens.github.io/community-group/format/",
+	"name": "Charites semantic theme tokens",
+	"version": "2.0.0",
+	"description": "Repository token manifest aligned with styles/global.css. Keep light and dark theme values synchronized with the CSS SSOT.",
+	"color": {
+		"background": { "$value": "oklch(1 0 0)", "$type": "color" },
+		"foreground": { "$value": "oklch(0.1284 0.0267 261.5937)", "$type": "color" },
+		"card": { "$value": "oklch(0.9924 0 0)", "$type": "color" },
+		"cardForeground": { "$value": "{color.foreground}", "$type": "color" },
+		"primary": { "$value": "oklch(0.4459 0.0645 187.3883)", "$type": "color" },
+		"primaryForeground": { "$value": "oklch(1 0 0)", "$type": "color" },
+		"secondary": { "$value": "oklch(0.9696 0 0)", "$type": "color" },
+		"secondaryForeground": { "$value": "{color.foreground}", "$type": "color" },
+		"muted": { "$value": "oklch(0.9772 0 0)", "$type": "color" },
+		"mutedForeground": { "$value": "oklch(0.5503 0.0235 264.362)", "$type": "color" },
+		"accent": { "$value": "oklch(0.977 0.0108 191.0072)", "$type": "color" },
+		"accentForeground": { "$value": "oklch(0.3831 0.0542 187.5211)", "$type": "color" },
+		"destructive": { "$value": "oklch(0.5356 0.2041 27.7226)", "$type": "color" },
+		"destructiveForeground": { "$value": "oklch(1 0 0)", "$type": "color" },
+		"warning": { "$value": "oklch(0.6925 0.1667 73.5)", "$type": "color" },
+		"amber": { "$value": "oklch(0.75 0.15 85)", "$type": "color" },
+		"emerald": { "$value": "oklch(0.65 0.15 145)", "$type": "color" },
+		"border": { "$value": "oklch(0.9466 0 0)", "$type": "color" },
+		"input": { "$value": "{color.border}", "$type": "color" },
+		"ring": { "$value": "{color.primary}", "$type": "color" }
+	},
+	"typography": {
+		"sans": { "$value": "Inter, system-ui, sans-serif", "$type": "fontFamily" },
+		"serif": { "$value": "Merriweather, Georgia, serif", "$type": "fontFamily" },
+		"mono": { "$value": "monospace", "$type": "fontFamily" }
+	},
+	"dimension": {
+		"radius": { "$value": "0.75rem", "$type": "dimension" },
+		"spacing": { "$value": "0.25rem", "$type": "dimension" }
+	},
+	"motion": {
+		"reduced": { "$value": "prefers-reduced-motion", "$type": "other" }
+	},
+	"themes": {
+		"dark": {
+			"background": { "$value": "oklch(0.1774 0.0095 196.331)", "$type": "color" },
+			"foreground": { "$value": "oklch(0.9696 0 0)", "$type": "color" },
+			"card": { "$value": "oklch(0.1903 0.0108 196.2809)", "$type": "color" },
+			"primary": { "$value": "oklch(0.7232 0.1191 186.1923)", "$type": "color" },
+			"muted": { "$value": "oklch(0.2156 0 0)", "$type": "color" },
+			"mutedForeground": { "$value": "oklch(0.683 0 0)", "$type": "color" },
+			"border": { "$value": "oklch(0.2697 0 0)", "$type": "color" },
+			"ring": { "$value": "{themes.dark.primary}", "$type": "color" }
+		}
+	}
+}

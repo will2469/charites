@@ -1,0 +1,78 @@
+name: New Rule Proposal
+description: Propose a new static analysis or design token rule for Charites
+title: "[Rule Proposal]: "
+labels: ["rule-proposal", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Charites welcomes proposals for new static analysis rules enforcing design token integrity, accessibility (WCAG 2.2), responsive ergonomics, and Core Web Vitals performance.
+        Please provide the rationale, web standard grounding, and concrete template examples below.
+
+  - type: input
+    id: proposed_name
+    attributes:
+      label: Proposed Rule Identifier
+      description: Follow the `<category>.<slug>` Semgrep canonical convention (e.g. `theme.hardcode-opacity-color`, `a11y.touch-target`).
+      placeholder: "theme.hardcode-color"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Architectural Category
+      options:
+        - "theme (Design Tokens, OKLCH, Color Spaces)"
+        - "a11y (Accessibility & WCAG 2.2 Standards)"
+        - "responsive (Touch Targets, Fitts's Law, Container Queries)"
+        - "perf (Core Web Vitals, Hydration & CSS Layout)"
+        - "tailwind (Tailwind CSS v4 Semantic Tokens)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: default_severity
+    attributes:
+      label: Recommended Severity
+      options:
+        - "CRITICAL (blocks compilation / fails CI by default)"
+        - "HIGH (emits high-priority warning / fails CI)"
+        - "MEDIUM (informational hygiene check)"
+        - "LOW (cosmetic / style recommendation)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: invariant_rationale
+    attributes:
+      label: Rule Invariant & Web Standard Grounding
+      description: Explain the failure mode (e.g. WCAG 2.2 contrast failure, aesthetic fatigue from raw hex, layout shift from missing aspect-ratio).
+    validations:
+      required: true
+
+  - type: textarea
+    id: bad_example
+    attributes:
+      label: Non-Compliant Code Example (Violation)
+      description: Show what template code (.astro, .tsx, or .css) should trigger this rule.
+      render: html
+    validations:
+      required: true
+
+  - type: textarea
+    id: good_example
+    attributes:
+      label: Compliant Remediation Example
+      description: Show what the recommended compliant pattern looks like.
+      render: html
+    validations:
+      required: true
+
+  - type: textarea
+    id: false_positives
+    attributes:
+      label: False-Positive Risks & Exemption Directives
+      description: What legitimate frontend patterns might look like violations and how should Charites whitelist them?
+    validations:
+      required: true

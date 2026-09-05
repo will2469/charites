@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Standard Golang Pre-Push Hook for Charites
+set -euo pipefail
+
+export GOWORK="${GOWORK:-off}"
+
+echo " [Charites] Running Go pre-push verification suite..."
+
+# 1. Run unit tests with race detection
+if [ -f "go.mod" ]; then
+    echo " [Charites] Running go test -race ./..."
+    go test -race ./...
+
+    # 2. Verify binary compilation
+    if [ -d "cmd/charites" ]; then
+        echo " [Charites] Verifying binary compilation..."
+        mkdir -p bin
+        go build -v -o bin/charites ./cmd/charites
+    fi
+
+    # 3. Check module integrity
+    echo " [Charites] Verifying go.mod & go.sum cleanliness..."
+    go mod tidy
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        if ! git diff --quiet go.mod go.sum 2>/dev/null; then
+            echo " [Charites] go.mod or go.sum was modified by 'go mod tidy'."
+            echo " Please stage and commit the updated go.mod and go.sum."
+            exit 1
+        fi
+    fi
+fi
+
+echo " [Charites] Pre-push verification passed!"

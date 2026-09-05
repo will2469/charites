@@ -1,0 +1,11 @@
+# Default ignore patterns for Charites Static Analyzer
+node_modules/
+dist/
+build/
+.astro/
+.next/
+.svelte-kit/
+.git/
+vendor/
+*.min.js
+*.min.css

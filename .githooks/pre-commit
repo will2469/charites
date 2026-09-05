@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Standard Golang Pre-Commit Hook (Native Lint-Staged) for Charites
+# Auto-cleans and re-stages only files being committed, then runs quality gates
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${REPO_DIR}"
+
+export GOWORK="${GOWORK:-off}"
+export PATH="${HOME}/go/bin:${HOME}/.local/bin:${PATH}"
+
+# 1. Ambil daftar berkas yang sedang di-stage (git add)
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+if [ -z "${STAGED_FILES}" ]; then
+    # Tidak ada berkas yang di-stage, tidak ada yang perlu diproses
+    exit 0
+fi
+
+echo "[Charites Hook] Cleaning & formatting staged files..."
+
+STAGED_GO_FILES=""
+while IFS= read -r file; do
+    [ -f "${file}" ] || continue
+
+    # a. Bersihkan emoji pada berkas yang di-stage (jika skrip ada secara lokal)
+    if [ -f "${SCRIPT_DIR}/remove-emojis.sh" ] && [ -x "${SCRIPT_DIR}/remove-emojis.sh" ]; then
+        "${SCRIPT_DIR}/remove-emojis.sh" "${file}"
+    fi
+
+    # b. Bersihkan invisible chars & AI typography artifacts (jika skrip ada secara lokal)
+    if [ -f "${SCRIPT_DIR}/clean-ai-artifacts.sh" ] && [ -x "${SCRIPT_DIR}/clean-ai-artifacts.sh" ]; then
+        "${SCRIPT_DIR}/clean-ai-artifacts.sh" "${file}"
+    fi
+
+    # c. Bersihkan trailing whitespace pada text/docs/config
+    case "${file}" in
+        *.md|*.yaml|*.yml|*.json|*.astro|*.tsx|*.jsx|*.ts|*.js|*.css|*.sh|*.toml|*.sql)
+            sed -i 's/[[:space:]]*$//' "${file}" 2>/dev/null || true
+            ;;
+    esac
+
+    # d. Format Go code dengan gofmt jika berkas .go
+    case "${file}" in
+        *.go)
+            gofmt -w "${file}" 2>/dev/null || true
+            STAGED_GO_FILES="${STAGED_GO_FILES} ${file}"
+            ;;
+    esac
+
+    # d. Masukkan kembali berkas bersih ke dalam staged index
+    git add "${file}"
+done <<< "${STAGED_FILES}"
+
+# 2. Quality Gates: Hanya dijalankan jika ada berkas .go yang di-stage
+if [ -n "${STAGED_GO_FILES## }" ] && [ -f "go.mod" ]; then
+    # Kumpulkan direktori package dari berkas .go yang di-stage
+    GO_PKGS=$(for f in ${STAGED_GO_FILES}; do dirname "$f"; done | sort -u | sed 's|^\./||; s|^|./|')
+
+    echo "[Charites Hook] Validating staged Go packages: ${GO_PKGS}..."
+    # shellcheck disable=SC2086
+    go vet ${GO_PKGS} 2>/dev/null || {
+        echo "[Charites Hook] Warning: go vet reported warnings on staged packages."
+    }
+
+    if command -v golangci-lint >/dev/null 2>&1; then
+        # shellcheck disable=SC2086
+        golangci-lint run --timeout=2m ${GO_PKGS} 2>/dev/null || {
+            echo "[Charites Hook] Warning: golangci-lint reported issues on staged packages."
+        }
+    fi
+
+    if command -v gosec >/dev/null 2>&1; then
+        # shellcheck disable=SC2086
+        gosec -quiet -exclude=G101,G104 ${GO_PKGS} 2>/dev/null || {
+            echo "[Charites Hook] Warning: gosec reported potential security findings."
+        }
+    fi
+fi
+
+echo "[Charites Hook] Staged files clean and ready to commit!"

@@ -1,0 +1,68 @@
+# {{RULE_ID}}: {{TITLE_CASE_NAME}}
+
+> **Rule ID:** `{{RULE_ID}}`
+> **Severity:** `{{SEVERITY}}`
+> **Category:** `{{CATEGORY}}`
+> **Target Standards:** [W3C Design Tokens, WCAG 2.2, Core Web Vitals]
+
+---
+
+## 1. Overview & Core Invariant
+
+{{DESCRIPTION}}
+
+---
+
+## 2. Technical Grounding & Engine Realities
+
+Explain why this pattern causes aesthetic fatigue, accessibility violations, or performance degradation in modern web applications (Astro, React/TSX, CSS).
+
+---
+
+## 3. Vulnerable Patterns (Bad Code Examples)
+
+```astro
+<!-- Violating Pattern -->
+<div style="background-color: #123456;">
+  Hardcoded Color
+</div>
+```
+
+---
+
+## 4. Compliant Remediation (Good Code Examples)
+
+```astro
+<!-- Compliant Pattern -->
+<div class="bg-primary text-primary-foreground">
+  Design Token
+</div>
+```
+
+---
+
+## 5. False-Positive Defense & Whitelist
+
+- Explicit ignore comments (`<!-- charites:ignore {{RULE_ID}} -->`, `/* charites:ignore {{RULE_ID}} */`)
+- Standard system tokens (`transparent`, `currentColor`, `inherit`)
+
+---
+
+## 6. Adversarial Evasion & Stress Matrix
+
+- Dynamic string template interpolation
+- Component prop forwarding and class merging (`clsx`, `twMerge`)
+- Shadowed token variables
+
+---
+
+## 7. Migration & Autofix Guide
+
+Instructions on how to automatically or manually refactor existing code to adhere to this rule.
+
+---
+
+## 8. Audit & Verification Checklist
+
+- [ ] Automated Tri-Corpus tests pass (`go test ./tests/correctness/{{RULE_ID}}/...`)
+- [ ] No regression across legacy test cases
