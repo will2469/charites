@@ -52,7 +52,7 @@ func setupFixtureRepo(t *testing.T) (cleanDir, violationDir string) {
 	violationDir = t.TempDir()
 
 	// Clean file
-	_ = os.WriteFile(filepath.Join(cleanDir, "Card.tsx"), []byte(`export const Card = () => <div className="bg-primary text-white" />;`), 0o600)
+	_ = os.WriteFile(filepath.Join(cleanDir, "Card.tsx"), []byte(`export const Card = () => <div className="bg-primary text-primary-foreground" />;`), 0o600)
 
 	// Violation file (theme.hardcode-opacity-color)
 	_ = os.WriteFile(filepath.Join(violationDir, "Card.astro"), []byte(`---
