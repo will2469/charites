@@ -36,8 +36,8 @@ func TestGenerator_Generate(t *testing.T) {
 	if !strings.Contains(homeContent, "theme") {
 		t.Errorf("Home.md missing 'theme' category")
 	}
-	if !strings.Contains(homeContent, "theme.hardcode-opacity-color") {
-		t.Errorf("Home.md missing 'theme.hardcode-opacity-color'")
+	if !strings.Contains(homeContent, "theme/hardcode-opacity-color.md") {
+		t.Errorf("Home.md missing 'theme/hardcode-opacity-color.md'")
 	}
 
 	// 2. Verify theme.md
@@ -50,8 +50,19 @@ func TestGenerator_Generate(t *testing.T) {
 	if !strings.Contains(themeContent, "# Theme Rules (`theme`)") {
 		t.Errorf("theme.md missing header")
 	}
-	if !strings.Contains(themeContent, "## `theme.hardcode-opacity-color`") {
-		t.Errorf("theme.md missing rule section")
+	if !strings.Contains(themeContent, "theme/hardcode-opacity-color.md") {
+		t.Errorf("theme.md missing link to theme/hardcode-opacity-color.md")
+	}
+
+	// 3. Verify theme/hardcode-opacity-color.md
+	rulePath := filepath.Join(tmpDir, "theme", "hardcode-opacity-color.md")
+	ruleBytes, readErr := os.ReadFile(filepath.Clean(rulePath)) //nolint:gosec // controlled test path
+	if readErr != nil {
+		t.Fatalf("theme/hardcode-opacity-color.md was not generated: %v", readErr)
+	}
+	ruleContent := string(ruleBytes)
+	if !strings.Contains(ruleContent, "# theme.hardcode-opacity-color") {
+		t.Errorf("rule doc missing header")
 	}
 }
 
@@ -76,5 +87,22 @@ func TestGenerator_WithCustomRegistry(t *testing.T) {
 	themePath := filepath.Join(tmpDir, "theme.md")
 	if _, statErr := os.Stat(themePath); os.IsNotExist(statErr) {
 		t.Errorf("expected theme.md to be created")
+	}
+
+	rulePath := filepath.Join(tmpDir, "theme", "hardcode-opacity-color.md")
+	if _, statErr := os.Stat(rulePath); os.IsNotExist(statErr) {
+		t.Errorf("expected theme/hardcode-opacity-color.md to be created")
+	}
+}
+
+func TestGenerator_RegenerateWiki(t *testing.T) {
+	gen := wiki.NewGenerator(nil)
+	repoRoot, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatalf("failed to get repo root: %v", err)
+	}
+	wikiDir := filepath.Join(repoRoot, "wiki")
+	if genErr := gen.Generate(wikiDir); genErr != nil {
+		t.Fatalf("failed to generate wiki into %s: %v", wikiDir, genErr)
 	}
 }

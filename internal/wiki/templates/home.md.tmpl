@@ -8,7 +8,9 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 | Category | Rules Count | Documentation |
 | :--- | :---: | :--- |
-| `theme` | 1 | [`theme.md`](theme.md) |
+{{- range .Categories }}
+| `{{ .Name }}` | {{ .Count }} | [`{{ .Name }}.md`]({{ .Name }}.md) |
+{{- end }}
 
 ---
 
@@ -16,7 +18,9 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 | Rule ID | Category | Severity | Description | Documentation |
 | :--- | :---: | :---: | :--- | :--- |
-| `theme.hardcode-opacity-color` | `theme` | `ERROR` | Detects utility classes with hardcoded slash opacity modifiers that have official semantic token replacements | [`theme/hardcode-opacity-color.md`](theme/hardcode-opacity-color.md) |
+{{- range .Rules }}
+| `{{ .ID }}` | `{{ .Category }}` | `{{ .Severity }}` | {{ .Description }} | [`{{ .Category }}/{{ .Slug }}.md`]({{ .Category }}/{{ .Slug }}.md) |
+{{- end }}
 
 ---
 

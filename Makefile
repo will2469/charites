@@ -1,6 +1,6 @@
 export GOWORK ?= off
 
-.PHONY: all test test-unit test-full test-race test-coverage lint build clean cross-compile setup-hooks format vulncheck
+.PHONY: all test test-unit test-full test-race test-coverage lint build clean cross-compile setup-hooks format vulncheck wiki
 
 # Deterministic build-before-test ordering (ARCH-00-BUILD-ORDER / TEST-00-BUILD-ORDER)
 all: build test lint
@@ -84,6 +84,11 @@ format:
 	else \
 		gofmt -w $$(find . -name '*.go' -not -path './vendor/*' 2>/dev/null); \
 	fi
+
+wiki:
+	@echo "Regenerating wiki documentation from rules..."
+	@go test -run TestGenerator_RegenerateWiki ./internal/wiki/... > /dev/null
+	@echo "Wiki documentation generated successfully at wiki/"
 
 clean:
 	rm -rf bin/ dist/ coverage.txt coverage.html

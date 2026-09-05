@@ -1,29 +1,91 @@
 package wiki
 
 import (
+	"bytes"
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"text/template"
 
+	"github.com/will2469/charites/internal/ir"
 	"github.com/will2469/charites/internal/rules"
 )
 
-// Generator mengelola perakitan dan pembuatan dokumentasi wiki markdown berbasis rules.Registry.
+//go:embed templates/*.tmpl
+var templateFS embed.FS
+
+// Generator mengelola perakitan dan pembuatan dokumentasi wiki markdown berbasis template dan rules.Registry.
 type Generator struct {
-	reg *rules.Registry
+	reg          *rules.Registry
+	tmplHome     *template.Template
+	tmplCategory *template.Template
+	tmplRule     *template.Template
 }
 
-// NewGenerator membuat instance Generator baru. Jika reg bernilai nil, menggunakan rules.DefaultRegistry().
+// NewGenerator membuat instance Generator baru berbasis rules.Registry dan memuat embedded templates.
 func NewGenerator(reg *rules.Registry) *Generator {
 	if reg == nil {
 		reg = rules.DefaultRegistry()
 	}
-	return &Generator{reg: reg}
+
+	funcMap := template.FuncMap{
+		"ToUpper": strings.ToUpper,
+	}
+
+	tmplHome := template.Must(template.New("home.md.tmpl").Funcs(funcMap).ParseFS(templateFS, "templates/home.md.tmpl"))
+	tmplCategory := template.Must(template.New("category.md.tmpl").Funcs(funcMap).ParseFS(templateFS, "templates/category.md.tmpl"))
+	tmplRule := template.Must(template.New("rule.md.tmpl").Funcs(funcMap).ParseFS(templateFS, "templates/rule.md.tmpl"))
+
+	return &Generator{
+		reg:          reg,
+		tmplHome:     tmplHome,
+		tmplCategory: tmplCategory,
+		tmplRule:     tmplRule,
+	}
 }
 
-// Generate menghasilkan berkas Home.md dan <category>.md ke direktori target secara atomik menggunakan staging.
+type homeCategoryEntry struct {
+	Name  string
+	Count int
+}
+
+type homeRuleEntry struct {
+	ID          string
+	Category    string
+	Slug        string
+	Severity    string
+	Description string
+}
+
+type homeTemplateData struct {
+	Categories []homeCategoryEntry
+	Rules      []homeRuleEntry
+}
+
+type categoryTemplateData struct {
+	Title    string
+	Category string
+	Rules    []homeRuleEntry
+}
+
+type ruleTemplateData struct {
+	ID            string
+	Severity      string
+	RawSeverity   string
+	Category      string
+	Description   string
+	Standards     string
+	CoreInvariant string
+	Grounding     string
+	BadExamples   []ir.CodeExample
+	GoodExamples  []ir.CodeExample
+	Risks         []ir.RiskItem
+}
+
+// Generate menghasilkan berkas Home.md, <category>.md, dan <category>/<slug>.md ke direktori target.
 func (g *Generator) Generate(outputDir string) error {
 	tmpDir, err := os.MkdirTemp("", "charites-wiki-staging-*")
 	if err != nil {
@@ -35,7 +97,7 @@ func (g *Generator) Generate(outputDir string) error {
 
 	allRules := g.reg.All()
 
-	// 1. Kumpulkan kategori unik terurut leksikografis
+	// 1. Kelompokkan kategori unik terurut leksikografis
 	catMap := make(map[string][]rules.Rule)
 	for _, r := range allRules {
 		cat := r.Category()
@@ -49,19 +111,42 @@ func (g *Generator) Generate(outputDir string) error {
 	slices.Sort(categories)
 
 	// 2. Render Home.md
-	homeContent := g.renderHome(categories, catMap, allRules)
+	homeContent, err := g.renderHome(categories, catMap, allRules)
+	if err != nil {
+		return fmt.Errorf("failed to render Home.md: %w", err)
+	}
 	homePath := filepath.Join(tmpDir, "Home.md")
 	if wErr := os.WriteFile(homePath, []byte(homeContent), 0o600); wErr != nil {
 		return fmt.Errorf("failed to write Home.md: %w", wErr)
 	}
 
-	// 3. Render <category>.md untuk setiap domain kategori
+	// 3. Render <category>.md dan <category>/<slug>.md untuk setiap domain
 	for _, cat := range categories {
 		cRules := catMap[cat]
-		catContent := g.renderCategory(cat, cRules)
+		catContent, cErr := g.renderCategory(cat, cRules)
+		if cErr != nil {
+			return fmt.Errorf("failed to render %s.md: %w", cat, cErr)
+		}
 		catPath := filepath.Join(tmpDir, cat+".md")
 		if wErr := os.WriteFile(catPath, []byte(catContent), 0o600); wErr != nil {
 			return fmt.Errorf("failed to write %s.md: %w", cat, wErr)
+		}
+
+		catSubDir := filepath.Join(tmpDir, cat)
+		if mErr := os.MkdirAll(catSubDir, 0o750); mErr != nil {
+			return fmt.Errorf("failed to create category directory %s: %w", catSubDir, mErr)
+		}
+
+		for _, r := range cRules {
+			slug := strings.TrimPrefix(r.ID(), cat+".")
+			ruleContent, rErr := g.renderRule(r, cat, slug)
+			if rErr != nil {
+				return fmt.Errorf("failed to render rule %s: %w", r.ID(), rErr)
+			}
+			rulePath := filepath.Join(catSubDir, slug+".md")
+			if wErr := os.WriteFile(rulePath, []byte(ruleContent), 0o600); wErr != nil {
+				return fmt.Errorf("failed to write rule doc %s: %w", rulePath, wErr)
+			}
 		}
 	}
 
@@ -70,103 +155,113 @@ func (g *Generator) Generate(outputDir string) error {
 		return fmt.Errorf("failed to create output directory %s: %w", outputDir, mErr)
 	}
 
-	// 5. Salin berkas terverifikasi dari staging ke target direktori secara deterministik
-	entries, err := os.ReadDir(tmpDir)
-	if err != nil {
-		return fmt.Errorf("failed to read staging directory: %w", err)
-	}
-
-	for _, entry := range entries {
-		srcFile := filepath.Join(tmpDir, entry.Name())
-		destFile := filepath.Join(outputDir, entry.Name())
-
-		content, err := os.ReadFile(filepath.Clean(srcFile))
-		if err != nil {
-			return fmt.Errorf("failed to read staged file %s: %w", entry.Name(), err)
-		}
-
-		if err := os.WriteFile(destFile, content, 0o600); err != nil {
-			return fmt.Errorf("failed to write destination file %s: %w", destFile, err)
-		}
-	}
-
-	return nil
+	// 5. Salin struktur dari staging ke target direktori secara rekursif
+	return copyTree(tmpDir, outputDir)
 }
 
-func (g *Generator) renderHome(categories []string, catMap map[string][]rules.Rule, allRules []rules.Rule) string {
-	var b strings.Builder
+func copyTree(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, relErr := filepath.Rel(src, path)
+		if relErr != nil {
+			return relErr
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o750)
+		}
+		data, readErr := os.ReadFile(filepath.Clean(path)) //nolint:gosec // controlled staging path
+		if readErr != nil {
+			return readErr
+		}
+		return os.WriteFile(filepath.Clean(target), data, 0o600) //nolint:gosec // controlled destination path
+	})
+}
 
-	b.WriteString("# Charites Static Analysis Rule Catalog\n\n")
-	b.WriteString("Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-fast, zero-CGO, zero-Node.js static analysis compiler for Astro, React TSX, and Tailwind CSS design tokens.\n\n")
-	b.WriteString("---\n\n")
-	b.WriteString("## Categories\n\n")
-	b.WriteString("| Category | Rules Count | Documentation |\n")
-	b.WriteString("| :--- | :---: | :--- |\n")
+func (g *Generator) renderHome(categories []string, catMap map[string][]rules.Rule, allRules []rules.Rule) (string, error) {
+	data := homeTemplateData{
+		Categories: make([]homeCategoryEntry, 0, len(categories)),
+		Rules:      make([]homeRuleEntry, 0, len(allRules)),
+	}
 
 	for _, cat := range categories {
-		cRules := catMap[cat]
-		fmt.Fprintf(&b, "| `%s` | %d | [`%s.md`](%s.md) |\n", cat, len(cRules), cat, cat)
+		data.Categories = append(data.Categories, homeCategoryEntry{
+			Name:  cat,
+			Count: len(catMap[cat]),
+		})
 	}
-
-	b.WriteString("\n---\n\n")
-	b.WriteString("## All Registered Rules\n\n")
-	b.WriteString("| Rule ID | Category | Severity | Description | Documentation |\n")
-	b.WriteString("| :--- | :---: | :---: | :--- | :--- |\n")
 
 	for _, r := range allRules {
-		anchor := strings.ReplaceAll(strings.ToLower(r.ID()), ".", "")
-		fmt.Fprintf(&b, "| `%s` | `%s` | `%s` | %s | [`%s.md#%s`](%s.md#%s) |\n",
-			r.ID(), r.Category(), strings.ToUpper(string(r.DefaultSeverity())), r.Description(), r.Category(), anchor, r.Category(), anchor)
+		slug := strings.TrimPrefix(r.ID(), r.Category()+".")
+		data.Rules = append(data.Rules, homeRuleEntry{
+			ID:          r.ID(),
+			Category:    r.Category(),
+			Slug:        slug,
+			Severity:    strings.ToUpper(string(r.DefaultSeverity())),
+			Description: r.Description(),
+		})
 	}
 
-	b.WriteString("\n---\n\n")
-	b.WriteString("## Architectural Principles\n\n")
-	b.WriteString("1. **Deterministic Execution:** Pure-function AST visitors without file system or network I/O during evaluation.\n")
-	b.WriteString("2. **1-SSOT Tri-Corpus Assurance:** Every rule is validated against a 3-part golden test corpus (`positive/`, `negative/`, `adversarial/`).\n")
-	b.WriteString("3. **Canonical Semgrep Identifiers:** All rules follow the `<category>.<slug>` standard.\n")
-
-	return b.String()
+	var buf bytes.Buffer
+	if err := g.tmplHome.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
-func (g *Generator) renderCategory(category string, categoryRules []rules.Rule) string {
-	var b strings.Builder
-
+func (g *Generator) renderCategory(category string, categoryRules []rules.Rule) (string, error) {
 	titleCat := strings.ToUpper(category[:1]) + category[1:]
-	fmt.Fprintf(&b, "# %s Rules (`%s`)\n\n", titleCat, category)
-	fmt.Fprintf(&b, "The `%s` category contains static analysis rules for code quality, architectural constraints, and design system governance.\n\n", category)
-	b.WriteString("---\n\n")
-	b.WriteString("## Category Rule Index\n\n")
-	b.WriteString("| Rule ID | Severity | Summary | Status |\n")
-	b.WriteString("| :--- | :---: | :--- | :---: |\n")
-
-	for _, r := range categoryRules {
-		anchor := strings.ReplaceAll(strings.ToLower(r.ID()), ".", "")
-		fmt.Fprintf(&b, "| [`%s`](#%s) | `%s` | %s | `enabled` |\n",
-			r.ID(), anchor, strings.ToUpper(string(r.DefaultSeverity())), r.Description())
+	data := categoryTemplateData{
+		Title:    titleCat,
+		Category: category,
+		Rules:    make([]homeRuleEntry, 0, len(categoryRules)),
 	}
 
-	b.WriteString("\n---\n\n")
-
 	for _, r := range categoryRules {
-		fmt.Fprintf(&b, "## `%s`\n\n", r.ID())
-		fmt.Fprintf(&b, "> **Rule ID:** `%s`  \n", r.ID())
-		fmt.Fprintf(&b, "> **Severity:** `%s`  \n", strings.ToUpper(string(r.DefaultSeverity())))
-		fmt.Fprintf(&b, "> **Category:** `%s`  \n", r.Category())
-		b.WriteString("> **Target Standards:** W3C Design Tokens Community Group (DTCG), Tailwind CSS Standards  \n\n")
-
-		b.WriteString("### 1. Overview\n")
-		fmt.Fprintf(&b, "%s.\n\n", r.Description())
-
-		b.WriteString("### 2. How to Suppress (Ignore Directives)\n\n")
-		b.WriteString("Suppress this rule via canonical directive:\n\n")
-		fmt.Fprintf(&b, "```astro\n<!-- charites:ignore %s intentional exception -->\n```\n\n", r.ID())
-		fmt.Fprintf(&b, "```tsx\n// charites:ignore %s intentional exception\n```\n\n", r.ID())
-
-		b.WriteString("### 3. Configuration Reference (`charites.yaml`)\n\n")
-		b.WriteString("```yaml\nrules:\n")
-		fmt.Fprintf(&b, "  %s:\n    severity: %s\n```\n\n", r.ID(), r.DefaultSeverity())
-		b.WriteString("---\n\n")
+		slug := strings.TrimPrefix(r.ID(), category+".")
+		data.Rules = append(data.Rules, homeRuleEntry{
+			ID:          r.ID(),
+			Category:    category,
+			Slug:        slug,
+			Severity:    strings.ToUpper(string(r.DefaultSeverity())),
+			Description: r.Description(),
+		})
 	}
 
-	return b.String()
+	var buf bytes.Buffer
+	if err := g.tmplCategory.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func (g *Generator) renderRule(r rules.Rule, category, slug string) (string, error) {
+	_ = slug
+	data := ruleTemplateData{
+		ID:          r.ID(),
+		Severity:    strings.ToUpper(string(r.DefaultSeverity())),
+		RawSeverity: string(r.DefaultSeverity()),
+		Category:    category,
+		Description: r.Description(),
+	}
+
+	if docRule, ok := r.(rules.DocumentedRule); ok {
+		doc := docRule.Doc()
+		if len(doc.TargetStandards) > 0 {
+			data.Standards = strings.Join(doc.TargetStandards, ", ")
+		}
+		data.CoreInvariant = doc.CoreInvariant
+		data.Grounding = doc.Grounding
+		data.BadExamples = doc.BadExamples
+		data.GoodExamples = doc.GoodExamples
+		data.Risks = doc.Risks
+	}
+
+	var buf bytes.Buffer
+	if err := g.tmplRule.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }

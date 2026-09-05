@@ -1,0 +1,90 @@
+# {{ .ID }}
+
+> **Rule ID:** `{{ .ID }}`
+> **Severity:** `{{ .Severity }}`
+> **Category:** `{{ .Category }}`
+{{- if .Standards }}
+> **Target Standards:** {{ .Standards }}
+{{- end }}
+
+---
+
+## 1. Overview & Core Invariant
+
+{{ .Description }}
+
+{{- if .CoreInvariant }}
+
+### Core Invariant:
+> **"{{ .CoreInvariant }}"**
+{{- end }}
+
+---
+
+{{- if .Grounding }}
+## 2. Technical Grounding & Engine Realities
+
+{{ .Grounding }}
+
+---
+{{- end }}
+
+{{- if .Risks }}
+## 3. Vulnerability & Risk Taxonomy
+
+| Risk Vector | Severity | Impact |
+| :--- | :---: | :--- |
+{{- range .Risks }}
+| **{{ .Vector }}** | {{ .Severity }} | {{ .Impact }} |
+{{- end }}
+
+---
+{{- end }}
+
+{{- if .BadExamples }}
+## 4. Non-Compliant Code Patterns (Bad Examples)
+
+{{- range .BadExamples }}
+### {{ .Language | ToUpper }} ({{ .Comment }}):
+```{{ .Language }}
+{{ .Code }}
+```
+{{- end }}
+
+---
+{{- end }}
+
+{{- if .GoodExamples }}
+## 5. Compliant Implementation Patterns (Good Examples)
+
+{{- range .GoodExamples }}
+### {{ .Language | ToUpper }} ({{ .Comment }}):
+```{{ .Language }}
+{{ .Code }}
+```
+{{- end }}
+
+---
+{{- end }}
+
+## 6. How to Suppress (Ignore Directives)
+
+If this pattern is required for an intentional exception, suppress the diagnostic using the canonical Charites Rule ID:
+
+```astro
+<!-- charites:ignore {{ .ID }} intentional exception -->
+```
+
+```tsx
+// charites:ignore {{ .ID }} intentional exception
+```
+
+---
+
+## 7. Configuration Reference (`charites.yaml`)
+
+```yaml
+rules:
+  {{ .ID }}:
+    severity: {{ .RawSeverity }} # error | warn | info | off
+```

@@ -1,0 +1,15 @@
+# {{ .Title }} Rules (`{{ .Category }}`)
+
+The `{{ .Category }}` category contains static analysis rules for code quality, architectural constraints, and design system governance.
+
+---
+
+## Category Rule Index
+
+| Rule ID | Severity | Summary | Full Specification | Status |
+| :--- | :---: | :--- | :--- | :---: |
+{{- range .Rules }}
+| `{{ .ID }}` | `{{ .Severity }}` | {{ .Description }} | [`{{ $.Category }}/{{ .Slug }}.md`]({{ $.Category }}/{{ .Slug }}.md) | `enabled` |
+{{- end }}
+
+---
