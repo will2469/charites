@@ -143,6 +143,82 @@ func TestCSS_ParserRobustness(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "Semicolons inside parentheses and brackets do not terminate declaration",
+			input: `:root {
+  --func-val: fn(first; second);
+  --bracket-val: [col-1; col-2];
+  --clean: #ffffff;
+}`,
+			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
+				root := sheet.Rules[0].(*theme.StyleRule)
+				if len(root.Declarations) != 3 {
+					t.Fatalf("expected 3 declarations, got %d", len(root.Declarations))
+				}
+				if root.Declarations[0].Property != "--func-val" || root.Declarations[0].Value != "fn(first; second)" {
+					t.Errorf("expected fn(first; second), got %+v", root.Declarations[0])
+				}
+				if root.Declarations[1].Property != "--bracket-val" || root.Declarations[1].Value != "[col-1; col-2]" {
+					t.Errorf("expected [col-1; col-2], got %+v", root.Declarations[1])
+				}
+				if root.Declarations[2].Property != "--clean" || root.Declarations[2].Value != "#ffffff" {
+					t.Errorf("expected #ffffff, got %+v", root.Declarations[2])
+				}
+			},
+		},
+		{
+			name: "Pseudo-class selectors and colon distinction",
+			input: `a:hover {
+  color: red;
+}
+:is(.btn, .link):focus {
+  outline: 2px;
+}`,
+			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
+				if len(sheet.Rules) != 2 {
+					t.Fatalf("expected 2 rules, got %d", len(sheet.Rules))
+				}
+				rule1, ok1 := sheet.Rules[0].(*theme.StyleRule)
+				if !ok1 || rule1.Selector != "a:hover" {
+					t.Errorf("expected style rule with selector 'a:hover', got %+v", sheet.Rules[0])
+				}
+				rule2, ok2 := sheet.Rules[1].(*theme.StyleRule)
+				if !ok2 || rule2.Selector != ":is(.btn, .link):focus" {
+					t.Errorf("expected style rule with selector ':is(.btn, .link):focus', got %+v", sheet.Rules[1])
+				}
+			},
+		},
+		{
+			name: "Final declaration without semicolon before closing brace",
+			input: `.box {
+  --pad: 10px;
+  --margin: 20px
+}`,
+			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
+				rule := sheet.Rules[0].(*theme.StyleRule)
+				if len(rule.Declarations) != 2 {
+					t.Fatalf("expected 2 declarations, got %d", len(rule.Declarations))
+				}
+				if rule.Declarations[1].Property != "--margin" || rule.Declarations[1].Value != "20px" {
+					t.Errorf("expected --margin: 20px, got %+v", rule.Declarations[1])
+				}
+			},
+		},
+		{
+			name: "Multiple empty semicolons",
+			input: `.box {
+  ;; --a: 1; ; ; --b: 2;;
+}`,
+			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
+				rule := sheet.Rules[0].(*theme.StyleRule)
+				if len(rule.Declarations) != 2 {
+					t.Fatalf("expected 2 declarations, got %d", len(rule.Declarations))
+				}
+				if rule.Declarations[0].Property != "--a" || rule.Declarations[1].Property != "--b" {
+					t.Errorf("unexpected declarations: %+v", rule.Declarations)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -129,7 +129,7 @@ func TestTokenIntegration_CircularDependencyProtection(t *testing.T) {
 	}
 
 	// Graph harus menemukan siklus tanpa deadlock atau stack overflow
-	cycles := ctx.Graph().FindCycles()
+	cycles := ctx.FindCycles()
 	if len(cycles) == 0 {
 		t.Fatalf("expected circular tokens to be detected by FindCycles()")
 	}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/will2469/charites/internal/token/theme"
@@ -21,8 +20,6 @@ var standardCSSPaths = []string{
 	"index.css",
 	"tests/fixtures/global.css",
 }
-
-var varRefRegex = regexp.MustCompile(`var\(\s*(--[a-zA-Z0-9_-]+)`)
 
 // DiscoverAndLoad mencari berkas CSS tema berdasarkan discovery fallback engine Charites:
 //  1. Jika customPath tidak kosong, periksa customPath.
@@ -188,8 +185,9 @@ func processDeclaration(
 		*sourceOrder++
 		tokenScope := scope
 		tokenScope.SourceOrder = *sourceOrder
+		unescapedProp := theme.UnescapeCSS(prop)
 		refs := extractVarReferences(val)
-		graph.AddToken(prop, val, tokenScope, decl.Span, refs)
+		graph.AddToken(unescapedProp, val, tokenScope, decl.Span, refs)
 		return
 	}
 
@@ -198,20 +196,7 @@ func processDeclaration(
 }
 
 func extractVarReferences(val string) []string {
-	matches := varRefRegex.FindAllStringSubmatch(val, -1)
-	if len(matches) == 0 {
-		return nil
-	}
-
-	var refs []string
-	seen := make(map[string]bool)
-	for _, m := range matches {
-		if len(m) >= 2 && !seen[m[1]] {
-			seen[m[1]] = true
-			refs = append(refs, m[1])
-		}
-	}
-	return refs
+	return theme.ExtractAllVarNames(val)
 }
 
 func resolveNestedSelector(parent, child string) string {

@@ -1,39 +1,69 @@
 package token
 
 import (
+	"iter"
 	"strings"
 )
 
 // Context mendefinisikan read-only query API ke Single Source of Truth (SSOT) token tema.
 // Mengisolasi implementasi graph dan parser dari rules penilai (Layer 4).
-// Bersifat thread-safe dan zero-alloc pada jalur evaluasi statis (hot-path).
+// Menjamin immutability penuh (zero mutation leak) dan zero-alloc pada jalur evaluasi statis (hot-path).
 type Context interface {
 	// Path mengembalikan path berkas CSS sumber (jika dibaca dari filesystem).
 	Path() string
 
-	// Tokens mengembalikan seluruh node token yang diekstrak sebagai fakta CSS.
-	Tokens() []Token
+	// TokenCount mengembalikan jumlah token terdaftar dalam graph (O(1), 0 alloc).
+	TokenCount() int
 
-	// TokenByID mengambil token spesifik berdasarkan identifier numeriknya.
+	// HasToken memeriksa keberadaan token berdasarkan nama (O(1), 0 alloc).
+	HasToken(name string) bool
+
+	// LookupToken mengambil token pertama yang cocok dengan nama tertentu tanpa alokasi heap (O(1), 0 alloc).
+	LookupToken(name string) (Token, bool)
+
+	// TokenByID mengambil token spesifik berdasarkan identifier numeriknya (O(1), 0 alloc).
 	TokenByID(id TokenID) (Token, bool)
 
-	// ByName mengembalikan seluruh deklarasi token yang memiliki nama identik (bisa multi-scope).
-	ByName(name string) []Token
+	// ScopeCount mengembalikan jumlah scope unik dalam berkas tema (O(1), 0 alloc).
+	ScopeCount() int
 
-	// ByPrefix mengembalikan seluruh deklarasi token yang memiliki prefix nama tertentu (misal: "--color-").
-	ByPrefix(prefix string) []Token
-
-	// Scopes mengembalikan daftar seluruh scope yang teridentifikasi dalam berkas CSS.
-	Scopes() []Scope
-
-	// Graph mengembalikan instance TokenGraph yang mendasari untuk analisis relasional tingkat lanjut.
-	Graph() *TokenGraph
-
-	// Resolve meresolusi nilai akhir suatu token dengan mengevaluasi rantai dependensi var(--...).
-	Resolve(id TokenID, opts ResolveOptions) (string, bool, error)
+	// ScopeByID mengambil scope spesifik berdasarkan indeks (O(1), 0 alloc).
+	ScopeByID(idx int) (Scope, bool)
 
 	// HasScopeProperty memeriksa apakah ada scope yang mendeklarasikan properti standar tertentu (misal: "color-scheme").
 	HasScopeProperty(property, value string) bool
+
+	// FindCycles memeriksa siklus relasional var() dan mengembalikan daftar TokenID yang terlibat.
+	FindCycles() [][]TokenID
+
+	// AllTokens mengembalikan iterator Go 1.26 range-over-func untuk seluruh token (zero heap alloc).
+	AllTokens() iter.Seq[Token]
+
+	// AllScopes mengembalikan iterator Go 1.26 range-over-func untuk seluruh scope (zero heap alloc).
+	AllScopes() iter.Seq[Scope]
+
+	// TokensByName mengembalikan iterator Go 1.26 range-over-func untuk token dengan nama tertentu (zero heap alloc).
+	TokensByName(name string) iter.Seq[Token]
+
+	// TokensByPrefix mengembalikan iterator Go 1.26 range-over-func untuk token dengan prefix tertentu (zero heap alloc).
+	TokensByPrefix(prefix string) iter.Seq[Token]
+
+	// Tokens mengembalikan salinan defensif (defensive snapshot) seluruh token.
+	// Aman dari mutasi eksternal, tetapi mengalokasikan slice baru di heap.
+	Tokens() []Token
+
+	// Scopes mengembalikan salinan defensif (defensive snapshot) seluruh scope.
+	// Aman dari mutasi eksternal, tetapi mengalokasikan slice baru di heap.
+	Scopes() []Scope
+
+	// ByName mengembalikan salinan defensif seluruh deklarasi token dengan nama identik.
+	ByName(name string) []Token
+
+	// ByPrefix mengembalikan salinan defensif seluruh deklarasi token dengan prefix tertentu.
+	ByPrefix(prefix string) []Token
+
+	// Resolve meresolusi nilai akhir suatu token dengan mengevaluasi rantai dependensi var(--...).
+	Resolve(id TokenID, opts ResolveOptions) (string, bool, error)
 }
 
 type themeContext struct {
@@ -72,8 +102,21 @@ func (c *themeContext) Path() string {
 	return c.path
 }
 
-func (c *themeContext) Tokens() []Token {
-	return c.graph.Nodes
+func (c *themeContext) TokenCount() int {
+	return len(c.graph.Nodes)
+}
+
+func (c *themeContext) HasToken(name string) bool {
+	ids, ok := c.graph.ByName[name]
+	return ok && len(ids) > 0
+}
+
+func (c *themeContext) LookupToken(name string) (Token, bool) {
+	ids, ok := c.graph.ByName[name]
+	if !ok || len(ids) == 0 {
+		return Token{}, false
+	}
+	return c.graph.Nodes[ids[0]], true
 }
 
 func (c *themeContext) TokenByID(id TokenID) (Token, bool) {
@@ -81,6 +124,85 @@ func (c *themeContext) TokenByID(id TokenID) (Token, bool) {
 		return c.graph.Nodes[id], true
 	}
 	return Token{}, false
+}
+
+func (c *themeContext) ScopeCount() int {
+	return len(c.scopes)
+}
+
+func (c *themeContext) ScopeByID(idx int) (Scope, bool) {
+	if idx >= 0 && idx < len(c.scopes) {
+		return c.scopes[idx], true
+	}
+	return Scope{}, false
+}
+
+func (c *themeContext) FindCycles() [][]TokenID {
+	return c.graph.FindCycles()
+}
+
+func (c *themeContext) AllTokens() iter.Seq[Token] {
+	return func(yield func(Token) bool) {
+		for _, node := range c.graph.Nodes {
+			if !yield(node) {
+				return
+			}
+		}
+	}
+}
+
+func (c *themeContext) AllScopes() iter.Seq[Scope] {
+	return func(yield func(Scope) bool) {
+		for _, s := range c.scopes {
+			if !yield(s) {
+				return
+			}
+		}
+	}
+}
+
+func (c *themeContext) TokensByName(name string) iter.Seq[Token] {
+	return func(yield func(Token) bool) {
+		ids, ok := c.graph.ByName[name]
+		if !ok {
+			return
+		}
+		for _, id := range ids {
+			if !yield(c.graph.Nodes[id]) {
+				return
+			}
+		}
+	}
+}
+
+func (c *themeContext) TokensByPrefix(prefix string) iter.Seq[Token] {
+	return func(yield func(Token) bool) {
+		for _, tok := range c.graph.Nodes {
+			if strings.HasPrefix(tok.Name, prefix) {
+				if !yield(tok) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func (c *themeContext) Tokens() []Token {
+	if len(c.graph.Nodes) == 0 {
+		return nil
+	}
+	res := make([]Token, len(c.graph.Nodes))
+	copy(res, c.graph.Nodes)
+	return res
+}
+
+func (c *themeContext) Scopes() []Scope {
+	if len(c.scopes) == 0 {
+		return nil
+	}
+	res := make([]Scope, len(c.scopes))
+	copy(res, c.scopes)
+	return res
 }
 
 func (c *themeContext) ByName(name string) []Token {
@@ -103,14 +225,6 @@ func (c *themeContext) ByPrefix(prefix string) []Token {
 		}
 	}
 	return res
-}
-
-func (c *themeContext) Scopes() []Scope {
-	return c.scopes
-}
-
-func (c *themeContext) Graph() *TokenGraph {
-	return c.graph
 }
 
 func (c *themeContext) Resolve(id TokenID, opts ResolveOptions) (string, bool, error) {

@@ -82,12 +82,11 @@ func (c *DefaultCharitesConvention) lookupCandidate(shortName string, ctx themee
 	}
 
 	for _, v := range variants {
-		tokens := ctx.ByName(v)
-		if len(tokens) > 0 {
-			// Token eksis di graph SSOT pengguna!
+		if tok, ok := ctx.LookupToken(v); ok {
+			// Token eksis di graph SSOT pengguna! (0 heap allocations)
 			return TokenCandidate{
 				Name:     shortName,
-				RawValue: tokens[0].RawValue,
+				RawValue: tok.RawValue,
 			}, true
 		}
 	}

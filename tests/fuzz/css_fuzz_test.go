@@ -67,7 +67,7 @@ func FuzzCSSParser(f *testing.F) {
 			_ = ctx.Scopes()
 
 			// Deteksi siklus harus aman terhadap input acak
-			_ = ctx.Graph().FindCycles()
+			_ = ctx.FindCycles()
 
 			// Resolusi token harus aman terhadap kedalaman apa pun
 			maxResolve := 10

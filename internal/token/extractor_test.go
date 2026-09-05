@@ -79,7 +79,7 @@ func TestTheme_CycleDetection(t *testing.T) {
 		t.Errorf("expected ErrCycleDetected, got %v", err)
 	}
 
-	cycles := ctx.Graph().FindCycles()
+	cycles := ctx.FindCycles()
 	if len(cycles) == 0 {
 		t.Errorf("expected FindCycles to return cycle nodes")
 	}
@@ -277,4 +277,61 @@ func TestTheme_DiscoverAndLoad(t *testing.T) {
 			t.Errorf("expected --color-brand to be discovered from custom path")
 		}
 	})
+}
+
+func TestTheme_ComplexVarFallbacks(t *testing.T) {
+	input := []byte(`:root {
+  --color-with-rgb-fallback: var(--non-existent, rgb(1, 2, 3));
+  --color-with-nested-fallback: var(--missing-a, var(--missing-b, #123456));
+  --tw-bg-opacity\:1: 0.85;
+  --consumer: var(--tw-bg-opacity\:1);
+}`)
+
+	ctx, err := token.ParseCSS(input)
+	if err != nil {
+		t.Fatalf("ParseCSS failed: %v", err)
+	}
+
+	// 1. Uji fallback rgb(1, 2, 3) tidak rusak oleh tanda kurung
+	rgbToks := ctx.ByName("--color-with-rgb-fallback")
+	if len(rgbToks) != 1 {
+		t.Fatalf("expected 1 token for --color-with-rgb-fallback, got %d", len(rgbToks))
+	}
+	rgbVal, ok, err := ctx.Resolve(rgbToks[0].ID, token.ResolveOptions{})
+	if err != nil || !ok {
+		t.Fatalf("failed to resolve rgb fallback: %v", err)
+	}
+	if rgbVal != "rgb(1, 2, 3)" {
+		t.Errorf("expected resolved 'rgb(1, 2, 3)', got %q", rgbVal)
+	}
+
+	// 2. Uji nested fallback resolution
+	nestedToks := ctx.ByName("--color-with-nested-fallback")
+	if len(nestedToks) != 1 {
+		t.Fatalf("expected 1 token for --color-with-nested-fallback, got %d", len(nestedToks))
+	}
+	nestedVal, ok, err := ctx.Resolve(nestedToks[0].ID, token.ResolveOptions{})
+	if err != nil || !ok {
+		t.Fatalf("failed to resolve nested fallback: %v", err)
+	}
+	if nestedVal != "#123456" {
+		t.Errorf("expected resolved '#123456', got %q", nestedVal)
+	}
+
+	// 3. Uji CSS escaped custom property name dan referensinya
+	escapedToks := ctx.ByName("--tw-bg-opacity:1")
+	if len(escapedToks) != 1 {
+		t.Fatalf("expected 1 token for --tw-bg-opacity:1, got %d", len(escapedToks))
+	}
+	consumerToks := ctx.ByName("--consumer")
+	if len(consumerToks) != 1 {
+		t.Fatalf("expected 1 token for --consumer, got %d", len(consumerToks))
+	}
+	consumerVal, ok, err := ctx.Resolve(consumerToks[0].ID, token.ResolveOptions{})
+	if err != nil || !ok {
+		t.Fatalf("failed to resolve consumer of escaped var: %v", err)
+	}
+	if consumerVal != "0.85" {
+		t.Errorf("expected resolved '0.85', got %q", consumerVal)
+	}
 }

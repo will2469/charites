@@ -183,16 +183,18 @@ func (l *Lexer) NextToken() Token {
 		return l.makeToken(TokenIdent, start, startLoc)
 	}
 
-	// 8. Identifiers (e.g. --banana, --color-primary, display, oklch)
-	if isIdentStart(b) || (b == '-' && l.idx+1 < len(l.src) && (isIdentStart(l.src[l.idx+1]) || l.src[l.idx+1] == '-')) {
-		for l.idx < len(l.src) && isIdentChar(l.src[l.idx]) {
-			l.advanceByte()
-		}
+	// 8. Identifiers (e.g. --banana, --color-primary, display, oklch, \:focus, --tw-bg-opacity\:1)
+	if l.startsIdent() {
+		l.consumeIdent()
 		return l.makeToken(TokenIdent, start, startLoc)
 	}
 
-	// 9. Numbers, Dimensions & Percentages
-	if isDigit(b) || (b == '.' && l.idx+1 < len(l.src) && isDigit(l.src[l.idx+1])) {
+	// 9. Numbers, Dimensions & Percentages (including signed e.g. -10px, +5%)
+	isSignPrefix := (b == '-' || b == '+') && l.idx+1 < len(l.src) && (isDigit(l.src[l.idx+1]) || (l.src[l.idx+1] == '.' && l.idx+2 < len(l.src) && isDigit(l.src[l.idx+2])))
+	if isDigit(b) || (b == '.' && l.idx+1 < len(l.src) && isDigit(l.src[l.idx+1])) || isSignPrefix {
+		if isSignPrefix {
+			l.advanceByte() // consume '+' or '-'
+		}
 		for l.idx < len(l.src) && (isDigit(l.src[l.idx]) || l.src[l.idx] == '.') {
 			l.advanceByte()
 		}
@@ -200,10 +202,8 @@ func (l *Lexer) NextToken() Token {
 			l.advanceByte()
 			return l.makeToken(TokenPercentage, start, startLoc)
 		}
-		if l.idx < len(l.src) && isIdentStart(l.src[l.idx]) {
-			for l.idx < len(l.src) && isIdentChar(l.src[l.idx]) {
-				l.advanceByte()
-			}
+		if l.startsIdent() {
+			l.consumeIdent()
 			return l.makeToken(TokenDimension, start, startLoc)
 		}
 		return l.makeToken(TokenNumber, start, startLoc)
@@ -240,12 +240,76 @@ func (l *Lexer) hasPrefixCI(prefix string) bool {
 	return strings.EqualFold(sub, prefix)
 }
 
+func (l *Lexer) startsIdent() bool {
+	if l.idx >= len(l.src) {
+		return false
+	}
+	b0 := l.src[l.idx]
+	var b1, b2 byte
+	if l.idx+1 < len(l.src) {
+		b1 = l.src[l.idx+1]
+	}
+	if l.idx+2 < len(l.src) {
+		b2 = l.src[l.idx+2]
+	}
+
+	if b0 == '-' {
+		return isIdentStart(b1) || b1 == '-' || isValidEscape(b1, b2)
+	}
+	if isIdentStart(b0) {
+		return true
+	}
+	if b0 == '\\' {
+		return isValidEscape(b0, b1)
+	}
+	return false
+}
+
+func (l *Lexer) consumeIdent() {
+	for l.idx < len(l.src) {
+		b := l.src[l.idx]
+		if isIdentChar(b) {
+			l.advanceByte()
+			continue
+		}
+		if b == '\\' && l.idx+1 < len(l.src) && isValidEscape(b, l.src[l.idx+1]) {
+			l.advanceByte() // consume '\\'
+			// Jika diikuti hex digit, konsumsi hingga 6 digit
+			if l.idx < len(l.src) && isHexDigit(l.src[l.idx]) {
+				hexCount := 0
+				for l.idx < len(l.src) && isHexDigit(l.src[l.idx]) && hexCount < 6 {
+					l.advanceByte()
+					hexCount++
+				}
+				// Jika diikuti 1 karakter spasi/whitespace, konsumsi sebagai delimiter escape (CSS spec 4.3.9)
+				if l.idx < len(l.src) && isWhitespace(l.src[l.idx]) {
+					l.advanceByte()
+				}
+			} else if l.idx < len(l.src) {
+				l.advanceByte() // konsumsi byte yang di-escape
+			}
+			continue
+		}
+		break
+	}
+}
+
 func isWhitespace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\r' || b == '\n' || b == '\f'
 }
 
 func isDigit(b byte) bool {
 	return b >= '0' && b <= '9'
+}
+
+func isHexDigit(b byte) bool {
+	return (b >= '0' && b <= '9') || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F')
+}
+
+// isValidEscape memeriksa apakah dua byte membentuk CSS escape yang valid (CSS Syntax 3 section 4.3.7).
+// Backslash diikuti karakter selain newline adalah valid escape sequence.
+func isValidEscape(b1, b2 byte) bool {
+	return b1 == '\\' && b2 != '\n' && b2 != '\r' && b2 != '\f'
 }
 
 func isIdentStart(b byte) bool {
@@ -258,4 +322,65 @@ func isIdentChar(b byte) bool {
 
 func isHexOrIdentChar(b byte) bool {
 	return isIdentChar(b)
+}
+
+// UnescapeCSS mengurai escape sequences pada identifier atau string CSS sesuai CSS Syntax Level 3.
+// Contoh: `\:` -> `:`, `\31 ` -> `1`, `\20` -> ` `, `\--` -> `--`.
+func UnescapeCSS(raw string) string {
+	if !strings.ContainsRune(raw, '\\') {
+		return raw
+	}
+	var sb strings.Builder
+	sb.Grow(len(raw))
+	n := len(raw)
+	for i := 0; i < n; i++ {
+		if raw[i] != '\\' {
+			sb.WriteByte(raw[i])
+			continue
+		}
+		// Escape dimulai
+		if i+1 >= n {
+			sb.WriteRune('\uFFFD')
+			break
+		}
+		i++ // lewati '\\'
+		b := raw[i]
+		if isHexDigit(b) {
+			hexStart := i
+			for i < n && isHexDigit(raw[i]) && (i-hexStart) < 6 {
+				i++
+			}
+			var cp rune
+			for j := hexStart; j < i; j++ {
+				cp = cp*16 + hexVal(raw[j])
+			}
+			if cp == 0 || (cp >= 0xD800 && cp <= 0xDFFF) || cp > 0x10FFFF {
+				cp = '\uFFFD'
+			}
+			sb.WriteRune(cp)
+			// Jika diikuti satu karakter whitespace, konsumsi (CSS Syntax 3)
+			if i < n && isWhitespace(raw[i]) {
+				// Karakter spasi dikonsumsi sebagai pemisah hex escape
+			} else {
+				i-- // kompensasi loop
+			}
+			continue
+		}
+		// Bukan hex escape, tulis karakter literal apa adanya
+		sb.WriteByte(b)
+	}
+	return sb.String()
+}
+
+func hexVal(b byte) rune {
+	if b >= '0' && b <= '9' {
+		return rune(b - '0')
+	}
+	if b >= 'a' && b <= 'f' {
+		return rune(b - 'a' + 10)
+	}
+	if b >= 'A' && b <= 'F' {
+		return rune(b - 'A' + 10)
+	}
+	return 0
 }

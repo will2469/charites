@@ -3,7 +3,6 @@ package token
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/will2469/charites/internal/token/theme"
@@ -19,8 +18,6 @@ var (
 	// ErrTokenNotFound dikembalikan saat token yang dicari tidak ada dalam graph.
 	ErrTokenNotFound = errors.New("token declaration not found")
 )
-
-var varRegex = regexp.MustCompile(`var\(\s*(--[a-zA-Z0-9_-]+)(?:\s*,\s*([^)]+))?\s*\)`)
 
 // ResolveOptions mendefinisikan opsi evaluasi saat me-resolve token dependency graph.
 type ResolveOptions struct {
@@ -153,63 +150,76 @@ func (g *Graph) resolveRecursive(
 	}()
 
 	raw := g.Nodes[currID].RawValue
-	if !strings.Contains(raw, "var(") {
-		return raw, true, nil
+	return g.resolveString(raw, currID, activePath, budgetCounter, maxBudget, opts)
+}
+
+func (g *Graph) resolveString(
+	input string,
+	originID TokenID,
+	activePath map[TokenID]bool,
+	budgetCounter *int,
+	maxBudget int,
+	opts ResolveOptions,
+) (string, bool, error) {
+	if !strings.Contains(input, "var(") && !strings.Contains(input, "VAR(") {
+		return input, true, nil
 	}
 
-	var resolveErr error
-	resolved := varRegex.ReplaceAllStringFunc(raw, func(match string) string {
-		if resolveErr != nil {
-			return match
-		}
+	calls := theme.ExtractTopLevelVarCalls(input)
+	if len(calls) == 0 {
+		return input, true, nil
+	}
 
-		submatches := varRegex.FindStringSubmatch(match)
-		if len(submatches) < 2 {
-			return match
-		}
-
-		refName := submatches[1]
+	result := input
+	// Substitusi dari kanan ke kiri (offset terbesar ke terkecil) agar slice offsets stabil
+	for i := len(calls) - 1; i >= 0; i-- {
+		call := calls[i]
+		refName := call.Name
 		candidates, exists := g.ByName[refName]
-		if !exists || len(candidates) == 0 {
-			// Jika ada fallback value: var(--foo, fallback)
-			if len(submatches) >= 3 && submatches[2] != "" {
-				return strings.TrimSpace(submatches[2])
-			}
-			return match
-		}
 
-		// Pilih kandidat berdasarkan ScopeMatcher atau fallback
-		var targetID TokenID
-		found := false
-		if opts.ScopeMatcher != nil {
-			for _, cID := range candidates {
-				if opts.ScopeMatcher(g.Nodes[cID].Scope) {
-					targetID = cID
-					found = true
-					break
+		var replacement string
+		if !exists || len(candidates) == 0 {
+			if call.HasFallback {
+				// Evaluasi jika fallback mengandung var() bersarang
+				fallbackResolved, _, err := g.resolveString(call.Fallback, originID, activePath, budgetCounter, maxBudget, opts)
+				if err != nil {
+					return "", false, err
+				}
+				replacement = fallbackResolved
+			} else {
+				// Tanpa fallback dan token tidak ditemukan, pertahankan panggilan var asli
+				continue
+			}
+		} else {
+			var targetID TokenID
+			found := false
+			if opts.ScopeMatcher != nil {
+				for _, cID := range candidates {
+					if opts.ScopeMatcher(g.Nodes[cID].Scope) {
+						targetID = cID
+						found = true
+						break
+					}
 				}
 			}
-		}
-		if !found {
-			targetID = g.matchBestScope(candidates, g.Nodes[currID].Scope)
+			if !found {
+				targetID = g.matchBestScope(candidates, g.Nodes[originID].Scope)
+			}
+
+			val, ok, err := g.resolveRecursive(targetID, activePath, budgetCounter, maxBudget, opts)
+			if err != nil {
+				return "", false, err
+			}
+			if !ok {
+				continue
+			}
+			replacement = val
 		}
 
-		val, ok, err := g.resolveRecursive(targetID, activePath, budgetCounter, maxBudget, opts)
-		if err != nil {
-			resolveErr = err
-			return match
-		}
-		if !ok {
-			return match
-		}
-		return val
-	})
-
-	if resolveErr != nil {
-		return "", false, resolveErr
+		result = result[:call.StartOffset] + replacement + result[call.EndOffset:]
 	}
 
-	return resolved, true, nil
+	return result, true, nil
 }
 
 // FindCycles memeriksa seluruh token dalam graph dan mengembalikan daftar TokenID yang terlibat dalam siklus.
