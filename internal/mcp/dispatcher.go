@@ -206,24 +206,15 @@ func (s *Server) handleToolCall(req *JSONRPCRequest) *JSONRPCResponse {
 	}
 }
 
-func (s *Server) handleScan(reqID json.RawMessage, argsRaw json.RawMessage) *JSONRPCResponse {
-	var args ScanArgs
-	if len(argsRaw) > 0 && string(argsRaw) != "null" {
-		if err := json.Unmarshal(argsRaw, &args); err != nil {
-			return NewErrorResponse(reqID, CodeInvalidParams, fmt.Sprintf("Invalid params: %v", err))
-		}
-	}
-
-	// 1. Validasi Keberadaan Parameter Path
-	pathParam := strings.TrimSpace(args.Path)
+func (s *Server) resolveScanTarget(pathParam string) (string, string) {
+	pathParam = strings.TrimSpace(pathParam)
 	if pathParam == "" {
-		return NewErrorResponse(reqID, CodeInvalidParams, "Invalid Params: missing required path")
+		return "", "missing required path"
 	}
 
-	// 2. Enkapsulasi Trust Boundary & Proteksi Path Traversal
 	workspaceClean, absErr := filepath.Abs(s.workspace)
 	if absErr != nil {
-		return NewErrorResponse(reqID, CodeInternalToolError, fmt.Sprintf("Failed to resolve workspace: %v", absErr))
+		return "", fmt.Sprintf("failed to resolve workspace: %v", absErr)
 	}
 	workspaceClean = filepath.Clean(workspaceClean)
 
@@ -236,72 +227,58 @@ func (s *Server) handleScan(reqID json.RawMessage, argsRaw json.RawMessage) *JSO
 
 	rel, relErr := filepath.Rel(workspaceClean, targetPath)
 	if relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return NewErrorResponse(reqID, CodeInvalidParams, "Invalid Params: path traversal denied")
+		return "", "path traversal denied"
 	}
 
-	// Evaluasi Symlink jika file/folder ada
 	if evalPath, symErr := filepath.EvalSymlinks(targetPath); symErr == nil {
 		evalRel, evalRelErr := filepath.Rel(workspaceClean, evalPath)
 		if evalRelErr != nil || evalRel == ".." || strings.HasPrefix(evalRel, ".."+string(filepath.Separator)) {
-			return NewErrorResponse(reqID, CodeInvalidParams, "Invalid Params: path traversal denied")
+			return "", "path traversal denied"
 		}
 	}
 
-	// 3. Verifikasi Keberadaan Target Path di Disk
 	if _, statErr := os.Stat(targetPath); statErr != nil {
-		return NewErrorResponse(reqID, CodeInvalidParams, fmt.Sprintf("Invalid Params: scan target %q does not exist: %v", pathParam, statErr))
+		return "", fmt.Sprintf("scan target %q does not exist: %v", pathParam, statErr)
 	}
 
-	// 4. Verifikasi Direct-Target Safety (Kekebalan Direktori Built-in Terlarang)
 	matcher := config.NewIgnoreMatcher(nil)
 	if matcher.HasBuiltinAncestor(targetPath) {
-		return NewErrorResponse(reqID, CodeInvalidParams, fmt.Sprintf("Invalid Params: scan target %q is within excluded directory (builtin hard exclusion)", pathParam))
+		return "", fmt.Sprintf("scan target %q is within excluded directory (builtin hard exclusion)", pathParam)
 	}
 
-	// 5. Validasi Category dan Rule jika diberikan
-	if args.Category != "" {
-		if len(s.reg.ByCategory(args.Category)) == 0 {
-			return NewErrorResponse(reqID, CodeInvalidParams, fmt.Sprintf("Invalid Params: unknown category %q", args.Category))
-		}
-	}
+	return targetPath, ""
+}
 
-	if args.Rule != "" {
-		r, exists := s.reg.Get(args.Rule)
+func (s *Server) validateScanCategoryAndRule(category, rule string) string {
+	if category != "" && len(s.reg.ByCategory(category)) == 0 {
+		return fmt.Sprintf("unknown category %q", category)
+	}
+	if rule != "" {
+		r, exists := s.reg.Get(rule)
 		if !exists {
-			return NewErrorResponse(reqID, CodeInvalidParams, fmt.Sprintf("Invalid Params: unknown rule %q", args.Rule))
+			return fmt.Sprintf("unknown rule %q", rule)
 		}
-		if args.Category != "" && r.Category() != args.Category {
-			return NewErrorResponse(reqID, CodeInvalidParams, fmt.Sprintf("Invalid Params: rule %q does not belong to category %q", args.Rule, args.Category))
+		if category != "" && r.Category() != category {
+			return fmt.Sprintf("rule %q does not belong to category %q", rule, category)
 		}
 	}
+	return ""
+}
 
-	// 6. Siapkan Batas Waktu Eksekusi 30 Detik & Kanal Pembatalan
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	key := canonicalIDKey(reqID)
-	if key != "" {
-		s.activeScans.Store(key, cancel)
-		defer s.activeScans.Delete(key)
-	}
-
-	// 7. Resolusi Konfigurasi charites.yaml
+func resolveWorkspaceConfigAndMatcher(workspaceClean string) (*config.Config, *config.IgnoreMatcher) {
 	var cfg *config.Config
-	workspaceConfig := filepath.Join(workspaceClean, "charites.yaml")
-	if _, cfgErr := os.Stat(workspaceConfig); cfgErr == nil {
-		cfg, _ = config.Load(workspaceConfig)
-	} else {
-		workspaceConfigYml := filepath.Join(workspaceClean, "charites.yml")
-		if _, ymlErr := os.Stat(workspaceConfigYml); ymlErr == nil {
-			cfg, _ = config.Load(workspaceConfigYml)
-		} else {
-			cfg, _ = config.Load("")
+	for _, cand := range []string{"charites.yaml", "charites.yml"} {
+		p := filepath.Join(workspaceClean, cand)
+		if _, err := os.Stat(p); err == nil {
+			cfg, _ = config.Load(p)
+			break
 		}
 	}
+	if cfg == nil {
+		cfg, _ = config.Load("")
+	}
 
-	activeRules := cfg.ResolveActiveRules(s.reg, args.Category, args.Rule)
-
-	// 8. Penyiapan Ignore Matcher
+	var matcher *config.IgnoreMatcher
 	targetIgnore := filepath.Join(workspaceClean, ".charitesignore")
 	if _, ignErr := os.Stat(targetIgnore); ignErr == nil {
 		matcher, _ = config.LoadIgnore(targetIgnore)
@@ -312,25 +289,58 @@ func (s *Server) handleScan(reqID json.RawMessage, argsRaw json.RawMessage) *JSO
 	if cfg != nil && len(cfg.Ignore) > 0 {
 		matcher.AddPatterns(cfg.Ignore)
 	}
+	return cfg, matcher
+}
 
-	// 9. Normalisasi Ekstensi Berkas
+func parseScanExts(extParam string) []string {
+	if strings.TrimSpace(extParam) == "" {
+		return []string{".astro", ".tsx", ".jsx"}
+	}
+	rawExts := strings.Split(extParam, ",")
 	var exts []string
-	if strings.TrimSpace(args.Ext) != "" {
-		rawExts := strings.Split(args.Ext, ",")
-		for _, e := range rawExts {
-			trimmed := strings.ToLower(strings.TrimSpace(e))
-			if trimmed != "" {
-				if !strings.HasPrefix(trimmed, ".") {
-					trimmed = "." + trimmed
-				}
-				exts = append(exts, trimmed)
+	for _, e := range rawExts {
+		trimmed := strings.ToLower(strings.TrimSpace(e))
+		if trimmed != "" {
+			if !strings.HasPrefix(trimmed, ".") {
+				trimmed = "." + trimmed
 			}
+			exts = append(exts, trimmed)
 		}
-	} else {
-		exts = []string{".astro", ".tsx", ".jsx"}
+	}
+	return exts
+}
+
+func (s *Server) handleScan(reqID json.RawMessage, argsRaw json.RawMessage) *JSONRPCResponse {
+	var args ScanArgs
+	if len(argsRaw) > 0 && string(argsRaw) != "null" {
+		if err := json.Unmarshal(argsRaw, &args); err != nil {
+			return NewErrorResponse(reqID, CodeInvalidParams, fmt.Sprintf("Invalid params: %v", err))
+		}
 	}
 
-	// 10. Eksekusi Engine Pemindaian
+	targetPath, errStr := s.resolveScanTarget(args.Path)
+	if errStr != "" {
+		return NewErrorResponse(reqID, CodeInvalidParams, "Invalid Params: "+errStr)
+	}
+
+	if ruleErr := s.validateScanCategoryAndRule(args.Category, args.Rule); ruleErr != "" {
+		return NewErrorResponse(reqID, CodeInvalidParams, "Invalid Params: "+ruleErr)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	key := canonicalIDKey(reqID)
+	if key != "" {
+		s.activeScans.Store(key, cancel)
+		defer s.activeScans.Delete(key)
+	}
+
+	workspaceClean, _ := filepath.Abs(s.workspace)
+	cfg, matcher := resolveWorkspaceConfigAndMatcher(workspaceClean)
+	activeRules := cfg.ResolveActiveRules(s.reg, args.Category, args.Rule)
+	exts := parseScanExts(args.Ext)
+
 	walker := scanner.NewWalker(matcher, exts)
 	eng := analyzer.NewEngine(activeRules)
 	pool := scanner.NewPool(0)

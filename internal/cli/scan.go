@@ -76,7 +76,7 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 	fs.BoolVar(&noColor, "no-color", false, "Disable ANSI color formatting")
 	fs.BoolVar(&failOnWarn, "fail-on-warn", false, "Exit with code 1 on warnings")
 
-	// 1. Reorder argumen untuk fleksibilitas POSIX/GNU (flag dapat diletakkan di sebelum atau sesudah path)
+	// 1. Reorder argumen untuk fleksibilitas POSIX/GNU
 	reorderedArgs, positionalArgs := partitionArgs(args)
 
 	if err := fs.Parse(reorderedArgs); err != nil {
@@ -88,118 +88,38 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 		return ExitOperational
 	}
 
-	// 2. Validasi Batasan Target Path
-	if len(positionalArgs) > 1 {
-		_, _ = fmt.Fprintf(stderr, "charites: error: multiple scan targets not supported. Specify a single path.\n")
-		return ExitOperational
-	}
-
 	target := "."
 	if len(positionalArgs) == 1 {
 		target = positionalArgs[0]
 	}
 
-	// 3. Validasi Keberadaan Target Path
-	if _, err := os.Stat(target); err != nil {
-		_, _ = fmt.Fprintf(stderr, "charites: error: scan target %q does not exist.\n", target)
+	if !validateScanTargetAndFormat(target, format, positionalArgs, stderr) {
 		return ExitOperational
 	}
 
-	// 4. Validasi Format Output
-	formatLower := strings.ToLower(strings.TrimSpace(format))
-	if formatLower != "inline" && formatLower != "json" {
-		_, _ = fmt.Fprintf(stderr, "charites: error: unsupported format %q. Supported formats: inline, json.\n", format)
-		return ExitOperational
-	}
-
-	// 5. Validasi & Normalisasi Flag --ext
 	normalizedExts, extErr := normalizeExtensions(extFlags)
 	if extErr != nil {
 		_, _ = fmt.Fprintln(stderr, extErr.Error())
 		return ExitOperational
 	}
 
-	// 6. Validasi Keberadaan & Konflik --category dan --rule
 	reg := rules.DefaultRegistry()
-
-	if category != "" {
-		if len(reg.ByCategory(category)) == 0 {
-			_, _ = fmt.Fprintf(stderr, "charites: error: unknown category %q.\n", category)
-			return ExitOperational
-		}
-	}
-
-	if rule != "" {
-		r, exists := reg.Get(rule)
-		if !exists {
-			_, _ = fmt.Fprintf(stderr, "charites: error: unknown rule %q.\n", rule)
-			return ExitOperational
-		}
-		if category != "" && r.Category() != category {
-			_, _ = fmt.Fprintf(stderr, "charites: error: rule %q does not belong to category %q.\n", rule, category)
-			return ExitOperational
-		}
-	}
-
-	// 7. Resolusi Konfigurasi charites.yaml
-	var cfg *config.Config
-	isExplicitConfig := isFlagPassed(args, "-config", "--config")
-
-	if isExplicitConfig {
-		var err error
-		cfg, err = config.Load(configPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				_, _ = fmt.Fprintf(stderr, "charites: error: config file not found: %q.\n", configPath)
-				return ExitOperational
-			}
-			_, _ = fmt.Fprintf(stderr, "charites: error: failed to parse config %q: %v\n", configPath, err)
-			return ExitOperational
-		}
-	} else {
-		// Zero-config default: periksa target terlebih dahulu jika berupa direktori
-		targetConfig := filepath.Join(target, "charites.yaml")
-		if _, err := os.Stat(targetConfig); err == nil {
-			cfg, _ = config.Load(targetConfig)
-		} else {
-			targetConfigYml := filepath.Join(target, "charites.yml")
-			if _, err := os.Stat(targetConfigYml); err == nil {
-				cfg, _ = config.Load(targetConfigYml)
-			} else {
-				cfg, _ = config.Load("")
-			}
-		}
-	}
-
-	// 8. Resolusi Active Rules (3-Tier Precedence: Registry -> CLI Scope -> Config Policy)
-	activeRules := cfg.ResolveActiveRules(reg, category, rule)
-
-	// 9. Penyiapan Ignore Matcher & Direct-Target Safety
-	var matcher *config.IgnoreMatcher
-	targetIgnore := filepath.Join(target, ".charitesignore")
-	if _, err := os.Stat(targetIgnore); err == nil {
-		matcher, _ = config.LoadIgnore(targetIgnore)
-	} else {
-		matcher, _ = config.LoadIgnore(".charitesignore")
-	}
-	if matcher == nil {
-		matcher = config.NewIgnoreMatcher(nil)
-	}
-
-	if cfg != nil && len(cfg.Ignore) > 0 {
-		matcher.AddPatterns(cfg.Ignore)
-	}
-	if len(ignoreFlags) > 0 {
-		matcher.AddPatterns(ignoreFlags)
-	}
-
-	// Direct-Target Safety Check (kekebalan builtin hard exclusions)
-	if matcher.HasBuiltinAncestor(target) {
-		_, _ = fmt.Fprintf(stderr, "charites: error: scan target %q is within excluded directory (builtin hard exclusion).\n", target)
+	if !validateCategoryAndRule(reg, category, rule, stderr) {
 		return ExitOperational
 	}
 
-	// 10. Inisialisasi Scanner Walker & Analyzer Engine
+	isExplicitConfig := isFlagPassed(args, "-config", "--config")
+	cfg, ok := resolveScanConfig(target, configPath, isExplicitConfig, stderr)
+	if !ok {
+		return ExitOperational
+	}
+
+	activeRules := cfg.ResolveActiveRules(reg, category, rule)
+	matcher, ok := buildScanMatcher(target, cfg, ignoreFlags, stderr)
+	if !ok {
+		return ExitOperational
+	}
+
 	walker := scanner.NewWalker(matcher, normalizedExts)
 	eng := analyzer.NewEngine(activeRules)
 	ca := &countingAnalyzer{inner: eng}
@@ -219,7 +139,100 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 		return ExitOperational
 	}
 
-	// 11. Agregasi Metrik Temuan
+	result := buildScanResult(ca, diags, durationMS, failOnWarn)
+	renderScanResult(stdout, result, format, noColor)
+
+	return ResolveExitCode(&result.Summary, failOnWarn)
+}
+
+func validateScanTargetAndFormat(target, format string, positionalArgs []string, stderr io.Writer) bool {
+	if len(positionalArgs) > 1 {
+		_, _ = fmt.Fprintf(stderr, "charites: error: multiple scan targets not supported. Specify a single path.\n")
+		return false
+	}
+	if _, err := os.Stat(target); err != nil {
+		_, _ = fmt.Fprintf(stderr, "charites: error: scan target %q does not exist.\n", target)
+		return false
+	}
+	formatLower := strings.ToLower(strings.TrimSpace(format))
+	if formatLower != "inline" && formatLower != "json" {
+		_, _ = fmt.Fprintf(stderr, "charites: error: unsupported format %q. Supported formats: inline, json.\n", format)
+		return false
+	}
+	return true
+}
+
+func validateCategoryAndRule(reg *rules.Registry, category, rule string, stderr io.Writer) bool {
+	if category != "" && len(reg.ByCategory(category)) == 0 {
+		_, _ = fmt.Fprintf(stderr, "charites: error: unknown category %q.\n", category)
+		return false
+	}
+	if rule != "" {
+		r, exists := reg.Get(rule)
+		if !exists {
+			_, _ = fmt.Fprintf(stderr, "charites: error: unknown rule %q.\n", rule)
+			return false
+		}
+		if category != "" && r.Category() != category {
+			_, _ = fmt.Fprintf(stderr, "charites: error: rule %q does not belong to category %q.\n", rule, category)
+			return false
+		}
+	}
+	return true
+}
+
+func resolveScanConfig(target, configPath string, isExplicit bool, stderr io.Writer) (*config.Config, bool) {
+	if isExplicit {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				_, _ = fmt.Fprintf(stderr, "charites: error: config file not found: %q.\n", configPath)
+			} else {
+				_, _ = fmt.Fprintf(stderr, "charites: error: failed to parse config %q: %v\n", configPath, err)
+			}
+			return nil, false
+		}
+		return cfg, true
+	}
+
+	for _, cand := range []string{"charites.yaml", "charites.yml"} {
+		p := filepath.Join(target, cand)
+		if _, err := os.Stat(p); err == nil {
+			cfg, _ := config.Load(p)
+			return cfg, true
+		}
+	}
+	cfg, _ := config.Load("")
+	return cfg, true
+}
+
+func buildScanMatcher(target string, cfg *config.Config, ignoreFlags []string, stderr io.Writer) (*config.IgnoreMatcher, bool) {
+	var matcher *config.IgnoreMatcher
+	targetIgnore := filepath.Join(target, ".charitesignore")
+	if _, err := os.Stat(targetIgnore); err == nil {
+		matcher, _ = config.LoadIgnore(targetIgnore)
+	} else {
+		matcher, _ = config.LoadIgnore(".charitesignore")
+	}
+	if matcher == nil {
+		matcher = config.NewIgnoreMatcher(nil)
+	}
+
+	if cfg != nil && len(cfg.Ignore) > 0 {
+		matcher.AddPatterns(cfg.Ignore)
+	}
+	if len(ignoreFlags) > 0 {
+		matcher.AddPatterns(ignoreFlags)
+	}
+
+	if matcher.HasBuiltinAncestor(target) {
+		_, _ = fmt.Fprintf(stderr, "charites: error: scan target %q is within excluded directory (builtin hard exclusion).\n", target)
+		return nil, false
+	}
+	return matcher, true
+}
+
+func buildScanResult(ca *countingAnalyzer, diags []ir.Diagnostic, durationMS int64, failOnWarn bool) *reporter.ScanResult {
 	var errCount, warnCount, infoCount int
 	for _, d := range diags {
 		switch d.Severity {
@@ -237,7 +250,7 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 		passed = false
 	}
 
-	result := &reporter.ScanResult{
+	return &reporter.ScanResult{
 		Version: Version,
 		Summary: reporter.ScanSummary{
 			ScannedFiles: int(ca.count.Load()),
@@ -249,9 +262,10 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 		},
 		Diagnostics: diags,
 	}
+}
 
-	// 12. Presentasi Dokumen Laporan
-	if formatLower == "json" {
+func renderScanResult(stdout io.Writer, result *reporter.ScanResult, format string, noColor bool) {
+	if strings.ToLower(strings.TrimSpace(format)) == "json" {
 		rep := reporter.NewJSONReporter()
 		_ = rep.Render(stdout, result)
 	} else {
@@ -259,9 +273,6 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 		rep := reporter.NewInlineReporter(colorMode)
 		_ = rep.Render(stdout, result)
 	}
-
-	// 13. Resolusi Kode Keluar
-	return ResolveExitCode(&result.Summary, failOnWarn)
 }
 
 func partitionArgs(args []string) ([]string, []string) {

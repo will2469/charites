@@ -8,48 +8,52 @@ import "strings"
 // - Template literal (backticks) mengekstrak segmen statis di luar ${...}.
 // - Segmen di dalam ${...} diisolasi secara buram (opaque) tanpa parsing JS AST.
 // - Flag hasDynamic bernilai true jika terdapat ekspresi ${...} atau ekspresi variabel dinamis.
+func isQuotedString(s string) bool {
+	return len(s) >= 2 && ((s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\''))
+}
+
+func isTemplateLiteral(s string) bool {
+	return len(s) >= 2 && s[0] == '`' && s[len(s)-1] == '`'
+}
+
+func extractJSXExpressionClasses(inner string) ([]string, bool) {
+	inner = strings.TrimSpace(inner)
+	if inner == "" {
+		return nil, false
+	}
+	if isQuotedString(inner) {
+		return strings.Fields(inner[1 : len(inner)-1]), false
+	}
+	if isTemplateLiteral(inner) {
+		return extractTemplateLiteralClasses(inner[1 : len(inner)-1])
+	}
+	return nil, true
+}
+
+// ExtractClasses mengekstrak token kelas CSS dari nilai atribut class/className mentah.
+// Mematuhi kontrak Option B:
+// - Literal string biasa diekstrak dan ditokenisasi.
+// - Template literal (backticks) mengekstrak segmen statis di luar ${...}.
+// - Segmen di dalam ${...} diisolasi secara buram (opaque) tanpa parsing JS AST.
+// - Flag hasDynamic bernilai true jika terdapat ekspresi ${...} atau ekspresi variabel dinamis.
 func ExtractClasses(raw string) (classes []string, hasDynamic bool) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return nil, false
 	}
 
-	// Tangani format JSX kurung kurawal: class={...}
 	if len(trimmed) >= 2 && strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
-		inner := strings.TrimSpace(trimmed[1 : len(trimmed)-1])
-		if inner == "" {
-			return nil, false
-		}
-
-		// String literal di dalam kurung kurawal: {"foo bar"} atau {'foo bar'}
-		if len(inner) >= 2 && ((strings.HasPrefix(inner, "\"") && strings.HasSuffix(inner, "\"")) ||
-			(strings.HasPrefix(inner, "'") && strings.HasSuffix(inner, "'"))) {
-			content := inner[1 : len(inner)-1]
-			return strings.Fields(content), false
-		}
-
-		// Template literal: {`foo ${bar} baz`}
-		if len(inner) >= 2 && strings.HasPrefix(inner, "`") && strings.HasSuffix(inner, "`") {
-			return extractTemplateLiteralClasses(inner[1 : len(inner)-1])
-		}
-
-		// Ekspresi variabel atau pemanggilan fungsi JS dinamis lainnya (misal class={cls})
-		return nil, true
+		return extractJSXExpressionClasses(trimmed[1 : len(trimmed)-1])
 	}
 
-	// Template literal langsung tanpa kurung kurawal terluar: `foo ${bar} baz`
-	if len(trimmed) >= 2 && strings.HasPrefix(trimmed, "`") && strings.HasSuffix(trimmed, "`") {
+	if isTemplateLiteral(trimmed) {
 		return extractTemplateLiteralClasses(trimmed[1 : len(trimmed)-1])
 	}
 
-	// String literal berkutip ganda atau tunggal: "foo bar" atau 'foo bar'
-	if len(trimmed) >= 2 && ((strings.HasPrefix(trimmed, "\"") && strings.HasSuffix(trimmed, "\"")) ||
-		(strings.HasPrefix(trimmed, "'") && strings.HasSuffix(trimmed, "'"))) {
-		content := trimmed[1 : len(trimmed)-1]
-		return strings.Fields(content), false
+	if isQuotedString(trimmed) {
+		return strings.Fields(trimmed[1 : len(trimmed)-1]), false
 	}
 
-	// Nilai atribut tanpa kutip (unquoted string)
 	return strings.Fields(trimmed), false
 }
 

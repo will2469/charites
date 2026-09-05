@@ -21,6 +21,69 @@ func NewInlineReporter(mode ColorMode) *InlineReporter {
 	}
 }
 
+func pluralize(count int, singular, plural string) string {
+	if count == 1 {
+		return singular
+	}
+	return plural
+}
+
+func (r *InlineReporter) renderDiagnostic(w io.Writer, d ir.Diagnostic, useColor bool) error {
+	badge := r.formatBadge(d.Severity, useColor)
+	posixPath := filepath.ToSlash(d.File)
+	header := fmt.Sprintf("%s %s:%d:%d [%s]", badge, posixPath, d.Line, d.Column, d.Rule)
+	if _, err := fmt.Fprintln(w, header); err != nil {
+		return err
+	}
+
+	msgLine := fmt.Sprintf("  %s", d.Message)
+	if _, err := fmt.Fprintln(w, msgLine); err != nil {
+		return err
+	}
+
+	if d.Hint != "" {
+		hintPrefix := "Hint:"
+		if useColor {
+			hintPrefix = "\033[2mHint:\033[0m"
+		}
+		hintLine := fmt.Sprintf("  %s %s", hintPrefix, d.Hint)
+		if _, err := fmt.Fprintln(w, hintLine); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func renderSummary(w io.Writer, summary ScanSummary) error {
+	totalProblems := summary.ErrorCount + summary.WarningCount + summary.InfoCount
+	problemsWord := pluralize(totalProblems, "problem", "problems")
+	errorsWord := pluralize(summary.ErrorCount, "error", "errors")
+	warningsWord := pluralize(summary.WarningCount, "warning", "warnings")
+
+	summaryLine := fmt.Sprintf(" %d %s found (%d %s, %d %s)",
+		totalProblems,
+		problemsWord,
+		summary.ErrorCount,
+		errorsWord,
+		summary.WarningCount,
+		warningsWord,
+	)
+	if _, err := fmt.Fprintln(w, summaryLine); err != nil {
+		return err
+	}
+
+	filesWord := pluralize(summary.ScannedFiles, "file", "files")
+	scannedLine := fmt.Sprintf("  Scanned %d %s in %dms.",
+		summary.ScannedFiles,
+		filesWord,
+		summary.DurationMS,
+	)
+	if _, err := fmt.Fprintln(w, scannedLine); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Render menulis laporan hasil pemindaian dalam format inline ANSI ke io.Writer.
 func (r *InlineReporter) Render(w io.Writer, result *ScanResult) error {
 	if result == nil {
@@ -29,90 +92,24 @@ func (r *InlineReporter) Render(w io.Writer, result *ScanResult) error {
 
 	useColor := r.colorMode == ColorAlways || (r.colorMode == ColorAuto && IsTerminal(w))
 
-	// 1. Render setiap temuan diagnostik
 	for i, d := range result.Diagnostics {
 		if i > 0 {
 			if _, err := fmt.Fprintln(w); err != nil {
 				return err
 			}
 		}
-
-		badge := r.formatBadge(d.Severity, useColor)
-		posixPath := filepath.ToSlash(d.File)
-		header := fmt.Sprintf("%s %s:%d:%d [%s]", badge, posixPath, d.Line, d.Column, d.Rule)
-		if _, err := fmt.Fprintln(w, header); err != nil {
+		if err := r.renderDiagnostic(w, d, useColor); err != nil {
 			return err
-		}
-
-		msgLine := fmt.Sprintf("  %s", d.Message)
-		if _, err := fmt.Fprintln(w, msgLine); err != nil {
-			return err
-		}
-
-		if d.Hint != "" {
-			hintPrefix := "Hint:"
-			if useColor {
-				hintPrefix = "\033[2mHint:\033[0m"
-			}
-			hintLine := fmt.Sprintf("  %s %s", hintPrefix, d.Hint)
-			if _, err := fmt.Fprintln(w, hintLine); err != nil {
-				return err
-			}
 		}
 	}
 
-	// 2. Jika ada diagnostik, beri baris pemisah sebelum ringkasan footer
 	if len(result.Diagnostics) > 0 {
 		if _, err := fmt.Fprintln(w); err != nil {
 			return err
 		}
 	}
 
-	// 3. Render Ringkasan Footer
-	totalProblems := result.Summary.ErrorCount + result.Summary.WarningCount + result.Summary.InfoCount
-
-	problemsWord := "problems"
-	if totalProblems == 1 {
-		problemsWord = "problem"
-	}
-
-	errorsWord := "errors"
-	if result.Summary.ErrorCount == 1 {
-		errorsWord = "error"
-	}
-
-	warningsWord := "warnings"
-	if result.Summary.WarningCount == 1 {
-		warningsWord = "warning"
-	}
-
-	summaryLine := fmt.Sprintf(" %d %s found (%d %s, %d %s)",
-		totalProblems,
-		problemsWord,
-		result.Summary.ErrorCount,
-		errorsWord,
-		result.Summary.WarningCount,
-		warningsWord,
-	)
-	if _, err := fmt.Fprintln(w, summaryLine); err != nil {
-		return err
-	}
-
-	filesWord := "files"
-	if result.Summary.ScannedFiles == 1 {
-		filesWord = "file"
-	}
-
-	scannedLine := fmt.Sprintf("  Scanned %d %s in %dms.",
-		result.Summary.ScannedFiles,
-		filesWord,
-		result.Summary.DurationMS,
-	)
-	if _, err := fmt.Fprintln(w, scannedLine); err != nil {
-		return err
-	}
-
-	return nil
+	return renderSummary(w, result.Summary)
 }
 
 func (r *InlineReporter) formatBadge(sev ir.Severity, useColor bool) string {

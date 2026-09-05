@@ -60,6 +60,29 @@ func (p *Parser) sliceTokens(tokens []Token) string {
 	return tokensToString(tokens)
 }
 
+func updateDelimiterDepths(tokType TokenType, parenDepth, bracketDepth, braceDepth *int) {
+	switch tokType {
+	case TokenOpenParen:
+		*parenDepth++
+	case TokenCloseParen:
+		if *parenDepth > 0 {
+			*parenDepth--
+		}
+	case TokenOpenBracket:
+		*bracketDepth++
+	case TokenCloseBracket:
+		if *bracketDepth > 0 {
+			*bracketDepth--
+		}
+	case TokenOpenBrace:
+		*braceDepth++
+	case TokenCloseBrace:
+		if *braceDepth > 0 {
+			*braceDepth--
+		}
+	}
+}
+
 // parseRuleOrDeclaration membedakan antara AtRule, StyleRule, atau Declaration pada scope saat ini
 // secara grammar-aware dengan melacak kedalaman tanda kurung, kurung siku, dan kurung kurawal.
 func (p *Parser) parseRuleOrDeclaration() (Rule, *Declaration) {
@@ -87,63 +110,26 @@ func (p *Parser) parseRuleOrDeclaration() (Rule, *Declaration) {
 	for p.curr.Type != TokenEOF {
 		// Periksa delimiter pemutus pada kedalaman seimbang (depth 0)
 		if parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 {
-			if p.curr.Type == TokenOpenBrace {
+			switch p.curr.Type {
+			case TokenOpenBrace:
 				// Ini adalah StyleRule (blok selektor terkualifikasi)
-				selector := p.sliceTokens(tokens)
-				p.advance() // konsumsi '{'
-				styleRule := &StyleRule{
-					Selector:     selector,
-					Declarations: make([]Declaration, 0),
-					Rules:        make([]Rule, 0),
-				}
-
-				p.parseBlockContents(&styleRule.Declarations, &styleRule.Rules)
-				styleRule.Span = SourceSpan{Start: startLoc, End: p.curr.Span.End}
-				if p.curr.Type == TokenCloseBrace {
-					p.advance() // konsumsi '}'
-				}
-				return styleRule, nil
-			}
-
-			if p.curr.Type == TokenSemicolon {
+				return p.parseStyleRule(startLoc, tokens), nil
+			case TokenSemicolon:
 				// Ini adalah deklarasi properti (prop: val;)
 				decl := p.tokensToDeclaration(tokens, startLoc)
 				p.advance() // konsumsi ';'
 				return nil, decl
-			}
-
-			if p.curr.Type == TokenCloseBrace {
+			case TokenCloseBrace:
 				// Akhir blok (deklarasi terakhir tanpa titik koma penutup, misal: { color: red })
 				if len(tokens) > 0 {
-					decl := p.tokensToDeclaration(tokens, startLoc)
-					return nil, decl
+					return nil, p.tokensToDeclaration(tokens, startLoc)
 				}
 				return nil, nil
 			}
 		}
 
 		// Lacak kedalaman nesting
-		switch p.curr.Type {
-		case TokenOpenParen:
-			parenDepth++
-		case TokenCloseParen:
-			if parenDepth > 0 {
-				parenDepth--
-			}
-		case TokenOpenBracket:
-			bracketDepth++
-		case TokenCloseBracket:
-			if bracketDepth > 0 {
-				bracketDepth--
-			}
-		case TokenOpenBrace:
-			braceDepth++
-		case TokenCloseBrace:
-			if braceDepth > 0 {
-				braceDepth--
-			}
-		}
-
+		updateDelimiterDepths(p.curr.Type, &parenDepth, &bracketDepth, &braceDepth)
 		tokens = append(tokens, p.curr)
 		p.advance()
 	}
@@ -154,6 +140,23 @@ func (p *Parser) parseRuleOrDeclaration() (Rule, *Declaration) {
 	}
 
 	return nil, nil
+}
+
+func (p *Parser) parseStyleRule(startLoc SourceLocation, tokens []Token) *StyleRule {
+	selector := p.sliceTokens(tokens)
+	p.advance() // konsumsi '{'
+	styleRule := &StyleRule{
+		Selector:     selector,
+		Declarations: make([]Declaration, 0),
+		Rules:        make([]Rule, 0),
+	}
+
+	p.parseBlockContents(&styleRule.Declarations, &styleRule.Rules)
+	styleRule.Span = SourceSpan{Start: startLoc, End: p.curr.Span.End}
+	if p.curr.Type == TokenCloseBrace {
+		p.advance() // konsumsi '}'
+	}
+	return styleRule
 }
 
 func (p *Parser) parseAtRule() Rule {
@@ -182,50 +185,38 @@ func (p *Parser) parseAtRule() Rule {
 
 			// Jika diakhiri '{', parse isi blok
 			if p.curr.Type == TokenOpenBrace {
-				prelude := p.sliceTokens(preludeTokens)
-				p.advance() // konsumsi '{'
-				atRule := &AtRule{
-					Name:         name,
-					Prelude:      prelude,
-					Declarations: make([]Declaration, 0),
-					Rules:        make([]Rule, 0),
-				}
-
-				p.parseBlockContents(&atRule.Declarations, &atRule.Rules)
-				atRule.Span = SourceSpan{Start: startLoc, End: p.curr.Span.End}
-				if p.curr.Type == TokenCloseBrace {
-					p.advance() // konsumsi '}'
-				}
-				return atRule
+				return p.parseBlockAtRule(startLoc, name, preludeTokens)
 			}
 		}
 
-		switch p.curr.Type {
-		case TokenOpenParen:
-			parenDepth++
-		case TokenCloseParen:
-			if parenDepth > 0 {
-				parenDepth--
-			}
-		case TokenOpenBracket:
-			bracketDepth++
-		case TokenCloseBracket:
-			if bracketDepth > 0 {
-				bracketDepth--
-			}
-		case TokenOpenBrace:
-			braceDepth++
-		case TokenCloseBrace:
-			if braceDepth > 0 {
-				braceDepth--
-			}
-		}
-
+		updateDelimiterDepths(p.curr.Type, &parenDepth, &bracketDepth, &braceDepth)
 		preludeTokens = append(preludeTokens, p.curr)
 		p.advance()
 	}
 
-	return &AtRule{Name: name, Prelude: p.sliceTokens(preludeTokens), Span: SourceSpan{Start: startLoc, End: p.curr.Span.End}}
+	return &AtRule{
+		Name:    name,
+		Prelude: p.sliceTokens(preludeTokens),
+		Span:    SourceSpan{Start: startLoc, End: p.curr.Span.End},
+	}
+}
+
+func (p *Parser) parseBlockAtRule(startLoc SourceLocation, name string, preludeTokens []Token) *AtRule {
+	prelude := p.sliceTokens(preludeTokens)
+	p.advance() // konsumsi '{'
+	atRule := &AtRule{
+		Name:         name,
+		Prelude:      prelude,
+		Declarations: make([]Declaration, 0),
+		Rules:        make([]Rule, 0),
+	}
+
+	p.parseBlockContents(&atRule.Declarations, &atRule.Rules)
+	atRule.Span = SourceSpan{Start: startLoc, End: p.curr.Span.End}
+	if p.curr.Type == TokenCloseBrace {
+		p.advance() // konsumsi '}'
+	}
+	return atRule
 }
 
 // parseBlockContents mem-parse seluruh deklarasi dan aturan bersarang di dalam kurung kurawal.

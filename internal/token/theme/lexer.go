@@ -43,175 +43,189 @@ func (l *Lexer) NextToken() Token {
 	start := l.idx
 	b := l.src[l.idx]
 
-	// 1. Whitespace
-	if isWhitespace(b) {
-		for l.idx < len(l.src) && isWhitespace(l.src[l.idx]) {
-			l.advanceByte()
-		}
-		return l.makeToken(TokenWhitespace, start, startLoc)
-	}
-
-	// 2. Comments (/* ... */)
-	if b == '/' && l.idx+1 < len(l.src) && l.src[l.idx+1] == '*' {
-		l.advanceByte() // '/'
-		l.advanceByte() // '*'
-		for l.idx < len(l.src) {
-			if l.src[l.idx] == '*' && l.idx+1 < len(l.src) && l.src[l.idx+1] == '/' {
-				l.advanceByte() // '*'
-				l.advanceByte() // '/'
-				break
-			}
-			l.advanceByte()
-		}
-		return l.makeToken(TokenComment, start, startLoc)
-	}
-
-	// 3. Strings ("..." or '...')
-	if b == '"' || b == '\'' {
-		quote := b
-		l.advanceByte() // quote awal
-		for l.idx < len(l.src) {
-			curr := l.src[l.idx]
-			if curr == '\\' {
-				l.advanceByte() // skip backslash
-				if l.idx < len(l.src) {
-					l.advanceByte() // skip escaped character
-				}
-				continue
-			}
-			if curr == quote {
-				l.advanceByte() // quote akhir
-				break
-			}
-			l.advanceByte()
-		}
-		return l.makeToken(TokenString, start, startLoc)
-	}
-
-	// 4. Single-Character Delimiters
-	switch b {
-	case ':':
-		l.advanceByte()
-		return l.makeToken(TokenColon, start, startLoc)
-	case ';':
-		l.advanceByte()
-		return l.makeToken(TokenSemicolon, start, startLoc)
-	case ',':
-		l.advanceByte()
-		return l.makeToken(TokenComma, start, startLoc)
-	case '{':
-		l.advanceByte()
-		return l.makeToken(TokenOpenBrace, start, startLoc)
-	case '}':
-		l.advanceByte()
-		return l.makeToken(TokenCloseBrace, start, startLoc)
-	case '(':
-		l.advanceByte()
-		return l.makeToken(TokenOpenParen, start, startLoc)
-	case ')':
-		l.advanceByte()
-		return l.makeToken(TokenCloseParen, start, startLoc)
-	case '[':
-		l.advanceByte()
-		return l.makeToken(TokenOpenBracket, start, startLoc)
-	case ']':
-		l.advanceByte()
-		return l.makeToken(TokenCloseBracket, start, startLoc)
-	}
-
-	// 5. At-Keywords (@media, @layer, @theme, @supports, etc.)
-	if b == '@' {
-		l.advanceByte() // '@'
-		for l.idx < len(l.src) && isIdentChar(l.src[l.idx]) {
-			l.advanceByte()
-		}
-		return l.makeToken(TokenAtKeyword, start, startLoc)
-	}
-
-	// 6. Hash / Hex (#123456)
-	if b == '#' {
-		l.advanceByte() // '#'
-		for l.idx < len(l.src) && isHexOrIdentChar(l.src[l.idx]) {
-			l.advanceByte()
-		}
-		return l.makeToken(TokenHash, start, startLoc)
-	}
-
-	// 7. Special url(...) function handling
-	if (b == 'u' || b == 'U') && l.hasPrefixCI("url(") {
-		l.advanceN(4) // "url("
-		parenDepth := 1
-		for l.idx < len(l.src) && parenDepth > 0 {
-			curr := l.src[l.idx]
-			if curr == '\\' {
-				l.advanceByte()
-				if l.idx < len(l.src) {
-					l.advanceByte()
-				}
-				continue
-			}
-			if curr == '"' || curr == '\'' {
-				quote := curr
-				l.advanceByte()
-				for l.idx < len(l.src) {
-					if l.src[l.idx] == '\\' {
-						l.advanceByte()
-						if l.idx < len(l.src) {
-							l.advanceByte()
-						}
-						continue
-					}
-					if l.src[l.idx] == quote {
-						l.advanceByte()
-						break
-					}
-					l.advanceByte()
-				}
-				continue
-			}
-			if curr == '(' {
-				parenDepth++
-			} else if curr == ')' {
-				parenDepth--
-				if parenDepth == 0 {
-					l.advanceByte()
-					break
-				}
-			}
-			l.advanceByte()
-		}
-		return l.makeToken(TokenIdent, start, startLoc)
-	}
-
-	// 8. Identifiers (e.g. --banana, --color-primary, display, oklch, \:focus, --tw-bg-opacity\:1)
-	if l.startsIdent() {
+	switch {
+	case isWhitespace(b):
+		return l.consumeWhitespace(start, startLoc)
+	case b == '/' && l.idx+1 < len(l.src) && l.src[l.idx+1] == '*':
+		return l.consumeComment(start, startLoc)
+	case b == '"' || b == '\'':
+		return l.consumeString(b, start, startLoc)
+	case b == '@':
+		return l.consumeAtKeyword(start, startLoc)
+	case b == '#':
+		return l.consumeHash(start, startLoc)
+	case (b == 'u' || b == 'U') && l.hasPrefixCI("url("):
+		return l.consumeURL(start, startLoc)
+	case l.startsIdent():
 		l.consumeIdent()
 		return l.makeToken(TokenIdent, start, startLoc)
+	case isNumberStart(b, l.src, l.idx):
+		return l.consumeNumber(start, startLoc)
 	}
 
-	// 9. Numbers, Dimensions & Percentages (including signed e.g. -10px, +5%)
-	isSignPrefix := (b == '-' || b == '+') && l.idx+1 < len(l.src) && (isDigit(l.src[l.idx+1]) || (l.src[l.idx+1] == '.' && l.idx+2 < len(l.src) && isDigit(l.src[l.idx+2])))
-	if isDigit(b) || (b == '.' && l.idx+1 < len(l.src) && isDigit(l.src[l.idx+1])) || isSignPrefix {
-		if isSignPrefix {
-			l.advanceByte() // consume '+' or '-'
-		}
-		for l.idx < len(l.src) && (isDigit(l.src[l.idx]) || l.src[l.idx] == '.') {
-			l.advanceByte()
-		}
-		if l.idx < len(l.src) && l.src[l.idx] == '%' {
-			l.advanceByte()
-			return l.makeToken(TokenPercentage, start, startLoc)
-		}
-		if l.startsIdent() {
-			l.consumeIdent()
-			return l.makeToken(TokenDimension, start, startLoc)
-		}
-		return l.makeToken(TokenNumber, start, startLoc)
-	}
+	return l.consumeDelimiter(b, start, startLoc)
+}
 
-	// 10. Fallback Delim
+func (l *Lexer) consumeWhitespace(start int, startLoc SourceLocation) Token {
+	for l.idx < len(l.src) && isWhitespace(l.src[l.idx]) {
+		l.advanceByte()
+	}
+	return l.makeToken(TokenWhitespace, start, startLoc)
+}
+
+func (l *Lexer) consumeComment(start int, startLoc SourceLocation) Token {
+	l.advanceByte() // '/'
+	l.advanceByte() // '*'
+	for l.idx < len(l.src) {
+		if l.src[l.idx] == '*' && l.idx+1 < len(l.src) && l.src[l.idx+1] == '/' {
+			l.advanceByte() // '*'
+			l.advanceByte() // '/'
+			break
+		}
+		l.advanceByte()
+	}
+	return l.makeToken(TokenComment, start, startLoc)
+}
+
+func (l *Lexer) consumeString(quote byte, start int, startLoc SourceLocation) Token {
+	l.advanceByte() // quote awal
+	for l.idx < len(l.src) {
+		curr := l.src[l.idx]
+		if curr == '\\' {
+			l.advanceByte() // skip backslash
+			if l.idx < len(l.src) {
+				l.advanceByte() // skip escaped character
+			}
+			continue
+		}
+		if curr == quote {
+			l.advanceByte() // quote akhir
+			break
+		}
+		l.advanceByte()
+	}
+	return l.makeToken(TokenString, start, startLoc)
+}
+
+func (l *Lexer) consumeAtKeyword(start int, startLoc SourceLocation) Token {
+	l.advanceByte() // '@'
+	for l.idx < len(l.src) && isIdentChar(l.src[l.idx]) {
+		l.advanceByte()
+	}
+	return l.makeToken(TokenAtKeyword, start, startLoc)
+}
+
+func (l *Lexer) consumeHash(start int, startLoc SourceLocation) Token {
+	l.advanceByte() // '#'
+	for l.idx < len(l.src) && isHexOrIdentChar(l.src[l.idx]) {
+		l.advanceByte()
+	}
+	return l.makeToken(TokenHash, start, startLoc)
+}
+
+func (l *Lexer) consumeURL(start int, startLoc SourceLocation) Token {
+	l.advanceN(4) // "url("
+	parenDepth := 1
+	for l.idx < len(l.src) && parenDepth > 0 {
+		curr := l.src[l.idx]
+		if curr == '\\' {
+			l.advanceByte()
+			if l.idx < len(l.src) {
+				l.advanceByte()
+			}
+			continue
+		}
+		if curr == '"' || curr == '\'' {
+			l.skipQuotedLiteral(curr)
+			continue
+		}
+		if curr == '(' {
+			parenDepth++
+		} else if curr == ')' {
+			parenDepth--
+			if parenDepth == 0 {
+				l.advanceByte()
+				break
+			}
+		}
+		l.advanceByte()
+	}
+	return l.makeToken(TokenIdent, start, startLoc)
+}
+
+func (l *Lexer) skipQuotedLiteral(quote byte) {
 	l.advanceByte()
-	return l.makeToken(TokenDelim, start, startLoc)
+	for l.idx < len(l.src) {
+		if l.src[l.idx] == '\\' {
+			l.advanceByte()
+			if l.idx < len(l.src) {
+				l.advanceByte()
+			}
+			continue
+		}
+		if l.src[l.idx] == quote {
+			l.advanceByte()
+			break
+		}
+		l.advanceByte()
+	}
+}
+
+func isNumberStart(b byte, src []byte, idx int) bool {
+	if isDigit(b) || (b == '.' && idx+1 < len(src) && isDigit(src[idx+1])) {
+		return true
+	}
+	isSign := b == '-' || b == '+'
+	if isSign && idx+1 < len(src) {
+		next := src[idx+1]
+		return isDigit(next) || (next == '.' && idx+2 < len(src) && isDigit(src[idx+2]))
+	}
+	return false
+}
+
+func (l *Lexer) consumeNumber(start int, startLoc SourceLocation) Token {
+	b := l.src[l.idx]
+	if b == '-' || b == '+' {
+		l.advanceByte()
+	}
+	for l.idx < len(l.src) && (isDigit(l.src[l.idx]) || l.src[l.idx] == '.') {
+		l.advanceByte()
+	}
+	if l.idx < len(l.src) && l.src[l.idx] == '%' {
+		l.advanceByte()
+		return l.makeToken(TokenPercentage, start, startLoc)
+	}
+	if l.startsIdent() {
+		l.consumeIdent()
+		return l.makeToken(TokenDimension, start, startLoc)
+	}
+	return l.makeToken(TokenNumber, start, startLoc)
+}
+
+func (l *Lexer) consumeDelimiter(b byte, start int, startLoc SourceLocation) Token {
+	l.advanceByte()
+	switch b {
+	case ':':
+		return l.makeToken(TokenColon, start, startLoc)
+	case ';':
+		return l.makeToken(TokenSemicolon, start, startLoc)
+	case ',':
+		return l.makeToken(TokenComma, start, startLoc)
+	case '{':
+		return l.makeToken(TokenOpenBrace, start, startLoc)
+	case '}':
+		return l.makeToken(TokenCloseBrace, start, startLoc)
+	case '(':
+		return l.makeToken(TokenOpenParen, start, startLoc)
+	case ')':
+		return l.makeToken(TokenCloseParen, start, startLoc)
+	case '[':
+		return l.makeToken(TokenOpenBracket, start, startLoc)
+	case ']':
+		return l.makeToken(TokenCloseBracket, start, startLoc)
+	default:
+		return l.makeToken(TokenDelim, start, startLoc)
+	}
 }
 
 func (l *Lexer) advanceByte() {
@@ -273,24 +287,28 @@ func (l *Lexer) consumeIdent() {
 			continue
 		}
 		if b == '\\' && l.idx+1 < len(l.src) && isValidEscape(b, l.src[l.idx+1]) {
-			l.advanceByte() // consume '\\'
-			// Jika diikuti hex digit, konsumsi hingga 6 digit
-			if l.idx < len(l.src) && isHexDigit(l.src[l.idx]) {
-				hexCount := 0
-				for l.idx < len(l.src) && isHexDigit(l.src[l.idx]) && hexCount < 6 {
-					l.advanceByte()
-					hexCount++
-				}
-				// Jika diikuti 1 karakter spasi/whitespace, konsumsi sebagai delimiter escape (CSS spec 4.3.9)
-				if l.idx < len(l.src) && isWhitespace(l.src[l.idx]) {
-					l.advanceByte()
-				}
-			} else if l.idx < len(l.src) {
-				l.advanceByte() // konsumsi byte yang di-escape
-			}
+			l.consumeEscapeSequence()
 			continue
 		}
 		break
+	}
+}
+
+func (l *Lexer) consumeEscapeSequence() {
+	l.advanceByte() // consume '\\'
+	if l.idx < len(l.src) && isHexDigit(l.src[l.idx]) {
+		hexCount := 0
+		for l.idx < len(l.src) && isHexDigit(l.src[l.idx]) && hexCount < 6 {
+			l.advanceByte()
+			hexCount++
+		}
+		if l.idx < len(l.src) && isWhitespace(l.src[l.idx]) {
+			l.advanceByte()
+		}
+		return
+	}
+	if l.idx < len(l.src) {
+		l.advanceByte()
 	}
 }
 
@@ -338,7 +356,6 @@ func UnescapeCSS(raw string) string {
 			sb.WriteByte(raw[i])
 			continue
 		}
-		// Escape dimulai
 		if i+1 >= n {
 			sb.WriteRune('\uFFFD')
 			break
@@ -346,30 +363,34 @@ func UnescapeCSS(raw string) string {
 		i++ // lewati '\\'
 		b := raw[i]
 		if isHexDigit(b) {
-			hexStart := i
-			for i < n && isHexDigit(raw[i]) && (i-hexStart) < 6 {
-				i++
-			}
-			var cp rune
-			for j := hexStart; j < i; j++ {
-				cp = cp*16 + hexVal(raw[j])
-			}
-			if cp == 0 || (cp >= 0xD800 && cp <= 0xDFFF) || cp > 0x10FFFF {
-				cp = '\uFFFD'
-			}
-			sb.WriteRune(cp)
-			// Jika diikuti satu karakter whitespace, konsumsi (CSS Syntax 3)
-			if i < n && isWhitespace(raw[i]) {
-				// Karakter spasi dikonsumsi sebagai pemisah hex escape
-			} else {
-				i-- // kompensasi loop
-			}
+			r, consumed := parseHexCodePoint(raw, i)
+			sb.WriteRune(r)
+			i = consumed
 			continue
 		}
-		// Bukan hex escape, tulis karakter literal apa adanya
 		sb.WriteByte(b)
 	}
 	return sb.String()
+}
+
+func parseHexCodePoint(raw string, start int) (rune, int) {
+	n := len(raw)
+	i := start
+	for i < n && isHexDigit(raw[i]) && (i-start) < 6 {
+		i++
+	}
+	var cp rune
+	for j := start; j < i; j++ {
+		cp = cp*16 + hexVal(raw[j])
+	}
+	if cp == 0 || (cp >= 0xD800 && cp <= 0xDFFF) || cp > 0x10FFFF {
+		cp = '\uFFFD'
+	}
+	// Jika diikuti 1 whitespace delimiter escape, lewati
+	if i < n && isWhitespace(raw[i]) {
+		return cp, i
+	}
+	return cp, i - 1
 }
 
 func hexVal(b byte) rune {

@@ -2,7 +2,6 @@ package token
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/will2469/charites/internal/token/theme"
@@ -119,44 +118,11 @@ func (g *Graph) matchBestScope(candidates []TokenID, currentScope Scope) TokenID
 		return candidates[0]
 	}
 
-	// 1. Filter deklarasi yang applicable terhadap kondisi konteks (media queries, supports, container)
-	applicable := make([]TokenID, 0, len(candidates))
-	for _, id := range candidates {
-		candScope := g.Nodes[id].Scope
-		if candScope.MatchesConditions(currentScope) {
-			applicable = append(applicable, id)
-		}
-	}
-
-	// Jika tidak ada yang applicable (misal evaluasi pada konteks tanpa kondisi spesifik),
-	// ambil deklarasi tanpa kondisi sebagai fallback alami.
-	if len(applicable) == 0 {
-		for _, id := range candidates {
-			if len(g.Nodes[id].Scope.AtRules) == 0 {
-				applicable = append(applicable, id)
-			}
-		}
-		if len(applicable) == 0 {
-			applicable = candidates
-		}
-	}
-
-	// 2. Element Scoping vs Root Inheritance:
-	// Deklarasi langsung pada elemen konteks selalu mendahului nilai yang diwarisi dari :root.
+	applicable := g.filterApplicableScopes(candidates, currentScope)
 	if currentScope.Selector != "" && !currentScope.IsRoot() {
-		direct := make([]TokenID, 0, len(applicable))
-		for _, id := range applicable {
-			candScope := g.Nodes[id].Scope
-			if candScope.Selector == currentScope.Selector {
-				direct = append(direct, id)
-			}
-		}
-		if len(direct) > 0 {
-			applicable = direct
-		}
+		applicable = g.filterDirectElementScopes(applicable, currentScope.Selector)
 	}
 
-	// 3. W3C Cascade Sorting: LayerRank -> Specificity -> SourceOrder
 	bestID := applicable[0]
 	bestRank := g.computeCascadeRank(bestID)
 
@@ -171,6 +137,42 @@ func (g *Graph) matchBestScope(candidates []TokenID, currentScope Scope) TokenID
 	return bestID
 }
 
+func (g *Graph) filterApplicableScopes(candidates []TokenID, currentScope Scope) []TokenID {
+	applicable := make([]TokenID, 0, len(candidates))
+	for _, id := range candidates {
+		if g.Nodes[id].Scope.MatchesConditions(currentScope) {
+			applicable = append(applicable, id)
+		}
+	}
+	if len(applicable) > 0 {
+		return applicable
+	}
+
+	// Fallback alami ke deklarasi tanpa kondisi
+	for _, id := range candidates {
+		if len(g.Nodes[id].Scope.AtRules) == 0 {
+			applicable = append(applicable, id)
+		}
+	}
+	if len(applicable) == 0 {
+		return candidates
+	}
+	return applicable
+}
+
+func (g *Graph) filterDirectElementScopes(candidates []TokenID, selector string) []TokenID {
+	direct := make([]TokenID, 0, len(candidates))
+	for _, id := range candidates {
+		if g.Nodes[id].Scope.Selector == selector {
+			direct = append(direct, id)
+		}
+	}
+	if len(direct) > 0 {
+		return direct
+	}
+	return candidates
+}
+
 // ResolveValue mengevaluasi dan meresolusi nilai akhir dari sebuah token (mengganti var(--...)).
 // Menggunakan visited set untuk cycle detection deterministik dan evaluation budget untuk perlindungan DoS.
 func (g *Graph) ResolveValue(tokenID TokenID, opts ResolveOptions) (string, bool, error) {
@@ -183,14 +185,13 @@ func (g *Graph) ResolveValue(tokenID TokenID, opts ResolveOptions) (string, bool
 		maxBudget = 1000
 	}
 
-	visited := make(map[TokenID]bool)
 	budgetCounter := 0
-
-	return g.resolveRecursive(tokenID, visited, &budgetCounter, maxBudget, opts)
+	activePath := make(map[TokenID]bool)
+	return g.resolveRecursive(tokenID, activePath, &budgetCounter, maxBudget, opts)
 }
 
 func (g *Graph) resolveRecursive(
-	currID TokenID,
+	tokenID TokenID,
 	activePath map[TokenID]bool,
 	budgetCounter *int,
 	maxBudget int,
@@ -198,20 +199,20 @@ func (g *Graph) resolveRecursive(
 ) (string, bool, error) {
 	*budgetCounter++
 	if *budgetCounter > maxBudget {
-		return "", false, fmt.Errorf("%w: limit %d nodes", ErrEvaluationBudgetExceeded, maxBudget)
+		return "", false, ErrEvaluationBudgetExceeded
 	}
 
-	if activePath[currID] {
-		return "", false, fmt.Errorf("%w: token %s (ID %d)", ErrCycleDetected, g.Nodes[currID].Name, currID)
+	if activePath[tokenID] {
+		return "", false, ErrCycleDetected
 	}
 
-	activePath[currID] = true
+	activePath[tokenID] = true
 	defer func() {
-		activePath[currID] = false
+		delete(activePath, tokenID)
 	}()
 
-	raw := g.Nodes[currID].RawValue
-	return g.resolveString(raw, currID, activePath, budgetCounter, maxBudget, opts)
+	node := g.Nodes[tokenID]
+	return g.resolveString(node.RawValue, tokenID, activePath, budgetCounter, maxBudget, opts)
 }
 
 func (g *Graph) resolveString(
@@ -235,52 +236,59 @@ func (g *Graph) resolveString(
 	// Substitusi dari kanan ke kiri (offset terbesar ke terkecil) agar slice offsets stabil
 	for i := len(calls) - 1; i >= 0; i-- {
 		call := calls[i]
-		refName := call.Name
-		candidates, exists := g.ByName[refName]
-
-		var replacement string
-		if !exists || len(candidates) == 0 {
-			if call.HasFallback {
-				// Evaluasi jika fallback mengandung var() bersarang
-				fallbackResolved, _, err := g.resolveString(call.Fallback, originID, activePath, budgetCounter, maxBudget, opts)
-				if err != nil {
-					return "", false, err
-				}
-				replacement = fallbackResolved
-			} else {
-				// Tanpa fallback dan token tidak ditemukan, pertahankan panggilan var asli
-				continue
-			}
-		} else {
-			var targetID TokenID
-			found := false
-			if opts.ScopeMatcher != nil {
-				for _, cID := range candidates {
-					if opts.ScopeMatcher(g.Nodes[cID].Scope) {
-						targetID = cID
-						found = true
-						break
-					}
-				}
-			}
-			if !found {
-				targetID = g.matchBestScope(candidates, g.Nodes[originID].Scope)
-			}
-
-			val, ok, err := g.resolveRecursive(targetID, activePath, budgetCounter, maxBudget, opts)
-			if err != nil {
-				return "", false, err
-			}
-			if !ok {
-				continue
-			}
-			replacement = val
+		replacement, ok, err := g.resolveVarReplacement(call, originID, activePath, budgetCounter, maxBudget, opts)
+		if err != nil {
+			return "", false, err
 		}
-
+		if !ok {
+			continue
+		}
 		result = result[:call.StartOffset] + replacement + result[call.EndOffset:]
 	}
 
 	return result, true, nil
+}
+
+func (g *Graph) resolveVarReplacement(
+	call theme.VarCall,
+	originID TokenID,
+	activePath map[TokenID]bool,
+	budgetCounter *int,
+	maxBudget int,
+	opts ResolveOptions,
+) (string, bool, error) {
+	candidates, exists := g.ByName[call.Name]
+	if !exists || len(candidates) == 0 {
+		if !call.HasFallback {
+			return "", false, nil
+		}
+		val, _, err := g.resolveString(call.Fallback, originID, activePath, budgetCounter, maxBudget, opts)
+		if err != nil {
+			return "", false, err
+		}
+		return val, true, nil
+	}
+
+	targetID := g.selectTargetID(candidates, originID, opts)
+	val, ok, err := g.resolveRecursive(targetID, activePath, budgetCounter, maxBudget, opts)
+	if err != nil {
+		return "", false, err
+	}
+	if !ok {
+		return "", false, nil
+	}
+	return val, true, nil
+}
+
+func (g *Graph) selectTargetID(candidates []TokenID, originID TokenID, opts ResolveOptions) TokenID {
+	if opts.ScopeMatcher != nil {
+		for _, cID := range candidates {
+			if opts.ScopeMatcher(g.Nodes[cID].Scope) {
+				return cID
+			}
+		}
+	}
+	return g.matchBestScope(candidates, g.Nodes[originID].Scope)
 }
 
 // FindCycles memeriksa seluruh token dalam graph dan mengembalikan daftar TokenID yang terlibat dalam siklus.

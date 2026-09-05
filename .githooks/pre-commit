@@ -76,6 +76,30 @@ if [ -n "${STAGED_GO_FILES## }" ] && [ -f "go.mod" ]; then
             echo "[Charites Hook] Warning: gosec reported potential security findings."
         }
     fi
+
+    if command -v gocognit >/dev/null 2>&1; then
+        # Cognitive Complexity Gate: <= 20 standard pass, tests excluded (_test.go)
+        HIGH_COG_FILES=""
+        for f in ${STAGED_GO_FILES}; do
+            case "${f}" in
+                *_test.go) continue ;; # tests gak masuk
+                *.go)
+                    if [ -f "${f}" ]; then
+                        COG_OUT=$(gocognit -over 20 "${f}" 2>/dev/null || true)
+                        if [ -n "${COG_OUT}" ]; then
+                            HIGH_COG_FILES="${HIGH_COG_FILES}
+${COG_OUT}"
+                        fi
+                    fi
+                    ;;
+            esac
+        done
+        if [ -n "${HIGH_COG_FILES}" ]; then
+            echo -e "[Charites Hook] ERROR: Cognitive complexity exceeds standard pass (threshold: 20):${HIGH_COG_FILES}"
+            echo "[Charites Hook] Please refactor nested control flow or extract helper functions."
+            exit 1
+        fi
+    fi
 fi
 
 echo "[Charites Hook] Staged files clean and ready to commit!"

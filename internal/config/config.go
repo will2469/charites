@@ -172,13 +172,21 @@ func parseConventionSection(trimmed, currentSection string, cfg *Config) {
 	switch {
 	case currentSection == "convention":
 		if k, v, found := strings.Cut(trimmed, ":"); found {
-			subKey := strings.TrimSpace(k)
-			val := cleanValue(v)
-			if subKey == "prefixes" {
-				cfg.Convention.Prefixes = parseStringList(val)
+			if strings.TrimSpace(k) == "prefixes" {
+				cfg.Convention.Prefixes = parseStringList(cleanValue(v))
 			}
 		}
-	case currentSection == "convention.opacity_mappings":
+	case strings.HasPrefix(currentSection, "convention.opacity_mappings"):
+		parseConventionOpacity(trimmed, currentSection, cfg)
+	case strings.HasPrefix(currentSection, "convention.fallbacks"):
+		parseConventionFallbacks(trimmed, currentSection, cfg)
+	case currentSection == "convention.prefixes":
+		parseConventionPrefixes(trimmed, cfg)
+	}
+}
+
+func parseConventionOpacity(trimmed, currentSection string, cfg *Config) {
+	if currentSection == "convention.opacity_mappings" {
 		if k, v, found := strings.Cut(trimmed, ":"); found {
 			op := cleanValue(k)
 			val := strings.TrimSpace(v)
@@ -186,15 +194,19 @@ func parseConventionSection(trimmed, currentSection string, cfg *Config) {
 				cfg.Convention.OpacityMappings[op] = parseStringList(val)
 			}
 		}
-	case strings.HasPrefix(currentSection, "convention.opacity_mappings."):
-		op := strings.TrimPrefix(currentSection, "convention.opacity_mappings.")
-		if strings.HasPrefix(trimmed, "-") {
-			val := cleanValue(strings.TrimPrefix(trimmed, "-"))
-			if val != "" {
-				cfg.Convention.OpacityMappings[op] = append(cfg.Convention.OpacityMappings[op], val)
-			}
+		return
+	}
+	op := strings.TrimPrefix(currentSection, "convention.opacity_mappings.")
+	if strings.HasPrefix(trimmed, "-") {
+		val := cleanValue(strings.TrimPrefix(trimmed, "-"))
+		if val != "" {
+			cfg.Convention.OpacityMappings[op] = append(cfg.Convention.OpacityMappings[op], val)
 		}
-	case currentSection == "convention.fallbacks":
+	}
+}
+
+func parseConventionFallbacks(trimmed, currentSection string, cfg *Config) {
+	if currentSection == "convention.fallbacks" {
 		if k, v, found := strings.Cut(trimmed, ":"); found {
 			base := cleanValue(k)
 			val := strings.TrimSpace(v)
@@ -202,24 +214,26 @@ func parseConventionSection(trimmed, currentSection string, cfg *Config) {
 				cfg.Convention.Fallbacks[base] = parseStringList(val)
 			}
 		}
-	case strings.HasPrefix(currentSection, "convention.fallbacks."):
-		base := strings.TrimPrefix(currentSection, "convention.fallbacks.")
-		if strings.HasPrefix(trimmed, "-") {
-			val := cleanValue(strings.TrimPrefix(trimmed, "-"))
-			if val != "" {
-				cfg.Convention.Fallbacks[base] = append(cfg.Convention.Fallbacks[base], val)
-			}
-		}
-	case currentSection == "convention.prefixes":
-		if strings.HasPrefix(trimmed, "-") {
-			val := cleanValue(strings.TrimPrefix(trimmed, "-"))
-			if val != "" {
-				cfg.Convention.Prefixes = append(cfg.Convention.Prefixes, val)
-			}
-		} else {
-			cfg.Convention.Prefixes = parseStringList(trimmed)
+		return
+	}
+	base := strings.TrimPrefix(currentSection, "convention.fallbacks.")
+	if strings.HasPrefix(trimmed, "-") {
+		val := cleanValue(strings.TrimPrefix(trimmed, "-"))
+		if val != "" {
+			cfg.Convention.Fallbacks[base] = append(cfg.Convention.Fallbacks[base], val)
 		}
 	}
+}
+
+func parseConventionPrefixes(trimmed string, cfg *Config) {
+	if strings.HasPrefix(trimmed, "-") {
+		val := cleanValue(strings.TrimPrefix(trimmed, "-"))
+		if val != "" {
+			cfg.Convention.Prefixes = append(cfg.Convention.Prefixes, val)
+		}
+		return
+	}
+	cfg.Convention.Prefixes = parseStringList(trimmed)
 }
 
 func parseStringList(raw string) []string {

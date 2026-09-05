@@ -96,38 +96,154 @@ func (l *lexer) parse() *ir.Node {
 // sambil terus memperbarui nomor baris asli (line offset preservation).
 func (l *lexer) skipFrontmatter() {
 	l.skipWhitespace()
-	if l.pos+3 > l.len {
+	if l.pos+3 > l.len || l.src[l.pos] != '-' || l.src[l.pos+1] != '-' || l.src[l.pos+2] != '-' {
 		return
 	}
 
-	if l.src[l.pos] == '-' && l.src[l.pos+1] == '-' && l.src[l.pos+2] == '-' {
-		// Konsumsi '---' pembuka
-		l.advance()
-		l.advance()
-		l.advance()
+	l.advanceBytes(3)
 
-		// Cari '---' penutup yang berada di baris baru
-		for l.pos < l.len {
-			if l.src[l.pos] == '\n' {
-				l.advance()
-				// Periksa apakah setelah newline ada '---'
-				if l.pos+3 <= l.len && l.src[l.pos] == '-' && l.src[l.pos+1] == '-' && l.src[l.pos+2] == '-' {
-					l.advance()
-					l.advance()
-					l.advance()
-					// Konsumsi sisa baris penutup frontmatter
-					for l.pos < l.len && l.src[l.pos] != '\n' {
-						l.advance()
-					}
-					if l.pos < l.len && l.src[l.pos] == '\n' {
-						l.advance()
-					}
-					return
-				}
-				continue
+	for l.pos < l.len {
+		if l.src[l.pos] == '\n' {
+			l.advance()
+			if l.checkAndConsumeClosingFrontmatter() {
+				return
 			}
+			continue
+		}
+		l.advance()
+	}
+}
+
+func (l *lexer) checkAndConsumeClosingFrontmatter() bool {
+	if l.pos+3 <= l.len && l.src[l.pos] == '-' && l.src[l.pos+1] == '-' && l.src[l.pos+2] == '-' {
+		l.advanceBytes(3)
+		for l.pos < l.len && l.src[l.pos] != '\n' {
 			l.advance()
 		}
+		if l.pos < l.len && l.src[l.pos] == '\n' {
+			l.advance()
+		}
+		return true
+	}
+	return false
+}
+
+func (l *lexer) skipUntilChar(target byte) {
+	for l.pos < l.len && l.src[l.pos] != target {
+		l.advance()
+	}
+	if l.pos < l.len && l.src[l.pos] == target {
+		l.advance()
+	}
+}
+
+func (l *lexer) handleHTMLComment(startLine, startCol int) {
+	l.pos += 3
+	l.col += 3
+	commentStart := l.pos
+	endIdx := bytes.Index(l.src[l.pos:], []byte("-->"))
+	if endIdx == -1 {
+		raw := string(l.src[commentStart:])
+		l.advanceTo(l.len)
+		l.bld.AddComment(raw, ir.Span{Line: startLine, Column: startCol, EndLine: l.line, EndColumn: l.col})
+		return
+	}
+	raw := string(l.src[commentStart : l.pos+endIdx])
+	l.advanceBytes(endIdx + 3)
+	l.bld.AddComment(raw, ir.Span{Line: startLine, Column: startCol, EndLine: l.line, EndColumn: l.col})
+}
+
+func (l *lexer) handleCloseElement() {
+	l.advance() // konsumsi '/'
+	l.skipWhitespace()
+	tagName := l.readIdentifier()
+	l.skipUntilChar('>')
+	l.bld.CloseElement(tagName)
+}
+
+func (l *lexer) parseAttributeVal() string {
+	l.skipWhitespace()
+	if l.pos < l.len && l.src[l.pos] == '=' {
+		l.advance() // konsumsi '='
+		l.skipWhitespace()
+		return l.readAttributeValue()
+	}
+	return ""
+}
+
+type parsedAttrs struct {
+	attrs       map[string]string
+	rawClasses  string
+	classes     []string
+	hasDynamic  bool
+	selfClosing bool
+	ok          bool
+}
+
+func (l *lexer) parseElementAttributes() parsedAttrs {
+	res := parsedAttrs{
+		attrs: make(map[string]string),
+	}
+
+	for l.pos < l.len {
+		l.skipWhitespace()
+		if l.pos >= l.len || l.src[l.pos] == '<' {
+			return res
+		}
+
+		ch := l.src[l.pos]
+		if ch == '>' {
+			l.advance()
+			res.ok = true
+			return res
+		}
+		if ch == '/' && l.pos+1 < l.len && l.src[l.pos+1] == '>' {
+			l.advanceBytes(2)
+			res.selfClosing = true
+			res.ok = true
+			return res
+		}
+
+		attrName := l.readAttributeName()
+		if attrName == "" {
+			l.advance()
+			continue
+		}
+
+		attrVal := l.parseAttributeVal()
+		res.attrs[attrName] = attrVal
+		if attrName == "class" || attrName == "className" {
+			res.rawClasses = attrVal
+			res.classes, res.hasDynamic = parser.ExtractClasses(attrVal)
+		}
+	}
+
+	return res
+}
+
+func (l *lexer) handleOpenElement(startLine, startCol int) {
+	tagName := l.readIdentifier()
+	if tagName == "" {
+		return
+	}
+
+	p := l.parseElementAttributes()
+	if !p.ok {
+		return
+	}
+
+	span := ir.Span{
+		Line:      startLine,
+		Column:    startCol,
+		EndLine:   l.line,
+		EndColumn: l.col,
+	}
+
+	isVoid := voidElements[strings.ToLower(tagName)]
+	if p.selfClosing || isVoid {
+		l.bld.AddSelfClosingElement(tagName, span, p.rawClasses, p.classes, p.attrs, p.hasDynamic)
+	} else {
+		l.bld.OpenElement(tagName, span, p.rawClasses, p.classes, p.attrs, p.hasDynamic)
 	}
 }
 
@@ -141,145 +257,34 @@ func (l *lexer) handleTag() {
 		return
 	}
 
-	// 1. Komentar HTML: <!-- ... -->
 	if l.matchPrefix("!--") {
-		l.pos += 3
-		l.col += 3
-		commentStart := l.pos
-		endIdx := bytes.Index(l.src[l.pos:], []byte("-->"))
-		if endIdx == -1 {
-			// Komentar tidak ditutup, konsumsi hingga akhir
-			raw := string(l.src[commentStart:])
-			l.advanceTo(l.len)
-			l.bld.AddComment(raw, ir.Span{Line: startLine, Column: startCol, EndLine: l.line, EndColumn: l.col})
-			return
-		}
-		raw := string(l.src[commentStart : l.pos+endIdx])
-		l.advanceBytes(endIdx + 3)
-		l.bld.AddComment(raw, ir.Span{Line: startLine, Column: startCol, EndLine: l.line, EndColumn: l.col})
+		l.handleHTMLComment(startLine, startCol)
 		return
 	}
 
-	// 2. Fragment closing: </>
 	if l.matchPrefix("/>") {
-		l.advance()
-		l.advance()
+		l.advanceBytes(2)
 		l.bld.CloseFragment()
 		return
 	}
 
-	// 3. Tag penutup: </tag>
 	if l.src[l.pos] == '/' {
-		l.advance() // konsumsi '/'
-		l.skipWhitespace()
-		tagName := l.readIdentifier()
-		// Cari penutup '>'
-		for l.pos < l.len && l.src[l.pos] != '>' {
-			l.advance()
-		}
-		if l.pos < l.len && l.src[l.pos] == '>' {
-			l.advance()
-		}
-		l.bld.CloseElement(tagName)
+		l.handleCloseElement()
 		return
 	}
 
-	// 4. Fragment opening: <>
 	if l.src[l.pos] == '>' {
 		l.advance()
 		l.bld.OpenFragment(ir.Span{Line: startLine, Column: startCol, EndLine: l.line, EndColumn: l.col})
 		return
 	}
 
-	// 5. Doctype / Directive: <! ... >
 	if l.src[l.pos] == '!' {
-		for l.pos < l.len && l.src[l.pos] != '>' {
-			l.advance()
-		}
-		if l.pos < l.len && l.src[l.pos] == '>' {
-			l.advance()
-		}
+		l.skipUntilChar('>')
 		return
 	}
 
-	// 6. Tag Pembuka Elemen: <tag ...>
-	tagName := l.readIdentifier()
-	if tagName == "" {
-		// Malformed: '<' tidak diikuti nama tag yang valid, abaikan karakter '<'
-		return
-	}
-
-	// Parsing atribut
-	attrs := make(map[string]string)
-	var rawClasses string
-	var classes []string
-	var hasDynamic bool
-	selfClosing := false
-
-	for l.pos < l.len {
-		l.skipWhitespace()
-		if l.pos >= l.len {
-			break
-		}
-
-		ch := l.src[l.pos]
-
-		// Jika menemukan '<' baru sebelum '>' (contoh: <broken <button>):
-		// Malformed recovery: buang broken tag, resinkronisasi ke '<' berikutnya
-		if ch == '<' {
-			return
-		}
-
-		if ch == '>' {
-			l.advance()
-			break
-		}
-
-		if ch == '/' && l.pos+1 < l.len && l.src[l.pos+1] == '>' {
-			l.advance()
-			l.advance()
-			selfClosing = true
-			break
-		}
-
-		// Baca nama atribut
-		attrName := l.readAttributeName()
-		if attrName == "" {
-			l.advance()
-			continue
-		}
-
-		l.skipWhitespace()
-		attrVal := ""
-
-		if l.pos < l.len && l.src[l.pos] == '=' {
-			l.advance() // konsumsi '='
-			l.skipWhitespace()
-			attrVal = l.readAttributeValue()
-		}
-
-		attrs[attrName] = attrVal
-		if attrName == "class" || attrName == "className" {
-			rawClasses = attrVal
-			classes, hasDynamic = parser.ExtractClasses(attrVal)
-		}
-	}
-
-	span := ir.Span{
-		Line:      startLine,
-		Column:    startCol,
-		EndLine:   l.line,
-		EndColumn: l.col,
-	}
-
-	// Deteksi void element HTML (selalu self-closing)
-	isVoid := voidElements[strings.ToLower(tagName)]
-
-	if selfClosing || isVoid {
-		l.bld.AddSelfClosingElement(tagName, span, rawClasses, classes, attrs, hasDynamic)
-	} else {
-		l.bld.OpenElement(tagName, span, rawClasses, classes, attrs, hasDynamic)
-	}
+	l.handleOpenElement(startLine, startCol)
 }
 
 // handleBraceExpression memproses kurung kurawal JSX { ... } atau {/* ... */} di luar tag.
@@ -353,69 +358,44 @@ func (l *lexer) readAttributeName() string {
 	return string(l.src[start:l.pos])
 }
 
-func (l *lexer) readAttributeValue() string {
-	if l.pos >= l.len {
-		return ""
-	}
-
-	ch := l.src[l.pos]
-
-	// String berkutip ganda: "..."
-	if ch == '"' {
-		start := l.pos
+func (l *lexer) readQuotedAttribute(quote byte) string {
+	start := l.pos
+	l.advance()
+	for l.pos < l.len && l.src[l.pos] != quote {
+		if l.src[l.pos] == '\\' && l.pos+1 < l.len {
+			l.advance()
+		}
 		l.advance()
-		for l.pos < l.len && l.src[l.pos] != '"' {
-			if l.src[l.pos] == '\\' && l.pos+1 < l.len {
-				l.advance()
-			}
-			l.advance()
-		}
-		if l.pos < l.len && l.src[l.pos] == '"' {
-			l.advance()
-		}
-		return string(l.src[start:l.pos])
 	}
-
-	// String berkutip tunggal: '...'
-	if ch == '\'' {
-		start := l.pos
+	if l.pos < l.len && l.src[l.pos] == quote {
 		l.advance()
-		for l.pos < l.len && l.src[l.pos] != '\'' {
-			if l.src[l.pos] == '\\' && l.pos+1 < l.len {
-				l.advance()
-			}
+	}
+	return string(l.src[start:l.pos])
+}
+
+func (l *lexer) readJSXBraceAttribute() string {
+	start := l.pos
+	l.advance()
+	depth := 1
+	for l.pos < l.len && depth > 0 {
+		c := l.src[l.pos]
+		switch c {
+		case '{':
+			depth++
+			l.advance()
+		case '}':
+			depth--
+			l.advance()
+		case '"', '\'', '`':
+			l.skipStringLiteral(c)
+		default:
 			l.advance()
 		}
-		if l.pos < l.len && l.src[l.pos] == '\'' {
-			l.advance()
-		}
-		return string(l.src[start:l.pos])
 	}
+	return string(l.src[start:l.pos])
+}
 
-	// Ekspresi kurung kurawal JSX: {...}
-	if ch == '{' {
-		start := l.pos
-		l.advance()
-		depth := 1
-		for l.pos < l.len && depth > 0 {
-			c := l.src[l.pos]
-			switch c {
-			case '{':
-				depth++
-				l.advance()
-			case '}':
-				depth--
-				l.advance()
-			case '"', '\'', '`':
-				l.skipStringLiteral(c)
-			default:
-				l.advance()
-			}
-		}
-		return string(l.src[start:l.pos])
-	}
-
-	// Atribut tanpa kutip
+func (l *lexer) readUnquotedAttribute() string {
 	start := l.pos
 	for l.pos < l.len {
 		c := l.src[l.pos]
@@ -425,6 +405,22 @@ func (l *lexer) readAttributeValue() string {
 		l.advance()
 	}
 	return string(l.src[start:l.pos])
+}
+
+func (l *lexer) readAttributeValue() string {
+	if l.pos >= l.len {
+		return ""
+	}
+
+	ch := l.src[l.pos]
+	switch ch {
+	case '"', '\'':
+		return l.readQuotedAttribute(ch)
+	case '{':
+		return l.readJSXBraceAttribute()
+	default:
+		return l.readUnquotedAttribute()
+	}
 }
 
 func (l *lexer) skipStringLiteral(quote byte) {

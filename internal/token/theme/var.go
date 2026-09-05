@@ -27,6 +27,87 @@ type VarCall struct {
 	HasFallback bool
 }
 
+func isVarCallStart(src string, i, n int) bool {
+	if i+4 > n || (src[i] != 'v' && src[i] != 'V') || !strings.EqualFold(src[i:i+4], "var(") {
+		return false
+	}
+	return i == 0 || !isIdentChar(src[i-1])
+}
+
+func scanVarTokenName(src string, start, n int) (string, int, bool) {
+	i := start
+	for i < n && isWhitespace(src[i]) {
+		i++
+	}
+	if i+2 > n || src[i] != '-' || src[i+1] != '-' {
+		return "", i, false
+	}
+
+	nameStart := i
+	for i < n {
+		if isIdentChar(src[i]) {
+			i++
+			continue
+		}
+		if src[i] == '\\' && i+1 < n && isValidEscape(src[i], src[i+1]) {
+			i += 2
+			continue
+		}
+		break
+	}
+	name := UnescapeCSS(src[nameStart:i])
+
+	for i < n && isWhitespace(src[i]) {
+		i++
+	}
+	return name, i, true
+}
+
+func scanBalancedFallback(src string, start, n int) (string, int, bool) {
+	i := start
+	for i < n && isWhitespace(src[i]) {
+		i++
+	}
+	fallbackStart := i
+
+	parenDepth := 1
+	var inQuote byte
+
+	for i < n && parenDepth > 0 {
+		b := src[i]
+		if inQuote != 0 {
+			i = advanceQuotedChar(b, &inQuote, i, n)
+			continue
+		}
+
+		switch b {
+		case '"', '\'':
+			inQuote = b
+		case '(':
+			parenDepth++
+		case ')':
+			parenDepth--
+			if parenDepth == 0 {
+				fallback := strings.TrimSpace(src[fallbackStart:i])
+				return fallback, i + 1, true
+			}
+		}
+		i++
+	}
+
+	return "", i, false
+}
+
+func advanceQuotedChar(b byte, inQuote *byte, i, n int) int {
+	if b == '\\' && i+1 < n {
+		return i + 2
+	}
+	if b == *inQuote {
+		*inQuote = 0
+	}
+	return i + 1
+}
+
 // ExtractTopLevelVarCalls mengekstrak seluruh pemanggilan var(...) tingkat teratas (top-level)
 // dari sebuah string deklarasi CSS dengan menjaga keseimbangan tanda kurung dan tanda kutip.
 func ExtractTopLevelVarCalls(src string) []VarCall {
@@ -35,131 +116,50 @@ func ExtractTopLevelVarCalls(src string) []VarCall {
 	i := 0
 
 	for i < n {
-		// Cari "var(" secara case-insensitive
-		if i+4 <= n && (src[i] == 'v' || src[i] == 'V') && strings.EqualFold(src[i:i+4], "var(") {
-			// Pastikan tidak didahului oleh karakter ident (misal 'myvar(')
-			if i > 0 && isIdentChar(src[i-1]) {
-				i++
-				continue
-			}
-
-			startOffset := i
-			i += 4 // lewati "var("
-
-			// Lewati whitespace di depan nama token
-			for i < n && isWhitespace(src[i]) {
-				i++
-			}
-
-			// Nama token harus diawali tanda hubung ganda "--"
-			if i+2 > n || src[i] != '-' || src[i+1] != '-' {
-				continue
-			}
-
-			// Kumpulkan nama token (mendukung CSS escape seperti \:)
-			nameStart := i
-			for i < n {
-				if isIdentChar(src[i]) {
-					i++
-					continue
-				}
-				if src[i] == '\\' && i+1 < n && isValidEscape(src[i], src[i+1]) {
-					i += 2
-					continue
-				}
-				break
-			}
-			name := UnescapeCSS(src[nameStart:i])
-
-			// Lewati whitespace setelah nama token
-			for i < n && isWhitespace(src[i]) {
-				i++
-			}
-
-			if i >= n {
-				break
-			}
-
-			if src[i] == ',' {
-				i++ // lewati ','
-				// Lewati whitespace sebelum nilai fallback
-				for i < n && isWhitespace(src[i]) {
-					i++
-				}
-				fallbackStart := i
-
-				// Pindai fallback dengan pelacakan kedalaman kurung seimbang (balanced parenthesis)
-				parenDepth := 1
-				bracketDepth := 0
-				braceDepth := 0
-				var inQuote byte
-
-				for i < n && parenDepth > 0 {
-					b := src[i]
-					if inQuote != 0 {
-						if b == '\\' && i+1 < n {
-							i += 2
-							continue
-						}
-						if b == inQuote {
-							inQuote = 0
-						}
-						i++
-						continue
-					}
-
-					switch b {
-					case '"', '\'':
-						inQuote = b
-					case '(':
-						parenDepth++
-					case ')':
-						parenDepth--
-						if parenDepth == 0 {
-							// Tanda kurung penutup var() utama tercapai
-							fallback := strings.TrimSpace(src[fallbackStart:i])
-							i++ // lewati ')'
-							calls = append(calls, VarCall{
-								Raw:         src[startOffset:i],
-								StartOffset: startOffset,
-								EndOffset:   i,
-								Name:        name,
-								Fallback:    fallback,
-								HasFallback: true,
-							})
-							goto nextOuter
-						}
-					case '[':
-						bracketDepth++
-					case ']':
-						if bracketDepth > 0 {
-							bracketDepth--
-						}
-					case '{':
-						braceDepth++
-					case '}':
-						if braceDepth > 0 {
-							braceDepth--
-						}
-					}
-					i++
-				}
-				continue
-			} else if src[i] == ')' {
-				i++ // lewati ')'
-				calls = append(calls, VarCall{
-					Raw:         src[startOffset:i],
-					StartOffset: startOffset,
-					EndOffset:   i,
-					Name:        name,
-					Fallback:    "",
-					HasFallback: false,
-				})
-				continue
-			}
+		if !isVarCallStart(src, i, n) {
+			i++
+			continue
 		}
+
+		startOffset := i
+		name, nextIdx, ok := scanVarTokenName(src, i+4, n)
+		if !ok {
+			i++
+			continue
+		}
+		i = nextIdx
+		if i >= n {
+			break
+		}
+
+		if src[i] == ',' {
+			fallback, endIdx, okFallback := scanBalancedFallback(src, i+1, n)
+			if okFallback {
+				calls = append(calls, VarCall{
+					Raw:         src[startOffset:endIdx],
+					StartOffset: startOffset,
+					EndOffset:   endIdx,
+					Name:        name,
+					Fallback:    fallback,
+					HasFallback: true,
+				})
+				i = endIdx
+				continue
+			}
+		} else if src[i] == ')' {
+			calls = append(calls, VarCall{
+				Raw:         src[startOffset : i+1],
+				StartOffset: startOffset,
+				EndOffset:   i + 1,
+				Name:        name,
+				Fallback:    "",
+				HasFallback: false,
+			})
+			i++
+			continue
+		}
+
 		i++
-	nextOuter:
 	}
 
 	return calls

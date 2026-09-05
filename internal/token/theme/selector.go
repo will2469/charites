@@ -182,15 +182,12 @@ func (s *selectorScanner) consumeParentheses() string {
 			continue
 		}
 
-		if b == '"' || b == '\'' {
+		switch b {
+		case '"', '\'':
 			inQuote = b
-			s.idx++
-			continue
-		}
-
-		if b == '(' {
+		case '(':
 			depth++
-		} else if b == ')' {
+		case ')':
 			depth--
 			if depth == 0 {
 				content := string(s.src[start:s.idx])
@@ -280,115 +277,109 @@ func (p *selectorParser) parseCompoundComponent() Specificity {
 
 	b := p.sc.src[p.sc.idx]
 
-	// 1. ID Selector (#id)
-	if b == '#' {
+	switch b {
+	case '#':
 		p.sc.idx++
 		_ = p.sc.consumeIdent()
 		return Specificity{A: 1}
-	}
-
-	// 2. Class Selector (.class)
-	if b == '.' {
+	case '.':
 		p.sc.idx++
 		_ = p.sc.consumeIdent()
 		return Specificity{B: 1}
-	}
-
-	// 3. Attribute Selector ([...])
-	if b == '[' {
+	case '[':
 		_ = p.sc.consumeBracket()
 		return Specificity{B: 1}
-	}
-
-	// 4. Nesting Selector (&)
-	if b == '&' {
+	case '&':
 		p.sc.idx++
 		return Specificity{B: 1}
+	case '*':
+		return p.parseUniversalSelector()
+	case ':':
+		return p.parseColonSelector()
 	}
 
-	// 5. Universal Selector (*) atau Namespace (*|tag)
-	if b == '*' {
-		p.sc.idx++
-		if p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == '|' {
-			p.sc.idx++ // lewati namespace separator '|'
-			if p.sc.startsIdent() {
-				_ = p.sc.consumeIdent()
-				return Specificity{C: 1} // Type selector dengan wildcard namespace
-			}
-		}
-		return Specificity{} // Universal selector memiliki spesifisitas (0, 0, 0)
-	}
-
-	// 6. Pseudo-classes & Pseudo-elements (:)
-	if b == ':' {
-		p.sc.idx++
-		if p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == ':' {
-			// Pseudo-element (::before, ::after, ::placeholder, ::marker, dll)
-			p.sc.idx++
-			ident := strings.ToLower(p.sc.consumeIdent())
-			if ident == "slotted" && p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == '(' {
-				inner := p.sc.consumeParentheses()
-				innerSpec := ComputeSpecificity(inner)
-				return Specificity{C: 1}.Add(innerSpec)
-			}
-			if p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == '(' {
-				_ = p.sc.consumeParentheses()
-			}
-			return Specificity{C: 1}
-		}
-
-		// Single-colon: bisa pseudo-class ATAU legacy pseudo-element
-		ident := strings.ToLower(p.sc.consumeIdent())
-
-		// Legacy CSS2 pseudo-elements yang diizinkan dengan single-colon (W3C Selectors 4 Section 16.1):
-		// :before, :after, :first-line, :first-letter -> Spesifisitas C (bukan B!)
-		switch ident {
-		case "before", "after", "first-line", "first-letter":
-			return Specificity{C: 1}
-		}
-
-		// Functional pseudo-classes dengan argumen: ident(...)
-		if p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == '(' {
-			args := p.sc.consumeParentheses()
-			switch ident {
-			case "where":
-				// :where(...) spesifisitasnya SELALU (0, 0, 0) terlepas dari isi argumennya
-				return Specificity{}
-			case "is", "not", "has":
-				// :is(), :not(), :has() mengambil spesifisitas tertinggi dari daftar selektor dalam argumennya
-				return ComputeSpecificity(args)
-			case "nth-child", "nth-last-child":
-				// :nth-child(An+B [of S]?): bernilai (0, 1, 0) + max specificity dari S jika klausa 'of' ada
-				spec := Specificity{B: 1}
-				if ofIdx := strings.Index(args, " of "); ofIdx != -1 {
-					selectorList := args[ofIdx+4:]
-					spec = spec.Add(ComputeSpecificity(selectorList))
-				}
-				return spec
-			default:
-				// Pseudo-class fungsional umum (:lang, :dir, :nth-of-type, dll) -> (0, 1, 0)
-				return Specificity{B: 1}
-			}
-		}
-
-		// Standard pseudo-class (:root, :hover, :focus, :active, :empty, :checked, dll)
-		return Specificity{B: 1}
-	}
-
-	// 7. Type Selector (div, html, body, svg|circle, dll)
 	if p.sc.startsIdent() {
-		_ = p.sc.consumeIdent()
-		// Cek namespace type (misal ns|tag)
-		if p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == '|' {
-			p.sc.idx++
-			if p.sc.startsIdent() {
-				_ = p.sc.consumeIdent()
-			}
+		return p.parseTypeSelector()
+	}
+
+	p.sc.idx++
+	return Specificity{}
+}
+
+func (p *selectorParser) parseUniversalSelector() Specificity {
+	p.sc.idx++ // lewati '*'
+	if p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == '|' {
+		p.sc.idx++ // lewati '|'
+		if p.sc.startsIdent() {
+			_ = p.sc.consumeIdent()
+			return Specificity{C: 1} // Type selector dengan wildcard namespace *|tag
 		}
+	}
+	return Specificity{}
+}
+
+func (p *selectorParser) parseColonSelector() Specificity {
+	p.sc.idx++ // lewati ':'
+	if p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == ':' {
+		return p.parseDoubleColonPseudoElement()
+	}
+
+	ident := strings.ToLower(p.sc.consumeIdent())
+
+	// Legacy CSS2 pseudo-elements yang diizinkan dengan single-colon
+	switch ident {
+	case "before", "after", "first-line", "first-letter":
 		return Specificity{C: 1}
 	}
 
-	// Karakter delimiter lain yang tak terduga, majukan 1 byte
-	p.sc.idx++
-	return Specificity{}
+	// Functional pseudo-classes: ident(...)
+	if p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == '(' {
+		args := p.sc.consumeParentheses()
+		return parseFunctionalPseudoClass(ident, args)
+	}
+
+	return Specificity{B: 1}
+}
+
+func (p *selectorParser) parseDoubleColonPseudoElement() Specificity {
+	p.sc.idx++ // lewati ':' kedua
+	ident := strings.ToLower(p.sc.consumeIdent())
+	if ident == "slotted" && p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == '(' {
+		inner := p.sc.consumeParentheses()
+		innerSpec := ComputeSpecificity(inner)
+		return Specificity{C: 1}.Add(innerSpec)
+	}
+	if p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == '(' {
+		_ = p.sc.consumeParentheses()
+	}
+	return Specificity{C: 1}
+}
+
+func parseFunctionalPseudoClass(ident, args string) Specificity {
+	switch ident {
+	case "where":
+		return Specificity{}
+	case "is", "not", "has":
+		return ComputeSpecificity(args)
+	case "nth-child", "nth-last-child":
+		spec := Specificity{B: 1}
+		if ofIdx := strings.Index(args, " of "); ofIdx != -1 {
+			selectorList := args[ofIdx+4:]
+			spec = spec.Add(ComputeSpecificity(selectorList))
+		}
+		return spec
+	default:
+		return Specificity{B: 1}
+	}
+}
+
+func (p *selectorParser) parseTypeSelector() Specificity {
+	_ = p.sc.consumeIdent()
+	if p.sc.idx < len(p.sc.src) && p.sc.src[p.sc.idx] == '|' {
+		p.sc.idx++
+		if p.sc.startsIdent() {
+			_ = p.sc.consumeIdent()
+		}
+	}
+	return Specificity{C: 1}
 }

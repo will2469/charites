@@ -21,6 +21,52 @@ var standardCSSPaths = []string{
 	"tests/fixtures/global.css",
 }
 
+func findSSOTInDir(dir string) string {
+	for _, rel := range standardCSSPaths {
+		cand := filepath.Join(dir, rel)
+		if _, err := os.Stat(cand); err == nil {
+			return cand
+		}
+	}
+	return ""
+}
+
+func resolveCSSPath(projectRoot, customPath string) (string, error) {
+	if customPath != "" {
+		resolved := customPath
+		if !filepath.IsAbs(resolved) && projectRoot != "" {
+			resolved = filepath.Join(projectRoot, resolved)
+		}
+		if _, err := os.Stat(resolved); err != nil {
+			return "", fmt.Errorf("specified theme css file not found: %s: %w", customPath, err)
+		}
+		return resolved, nil
+	}
+
+	startDir := projectRoot
+	if startDir == "" {
+		if cwd, err := os.Getwd(); err == nil {
+			startDir = cwd
+		}
+	}
+	if abs, err := filepath.Abs(startDir); err == nil {
+		startDir = abs
+	}
+
+	curr := startDir
+	for {
+		if found := findSSOTInDir(curr); found != "" {
+			return found, nil
+		}
+		parent := filepath.Dir(curr)
+		if parent == curr {
+			break
+		}
+		curr = parent
+	}
+	return "", nil
+}
+
 // DiscoverAndLoad mencari berkas CSS tema berdasarkan discovery fallback engine Charites:
 //  1. Jika customPath tidak kosong, periksa customPath.
 //  2. Jika customPath kosong, cari di daftar standardCSSPaths dengan melakukan upward walk
@@ -29,49 +75,10 @@ var standardCSSPaths = []string{
 //  4. Jika tidak ditemukan berkas CSS manapun, kembalikan Context kosong tanpa error
 //     (mematuhi invarian Zero-Config Default: YES).
 func DiscoverAndLoad(projectRoot, customPath string) (Context, error) {
-	var targetPath string
-
-	if customPath != "" {
-		resolved := customPath
-		if !filepath.IsAbs(resolved) && projectRoot != "" {
-			resolved = filepath.Join(projectRoot, resolved)
-		}
-		if _, err := os.Stat(resolved); err == nil {
-			targetPath = resolved
-		} else {
-			return nil, fmt.Errorf("specified theme css file not found: %s: %w", customPath, err)
-		}
-	} else {
-		startDir := projectRoot
-		if startDir == "" {
-			if cwd, err := os.Getwd(); err == nil {
-				startDir = cwd
-			}
-		}
-		if abs, err := filepath.Abs(startDir); err == nil {
-			startDir = abs
-		}
-
-		curr := startDir
-		for {
-			for _, rel := range standardCSSPaths {
-				cand := filepath.Join(curr, rel)
-				if _, err := os.Stat(cand); err == nil {
-					targetPath = cand
-					break
-				}
-			}
-			if targetPath != "" {
-				break
-			}
-			parent := filepath.Dir(curr)
-			if parent == curr {
-				break
-			}
-			curr = parent
-		}
+	targetPath, err := resolveCSSPath(projectRoot, customPath)
+	if err != nil {
+		return nil, err
 	}
-
 	if targetPath == "" {
 		return NewEmptyContext(), nil
 	}
@@ -91,6 +98,74 @@ func DiscoverAndLoad(projectRoot, customPath string) (Context, error) {
 	return ctx, nil
 }
 
+func registerLayerOrder(prelude string, graph *TokenGraph) {
+	for _, part := range strings.Split(prelude, ",") {
+		lName := strings.TrimSpace(part)
+		if lName != "" {
+			if _, ok := graph.LayerOrder[lName]; !ok {
+				graph.LayerOrder[lName] = len(graph.LayerOrder) + 1
+			}
+		}
+	}
+}
+
+func processAtRule(
+	node *theme.AtRule,
+	currentScope Scope,
+	graph *TokenGraph,
+	scopeProps map[string][]string,
+	sourceOrder *int,
+	walk func([]theme.Rule, Scope),
+) {
+	if strings.EqualFold(node.Name, "@layer") && node.Prelude != "" {
+		registerLayerOrder(node.Prelude, graph)
+	}
+
+	childScope := currentScope
+	childScope.AtRules = append(childScope.AtRules, AtRule{
+		Name:       node.Name,
+		Prelude:    node.Prelude,
+		Conditions: parseConditions(node.Name, node.Prelude),
+	})
+	if strings.EqualFold(node.Name, "@layer") && node.Prelude != "" {
+		childScope.Layers = append(childScope.Layers, node.Prelude)
+	}
+
+	for _, decl := range node.Declarations {
+		processDeclaration(decl, childScope, graph, scopeProps, sourceOrder)
+	}
+
+	if len(node.Rules) > 0 {
+		walk(node.Rules, childScope)
+	}
+}
+
+func processStyleRule(
+	node *theme.StyleRule,
+	currentScope Scope,
+	graph *TokenGraph,
+	scopeProps map[string][]string,
+	sourceOrder *int,
+	scopes *[]Scope,
+	walk func([]theme.Rule, Scope),
+) {
+	resolvedSelector := resolveNestedSelector(currentScope.Selector, node.Selector)
+	childScope := currentScope
+	childScope.Selector = resolvedSelector
+	childScope.Specificity = ComputeSpecificity(resolvedSelector)
+	*sourceOrder++
+	childScope.SourceOrder = *sourceOrder
+	*scopes = append(*scopes, childScope)
+
+	for _, decl := range node.Declarations {
+		processDeclaration(decl, childScope, graph, scopeProps, sourceOrder)
+	}
+
+	if len(node.Rules) > 0 {
+		walk(node.Rules, childScope)
+	}
+}
+
 // ParseCSS mem-parse buffer CSS mentah menjadi Context terstruktur yang design-agnostic.
 func ParseCSS(src []byte) (Context, error) {
 	sheet, err := theme.Parse(src)
@@ -108,59 +183,13 @@ func ParseCSS(src []byte) (Context, error) {
 		for _, r := range rules {
 			switch node := r.(type) {
 			case *theme.AtRule:
-				if strings.EqualFold(node.Name, "@layer") && node.Prelude != "" {
-					// Daftarkan layer order berurutan (misal: @layer base, theme, utilities;)
-					for _, part := range strings.Split(node.Prelude, ",") {
-						lName := strings.TrimSpace(part)
-						if lName != "" {
-							if _, ok := graph.LayerOrder[lName]; !ok {
-								graph.LayerOrder[lName] = len(graph.LayerOrder) + 1
-							}
-						}
-					}
-				}
-
-				at := AtRule{
-					Name:       node.Name,
-					Prelude:    node.Prelude,
-					Conditions: parseConditions(node.Name, node.Prelude),
-				}
-				childScope := currentScope
-				childScope.AtRules = append(childScope.AtRules, at)
-				if strings.EqualFold(node.Name, "@layer") && node.Prelude != "" {
-					childScope.Layers = append(childScope.Layers, node.Prelude)
-				}
-
-				// Deklarasi langsung di dalam AtRule (misal: @theme { --font-sans: ...; })
-				for _, decl := range node.Declarations {
-					processDeclaration(decl, childScope, graph, scopeProps, &sourceOrder)
-				}
-
-				if len(node.Rules) > 0 {
-					walkRules(node.Rules, childScope)
-				}
-
+				processAtRule(node, currentScope, graph, scopeProps, &sourceOrder, walkRules)
 			case *theme.StyleRule:
-				resolvedSelector := resolveNestedSelector(currentScope.Selector, node.Selector)
-				childScope := currentScope
-				childScope.Selector = resolvedSelector
-				childScope.Specificity = ComputeSpecificity(resolvedSelector)
-				sourceOrder++
-				childScope.SourceOrder = sourceOrder
-				scopes = append(scopes, childScope)
-
-				for _, decl := range node.Declarations {
-					processDeclaration(decl, childScope, graph, scopeProps, &sourceOrder)
-				}
-
-				if len(node.Rules) > 0 {
-					walkRules(node.Rules, childScope)
-				}
+				processStyleRule(node, currentScope, graph, scopeProps, &sourceOrder, &scopes, walkRules)
 			}
 		}
 	}
 
-	// Scope global awal
 	initialScope := Scope{
 		Selector:    "",
 		AtRules:     make([]AtRule, 0),
@@ -169,15 +198,11 @@ func ParseCSS(src []byte) (Context, error) {
 		Specificity: Specificity{},
 	}
 
-	// Deklarasi root level
 	for _, decl := range sheet.Declarations {
 		processDeclaration(decl, initialScope, graph, scopeProps, &sourceOrder)
 	}
 
-	// Aturan tingkat atas
 	walkRules(sheet.Rules, initialScope)
-
-	// Hubungkan dependensi relasional token
 	graph.BuildDependencies()
 
 	return NewContext("", graph, scopes, scopeProps), nil

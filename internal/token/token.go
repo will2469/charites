@@ -168,29 +168,39 @@ func (s Scope) MatchesConditions(target Scope) bool {
 	targetIsDark := target.IsDark()
 	for _, at := range s.AtRules {
 		for _, cond := range at.Conditions {
-			if cond.IsDark && !targetIsDark {
+			if (cond.IsDark && !targetIsDark) || (cond.IsLight && targetIsDark) {
 				return false
 			}
-			if cond.IsLight && targetIsDark {
+			if hasFeatureConflict(cond.Features, target.AtRules) {
 				return false
-			}
-			// Periksa kecocokan fitur spesifik
-			for k, v := range cond.Features {
-				if k == "prefers-color-scheme" {
-					continue
-				}
-				for _, targetAt := range target.AtRules {
-					for _, targetCond := range targetAt.Conditions {
-						if targetVal, ok := targetCond.Features[k]; ok && targetVal != v {
-							return false
-						}
-					}
-				}
 			}
 		}
 	}
 
 	return true
+}
+
+func hasFeatureConflict(features map[string]string, targetAtRules []AtRule) bool {
+	for k, v := range features {
+		if k == "prefers-color-scheme" {
+			continue
+		}
+		if hasTargetMismatch(k, v, targetAtRules) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasTargetMismatch(k, v string, targetAtRules []AtRule) bool {
+	for _, targetAt := range targetAtRules {
+		for _, targetCond := range targetAt.Conditions {
+			if targetVal, ok := targetCond.Features[k]; ok && targetVal != v {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Token merepresentasikan deklarasi token desain tunggal sebagai fakta murni.

@@ -104,80 +104,107 @@ func e_isIdentifierChar(c byte) bool {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
 }
 
-func (e *extractor) tryHandleJSX() bool {
-	startLine := e.line
-	startCol := e.col
-	savedPos := e.pos
+func isIllegalJSXHeaderChar(src []byte, pos, length int) bool {
+	c := src[pos]
+	if c == ';' || c == ')' || c == '(' || c == ',' {
+		return true
+	}
+	if (c == '&' && pos+1 < length && src[pos+1] == '&') ||
+		(c == '|' && pos+1 < length && src[pos+1] == '|') {
+		return true
+	}
+	return false
+}
 
-	e.advance() // konsumsi '<'
-	if e.pos >= e.len {
-		return false
+func (e *extractor) isArrowGeneric(tagName string) bool {
+	if len(tagName) == 1 && tagName[0] >= 'A' && tagName[0] <= 'Z' {
+		peek := e.pos + 1
+		for peek < e.len && (e.src[peek] == ' ' || e.src[peek] == '\t' || e.src[peek] == '\n' || e.src[peek] == '\r') {
+			peek++
+		}
+		if peek < e.len && e.src[peek] == '(' {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *extractor) tryHandleClosing() (handled bool, ok bool) {
+	if e.pos >= e.len || e.src[e.pos] != '/' {
+		return false, false
 	}
 
-	next := e.src[e.pos]
-
-	// 1. Fragment closing: </>
-	if next == '/' && e.pos+1 < e.len && e.src[e.pos+1] == '>' {
-		e.advance()
-		e.advance()
+	// Fragment closing: </>
+	if e.pos+1 < e.len && e.src[e.pos+1] == '>' {
+		e.advanceBytes(2)
 		e.bld.CloseFragment()
-		return true
+		return true, true
 	}
 
-	// 2. Tag penutup: </tag>
-	if next == '/' {
-		e.advance() // konsumsi '/'
-		e.skipWhitespace()
-		tagName := e.readIdentifier()
-		if tagName == "" {
-			// Cacat: </ tanpa nama tag
-			return false
-		}
-		// Cari '>' penutup
-		for e.pos < e.len && e.src[e.pos] != '>' {
-			e.advance()
-		}
-		if e.pos < e.len && e.src[e.pos] == '>' {
-			e.advance()
-		}
-		e.bld.CloseElement(tagName)
-		return true
-	}
-
-	// 3. Fragment opening: <>
-	if next == '>' {
-		e.advance()
-		e.bld.OpenFragment(ir.Span{Line: startLine, Column: startCol, EndLine: e.line, EndColumn: e.col})
-		return true
-	}
-
-	// 4. Disambiguasi pembuka: Jika '<' langsung menempel pada karakter identifier sebelumnya tanpa spasi
-	// (contoh: Map<string> atau x<y), ini adalah generics atau perbandingan, bukan tag JSX.
-	if savedPos > 0 && e_isIdentifierChar(e.src[savedPos-1]) {
-		e.rollback(savedPos, startLine, startCol)
-		return false
-	}
-
-	// Tag pembuka harus diawali huruf atau underscore
-	if !((next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') || next == '_') {
-		// Bukan tag JSX (misal: < 10 atau <= atau <<)
-		e.rollback(savedPos, startLine, startCol)
-		return false
-	}
-
+	// Tag penutup: </tag>
+	e.advance() // konsumsi '/'
+	e.skipWhitespace()
 	tagName := e.readIdentifier()
 	if tagName == "" {
-		e.rollback(savedPos, startLine, startCol)
-		return false
+		return true, false
+	}
+	for e.pos < e.len && e.src[e.pos] != '>' {
+		e.advance()
+	}
+	if e.pos < e.len && e.src[e.pos] == '>' {
+		e.advance()
+	}
+	e.bld.CloseElement(tagName)
+	return true, true
+}
+
+type jsxParsedAttrs struct {
+	attrs       map[string]string
+	rawClasses  string
+	classes     []string
+	hasDynamic  bool
+	selfClosing bool
+	isValid     bool
+	isBroken    bool
+}
+
+func (e *extractor) checkTagDelimiter(tagName string, savedPos, startLine, startCol int, res *jsxParsedAttrs) bool {
+	c := e.src[e.pos]
+	if c == '<' {
+		res.isBroken = true
+		res.isValid = true
+		return true
 	}
 
-	// Parsing atribut hingga '>' atau '/>'
-	attrs := make(map[string]string)
-	var rawClasses string
-	var classes []string
-	var hasDynamic bool
-	selfClosing := false
-	isValidJSX := false
+	if isIllegalJSXHeaderChar(e.src, e.pos, e.len) {
+		e.rollback(savedPos, startLine, startCol)
+		return true
+	}
+
+	if c == '>' {
+		if e.isArrowGeneric(tagName) {
+			e.rollback(savedPos, startLine, startCol)
+			return true
+		}
+		e.advance()
+		res.isValid = true
+		return true
+	}
+
+	if c == '/' && e.pos+1 < e.len && e.src[e.pos+1] == '>' {
+		e.advanceBytes(2)
+		res.selfClosing = true
+		res.isValid = true
+		return true
+	}
+
+	return false
+}
+
+func (e *extractor) parseJSXAttributes(tagName string, savedPos, startLine, startCol int) jsxParsedAttrs {
+	res := jsxParsedAttrs{
+		attrs: make(map[string]string),
+	}
 
 	for e.pos < e.len {
 		e.skipWhitespace()
@@ -185,49 +212,11 @@ func (e *extractor) tryHandleJSX() bool {
 			break
 		}
 
+		if e.checkTagDelimiter(tagName, savedPos, startLine, startCol, &res) {
+			return res
+		}
+
 		c := e.src[e.pos]
-
-		// Jika ada '<' sebelum tag ditutup: recovery (broken tag)
-		if c == '<' {
-			return true
-		}
-
-		// Karakter ilegal di header tag JSX yang menandakan ini bukan JSX
-		// (misal: a < b && c > d atau if (a < b) atau const x = <T,>(...) atau const fn = <T>(x: T))
-		if c == ';' || c == ')' || c == '(' || c == ',' ||
-			(c == '&' && e.pos+1 < e.len && e.src[e.pos+1] == '&') ||
-			(c == '|' && e.pos+1 < e.len && e.src[e.pos+1] == '|') {
-			e.rollback(savedPos, startLine, startCol)
-			return false
-		}
-
-		if c == '>' {
-			// Disambiguasi: jika nama tag hanya 1 huruf kapital (contoh: <T>) dan langsung diikuti '(',
-			// ini adalah generic type parameter arrow function TypeScript: <T>(x: T) => ...
-			if len(tagName) == 1 && tagName[0] >= 'A' && tagName[0] <= 'Z' {
-				peek := e.pos + 1
-				for peek < e.len && (e.src[peek] == ' ' || e.src[peek] == '\t' || e.src[peek] == '\n' || e.src[peek] == '\r') {
-					peek++
-				}
-				if peek < e.len && e.src[peek] == '(' {
-					e.rollback(savedPos, startLine, startCol)
-					return false
-				}
-			}
-			e.advance()
-			isValidJSX = true
-			break
-		}
-
-		if c == '/' && e.pos+1 < e.len && e.src[e.pos+1] == '>' {
-			e.advance()
-			e.advance()
-			selfClosing = true
-			isValidJSX = true
-			break
-		}
-
-		// Spread attribute: {...props}
 		if c == '{' {
 			e.skipBraceExpression()
 			continue
@@ -239,23 +228,69 @@ func (e *extractor) tryHandleJSX() bool {
 			continue
 		}
 
-		e.skipWhitespace()
-		attrVal := ""
-
-		if e.pos < e.len && e.src[e.pos] == '=' {
-			e.advance() // konsumsi '='
-			e.skipWhitespace()
-			attrVal = e.readAttributeValue()
-		}
-
-		attrs[attrName] = attrVal
+		attrVal := e.parseJSXAttrVal()
+		res.attrs[attrName] = attrVal
 		if attrName == "className" || attrName == "class" {
-			rawClasses = attrVal
-			classes, hasDynamic = parser.ExtractClasses(attrVal)
+			res.rawClasses = attrVal
+			res.classes, res.hasDynamic = parser.ExtractClasses(attrVal)
 		}
 	}
 
-	if !isValidJSX {
+	return res
+}
+
+func (e *extractor) parseJSXAttrVal() string {
+	e.skipWhitespace()
+	if e.pos < e.len && e.src[e.pos] == '=' {
+		e.advance() // konsumsi '='
+		e.skipWhitespace()
+		return e.readAttributeValue()
+	}
+	return ""
+}
+
+func (e *extractor) tryHandleJSX() bool {
+	startLine := e.line
+	startCol := e.col
+	savedPos := e.pos
+
+	e.advance() // konsumsi '<'
+	if e.pos >= e.len {
+		return false
+	}
+
+	if handled, ok := e.tryHandleClosing(); handled {
+		return ok
+	}
+
+	next := e.src[e.pos]
+	if next == '>' {
+		e.advance()
+		e.bld.OpenFragment(ir.Span{Line: startLine, Column: startCol, EndLine: e.line, EndColumn: e.col})
+		return true
+	}
+
+	if savedPos > 0 && e_isIdentifierChar(e.src[savedPos-1]) {
+		e.rollback(savedPos, startLine, startCol)
+		return false
+	}
+
+	if !((next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') || next == '_') {
+		e.rollback(savedPos, startLine, startCol)
+		return false
+	}
+
+	tagName := e.readIdentifier()
+	if tagName == "" {
+		e.rollback(savedPos, startLine, startCol)
+		return false
+	}
+
+	p := e.parseJSXAttributes(tagName, savedPos, startLine, startCol)
+	if !p.isValid {
+		return false
+	}
+	if p.isBroken {
 		return true
 	}
 
@@ -267,11 +302,10 @@ func (e *extractor) tryHandleJSX() bool {
 	}
 
 	isVoid := voidElements[strings.ToLower(tagName)]
-
-	if selfClosing || isVoid {
-		e.bld.AddSelfClosingElement(tagName, span, rawClasses, classes, attrs, hasDynamic)
+	if p.selfClosing || isVoid {
+		e.bld.AddSelfClosingElement(tagName, span, p.rawClasses, p.classes, p.attrs, p.hasDynamic)
 	} else {
-		e.bld.OpenElement(tagName, span, rawClasses, classes, attrs, hasDynamic)
+		e.bld.OpenElement(tagName, span, p.rawClasses, p.classes, p.attrs, p.hasDynamic)
 	}
 
 	return true
@@ -344,36 +378,44 @@ func (e *extractor) skipJSTemplateLiteral() {
 	}
 }
 
+func (e *extractor) skipBraceChar(depth *int) {
+	c := e.src[e.pos]
+	switch c {
+	case '{':
+		*depth++
+		e.advance()
+	case '}':
+		*depth--
+		e.advance()
+	case '"', '\'':
+		e.skipStringLiteral(c)
+	case '`':
+		e.skipJSTemplateLiteral()
+	default:
+		if c == '<' && e.trySkipJSXInBrace() {
+			return
+		}
+		e.advance()
+	}
+}
+
+func (e *extractor) trySkipJSXInBrace() bool {
+	if e.pos+1 < e.len {
+		next := e.src[e.pos+1]
+		if (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') || next == '_' || next == '>' || next == '/' {
+			return e.tryHandleJSX()
+		}
+	}
+	return false
+}
+
 func (e *extractor) skipBraceExpression() {
 	if e.pos < e.len && e.src[e.pos] == '{' {
 		e.advance()
 	}
 	depth := 1
 	for e.pos < e.len && depth > 0 {
-		c := e.src[e.pos]
-		switch c {
-		case '{':
-			depth++
-			e.advance()
-		case '}':
-			depth--
-			e.advance()
-		case '"', '\'':
-			e.skipStringLiteral(c)
-		case '`':
-			e.skipJSTemplateLiteral()
-		default:
-			// Jika di dalam kurung kurawal ada tag JSX pembuka:
-			if c == '<' && e.pos+1 < e.len {
-				next := e.src[e.pos+1]
-				if (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') || next == '_' || next == '>' || next == '/' {
-					if e.tryHandleJSX() {
-						continue
-					}
-				}
-			}
-			e.advance()
-		}
+		e.skipBraceChar(&depth)
 	}
 }
 
@@ -405,53 +447,46 @@ func (e *extractor) readAttributeName() string {
 	return string(e.src[start:e.pos])
 }
 
-func (e *extractor) readAttributeValue() string {
-	if e.pos >= e.len {
-		return ""
-	}
-
-	ch := e.src[e.pos]
-
-	if ch == '"' || ch == '\'' {
-		start := e.pos
-		e.advance()
-		for e.pos < e.len && e.src[e.pos] != ch {
-			if e.src[e.pos] == '\\' && e.pos+1 < e.len {
-				e.advance()
-			}
+func (e *extractor) readQuotedAttribute(quote byte) string {
+	start := e.pos
+	e.advance()
+	for e.pos < e.len && e.src[e.pos] != quote {
+		if e.src[e.pos] == '\\' && e.pos+1 < e.len {
 			e.advance()
 		}
-		if e.pos < e.len && e.src[e.pos] == ch {
+		e.advance()
+	}
+	if e.pos < e.len && e.src[e.pos] == quote {
+		e.advance()
+	}
+	return string(e.src[start:e.pos])
+}
+
+func (e *extractor) readBraceAttribute() string {
+	start := e.pos
+	e.advance()
+	depth := 1
+	for e.pos < e.len && depth > 0 {
+		c := e.src[e.pos]
+		switch c {
+		case '{':
+			depth++
+			e.advance()
+		case '}':
+			depth--
+			e.advance()
+		case '"', '\'':
+			e.skipStringLiteral(c)
+		case '`':
+			e.skipJSTemplateLiteral()
+		default:
 			e.advance()
 		}
-		return string(e.src[start:e.pos])
 	}
+	return string(e.src[start:e.pos])
+}
 
-	if ch == '{' {
-		start := e.pos
-		e.advance()
-		depth := 1
-		for e.pos < e.len && depth > 0 {
-			c := e.src[e.pos]
-			switch c {
-			case '{':
-				depth++
-				e.advance()
-			case '}':
-				depth--
-				e.advance()
-			case '"', '\'':
-				e.skipStringLiteral(c)
-			case '`':
-				e.skipJSTemplateLiteral()
-			default:
-				e.advance()
-			}
-		}
-		return string(e.src[start:e.pos])
-	}
-
-	// Atribut tanpa kutip
+func (e *extractor) readUnquotedAttribute() string {
 	start := e.pos
 	for e.pos < e.len {
 		c := e.src[e.pos]
@@ -461,6 +496,28 @@ func (e *extractor) readAttributeValue() string {
 		e.advance()
 	}
 	return string(e.src[start:e.pos])
+}
+
+func (e *extractor) readAttributeValue() string {
+	if e.pos >= e.len {
+		return ""
+	}
+
+	ch := e.src[e.pos]
+	switch ch {
+	case '"', '\'':
+		return e.readQuotedAttribute(ch)
+	case '{':
+		return e.readBraceAttribute()
+	default:
+		return e.readUnquotedAttribute()
+	}
+}
+
+func (e *extractor) advanceBytes(n int) {
+	for i := 0; i < n && e.pos < e.len; i++ {
+		e.advance()
+	}
 }
 
 func (e *extractor) skipWhitespace() {
