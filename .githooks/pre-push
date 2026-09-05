@@ -22,7 +22,11 @@ if [ -f "go.mod" ]; then
     echo " [Charites] Verifying go.mod & go.sum cleanliness..."
     go mod tidy
     if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        if ! git diff --quiet go.mod go.sum 2>/dev/null; then
+        diff_targets="go.mod"
+        if [ -f "go.sum" ]; then
+            diff_targets="go.mod go.sum"
+        fi
+        if ! git diff --quiet $diff_targets 2>/dev/null; then
             echo " [Charites] go.mod or go.sum was modified by 'go mod tidy'."
             echo " Please stage and commit the updated go.mod and go.sum."
             exit 1

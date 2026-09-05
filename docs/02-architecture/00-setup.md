@@ -136,3 +136,8 @@ clean:
 > **Dependency Ordering Rationale (`all: build test lint`):**
 > Target `all` dan `test` mewajibkan `build` mendahului `test`. Pada *fresh checkout*, langkah ini menjamin artefak binary `bin/charites` telah tersedia sebelum pengujian subprocess end-to-end (`tests/e2e/smoke_test.go`) dieksekusi, mencegah kegagalan *missing binary* saat pipeline CI atau developer baru menjalankan `make all`.
 
+> [!NOTE]
+> **Makefile Host Environment Scope:**
+> Automasi Makefile mengasumsikan lingkungan shell POSIX/Unix (`mkdir -p`, `rm -rf`, `/dev/null` di Linux, macOS, WSL, atau CI runner). Kontrak `SPEC-00-BUILD-002` mengatur portabilitas dan kompilasi silang binary keluaran Charites ke seluruh 4 target sistem operasi, bukan portabilitas skrip Makefile itu sendiri pada native Windows CMD/PowerShell.
+
+

@@ -1,0 +1,19 @@
+# ==============================================================================
+# Charites Static Analysis Configuration Example (charites.yaml)
+# Principle: Default: YES (all rules active by default)
+# Use this file strictly to configure overrides.
+# ==============================================================================
+
+# General settings
+format: inline # inline | json
+scan_path: .
+
+# Custom ignore patterns (in addition to .charitesignore)
+ignore:
+  - "legacy/**"
+  - "test-fixtures/**"
+
+# Rule severity overrides: off | warn | error | info
+rules:
+  theme.hardcode-opacity-color: error
+  theme.hardcode-color: warn

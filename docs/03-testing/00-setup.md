@@ -115,6 +115,7 @@ func TestBinarySmoke(t *testing.T) {
 
     for _, tc := range tests {
         t.Run(tc.name, func(t *testing.T) {
+            // #nosec G204 -- smoke test executes test-controlled CLI binary with constant test arguments
             cmd := exec.Command(binPath, tc.args...)
             var stdout, stderr bytes.Buffer
             cmd.Stdout = &stdout
