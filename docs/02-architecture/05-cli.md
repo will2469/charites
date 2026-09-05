@@ -22,6 +22,8 @@ flowchart TD
 
     subgraph Dispatcher ["Subcommand & Flag Normalizer"]
         Root -->|Empty Args / scan / check / run / direct path/flag| ScanCmd["cli/scan.go\n(RunScan Handler)"]
+        Root -->|update / upgrade| UpdateCmd["cli/update.go\n(RunUpdate Handler)"]
+        Root -->|uninstall| UninstallCmd["cli/uninstall.go\n(RunUninstall Handler)"]
         Root -->|version / -v / --version| VersionCmd["cli/version.go\n(RunVersion Handler)"]
         Root -->|help / -h / --help| HelpCmd["cli/help.go\n(RunHelp Handler)"]
         Root -->|Unknown Command| ErrorHandler["Stderr Error -> Exit 2"]
@@ -34,7 +36,8 @@ flowchart TD
 
     subgraph Presenter ["Presentation Layer (internal/reporter)"]
         Orchestrate --> Result["ScanResult Envelope\n(Version, Summary, Diagnostics)"]
-        Result --> ColorResolver["ColorMode Resolver\n(--no-color, NO_COLOR, isTTY)"]
+        ColorResolver["ColorMode Resolver\n(--no-color, NO_COLOR, isTTY)"]
+        Result --> ColorResolver
         ColorResolver --> FormatSwitch{"Format Selector\n(-f / --format)"}
         FormatSwitch -- "inline" --> Inline["reporter/inline.go\n(POSIX Path & ANSI Formatter)"]
         FormatSwitch -- "json" --> JSON["reporter/json.go\n(JSON Document Encoder)"]
@@ -55,8 +58,10 @@ Setiap kebutuhan pada `SPEC-05-CLI` dipetakan ke komponen implementasi dengan ba
 
 | Komponen Arsitektur | Berkas Sumber | Tanggung Jawab Kepemilikan (*Ownership*) | Masukan (*Input*) | Keluaran / Dampak |
 | :--- | :--- | :--- | :--- | :--- |
-| **Command Dispatcher** | `internal/cli/root.go` | Parsing argv tingkat atas, routing pemanggilan 0 argumen ke `scan .`, routing direct path/flag ke `scan`, alias `check`/`run`, penolakan unknown commands (exit 2). | `args []string`, `stdout`, `stderr` | Exit code `int` |
+| **Command Dispatcher** | `internal/cli/root.go` | Parsing argv tingkat atas, routing pemanggilan 0 argumen ke `scan .`, routing direct path/flag ke `scan`, alias `check`/`run`, alias `update`/`upgrade`, `uninstall`, penolakan unknown commands (exit 2). | `args []string`, `stdout`, `stderr` | Exit code `int` |
 | **Scan Controller** | `internal/cli/scan.go` | Definisi `flag.FlagSet`, parsing flag ergonomi, validasi/normalisasi `--ext`, validasi irisan `--category` $\times$ `--rule`, validasi `--format`, orkestrasi pipeline pemindaian. | `args []string`, `stdout`, `stderr` | Exit code `int` |
+| **Update Controller** | `internal/cli/update.go` | Pengecekan GitHub API rilis terbaru, flag `--check`, fallback `No update found.` (exit 0), penggantian atomik biner via `os.Rename`. Alias: `upgrade`. | `args []string`, `stdout`, `stderr` | Exit code `int` |
+| **Uninstall Controller** | `internal/cli/uninstall.go` | Penghapusan biner eksekutabel tunggal via `os.Remove`, audit 0 residu host sistem (*Zero Residual Footprint*). | `args []string`, `stdout`, `stderr` | Exit code `int` |
 | **Config Resolver** | `internal/config/config.go` | Pemuatan `charites.yaml` / custom path, penegakan Default: YES, resolusi 3-tier precedence (Policy `off` mengalahkan CLI), penggabungan pola `--ignore`. | Path config, CLI flags | `*config.Config`, `[]config.ActiveRule` |
 | **Scanner & Pool** | `internal/scanner/` | Traversal direktori `Walker`, proteksi symlink & limit 10 MB, proteksi target langsung, eksekusi paralel worker pool terisolasi. | Target path, extensions, matcher | `[]ir.Diagnostic`, `error` |
 | **AST Engine** | `internal/analyzer/` | Parsing AST, traversal node AST via iterator Go 1.26, evaluasi rule murni, penekanan inline ignore `ctx.IsIgnored()`. | Files, active rules, context | `[]ir.Diagnostic` |
@@ -88,6 +93,10 @@ func Execute(args []string) int {
     switch args[0] {
     case "scan", "check", "run":
         return RunScan(args[1:])
+    case "update", "upgrade":
+        return RunUpdate(args[1:])
+    case "uninstall":
+        return RunUninstall(args[1:])
     case "version", "-v", "--version":
         return RunVersion()
     case "help", "-h", "--help":

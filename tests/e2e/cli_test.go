@@ -380,3 +380,32 @@ func TestScenario14_ZeroHostFootprintAudit(t *testing.T) {
 		t.Errorf("illegal residual files in temp: %v", matches)
 	}
 }
+
+// Skenario 15: Update & Upgrade Equivalence dan Uninstall Help
+func TestScenario15_UpdateUpgradeEquivalenceAndUninstallHelp(t *testing.T) {
+	// 1. Update and Upgrade equivalence
+	stdoutUpdate, stderrUpdate, codeUpdate := runBinary(t, []string{"update"})
+	stdoutUpgrade, stderrUpgrade, codeUpgrade := runBinary(t, []string{"upgrade"})
+
+	if codeUpdate != 0 {
+		t.Fatalf("expected update to exit 0, got %d, stderr: %s", codeUpdate, stderrUpdate)
+	}
+	if codeUpgrade != 0 {
+		t.Fatalf("expected upgrade to exit 0, got %d, stderr: %s", codeUpgrade, stderrUpgrade)
+	}
+	if stdoutUpdate != stdoutUpgrade {
+		t.Errorf("update output (%q) differs from upgrade output (%q)", stdoutUpdate, stdoutUpgrade)
+	}
+	if !strings.Contains(stdoutUpdate, "No update found. Charites is up to date.") {
+		t.Errorf("expected clean up-to-date message, got: %q", stdoutUpdate)
+	}
+
+	// 2. Uninstall help
+	stdoutUninst, _, codeUninst := runBinary(t, []string{"uninstall", "-h"})
+	if codeUninst != 0 {
+		t.Fatalf("expected uninstall -h to exit 0, got %d", codeUninst)
+	}
+	if !strings.Contains(stdoutUninst, "Usage: charites") {
+		t.Errorf("expected usage string for uninstall -h, got: %q", stdoutUninst)
+	}
+}

@@ -22,6 +22,9 @@ Available Commands:
   scan        Pindai berkas frontend untuk audit kualitas dan token semantik (Default)
   check       Alias identik untuk 'scan'
   run         Alias identik untuk 'scan'
+  update      Periksa dan perbarui biner Charites ke versi terbaru (Alias: 'upgrade')
+  upgrade     Alias identik untuk 'update'
+  uninstall   Copot pemasangan Charites dari sistem secara tuntas tanpa residu
   version     Cetak versi kompilasi binary, commit git, dan Go runtime
   help        Bantuan penggunaan perintah
 ```
@@ -31,7 +34,9 @@ Available Commands:
 2. **Argumen Path / Flag Langsung Tanpa Subcommand:**
    - Pemanggilan dengan path langsung (misal: `charites .` atau `charites src/Button.tsx`) **MUST** diarahkan ke subcommand `scan` dengan path tersebut sebagai target.
    - Pemanggilan dengan flag langsung (misal: `charites --format=json` atau `charites --ext=astro src/`) **MUST** diarahkan ke subcommand `scan` dengan meneruskan seluruh flag dan target path default `.` jika path tidak ditentukan.
-3. **Subcommand Aliases:** Subcommand `check` dan `run` memiliki perilaku, flag, output, dan kode keluar yang identik 100% dengan `scan`.
+3. **Subcommand Aliases:**
+   - Subcommand `check` dan `run` memiliki perilaku, flag, output, dan kode keluar yang identik 100% dengan `scan`.
+   - Subcommand `upgrade` memiliki perilaku, flag, output, dan kode keluar yang identik 100% dengan `update`.
 4. **Subcommand Bantuan & Versi:**
    - `charites version`, `charites -v`, `charites --version` mencetak string versi ke `stdout` dan mengembalikan exit code `0`.
    - `charites help`, `charites -h`, `charites --help` mencetak petunjuk penggunaan ke `stdout` dan mengembalikan exit code `0`.
@@ -52,8 +57,23 @@ Available Commands:
 1. **Zero Host Pollution Invariant:** Biner CLI `charites` beroperasi secara murni *in-memory* dan *in-workspace*. CLI dilarang keras membuat berkas state, cache, atau konfigurasi global di luar target direktori yang sedang dipindai (dilarang membuat `~/.config/charites`, `~/.cache/charites`, `%APPDATA%\charites`, dsb.).
 2. **Ephemeral Run-to-Completion:** Setiap pemanggilan CLI (subcommand `scan`, `version`, `help`) bersifat *run-to-completion*. Saat proses mengembalikan kode keluar, seluruh alokasi memori dilepaskan oleh OS dan tidak ada proses latar belakang, daemon, socket, atau berkas sementara di `/tmp` yang ditinggalkan.
 3. **Pembaruan & Pencopotan Bersih (Clean Update & Uninstall Contract):**
-   - **Update:** Pengguna memperbarui Charites cukup dengan mengganti berkas biner secara atomik tanpa perlu membersihkan cache atau menjalankan perintah migrasi database.
-   - **Uninstall:** Menghapus satu-satunya berkas biner `charites` menjamin sistem pengguna kembali 100% bersih tanpa ada *leftover* di direktori mana pun pada sistem operasi (*Zero Leftover Guarantee*).
+   - **Subcommand `update` (Alias: `upgrade`):**
+     - Memeriksa ketersediaan versi rilis terbaru di repository GitHub resmi.
+     - Jika biner sudah merupakan versi terbaru atau tidak ditemukan versi baru:
+       Mencetak: `No update found. Charites is up to date.` ke `stdout` dan keluar dengan exit code `0`.
+     - Jika ditemukan versi baru:
+       Mengunduh biner artefak yang sesuai dengan OS/Arsitektur saat ini, menimpa biner lama secara atomik (`os.Rename`), dan mencetak: `Charites updated to <version> successfully.` dengan exit code `0`.
+     - Flag opsional `--check` / `-c`: Hanya memeriksa versi tanpa mengunduh.
+   - **Subcommand `uninstall`:**
+     - Menghapus satu-satunya berkas biner `charites` dari sistem operasi host (`os.Remove(selfPath)`).
+     - Menjamin sistem pengguna kembali 100% bersih tanpa ada *leftover* berkas atau cache (*Zero Leftover Guarantee*).
+     - Mencetak:
+       ```text
+       Charites uninstalled successfully.
+       0 residual files or caches remaining.
+       ```
+     - Keluar dengan exit code `0` (atau exit code `2` jika terdapat kegagalan permission OS).
+     - Flag opsional `--yes` / `-y`: Melewati konfirmasi prompt interaktif.
 
 ---
 

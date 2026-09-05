@@ -15,6 +15,10 @@ func UsageString() string {
 Available Commands:
   scan        Pindai berkas frontend untuk audit kualitas dan token semantik (Default)
               Aliases: check, run
+  update      Periksa dan perbarui biner Charites ke versi terbaru
+              Aliases: upgrade
+  upgrade     Alias identik untuk 'update'
+  uninstall   Copot pemasangan Charites dari sistem secara tuntas tanpa residu
   version     Cetak versi kompilasi binary, commit git, dan Go runtime
   help        Bantuan penggunaan perintah
 
@@ -48,6 +52,10 @@ func ExecuteArgs(args []string, stdout, stderr io.Writer) int {
 	switch first {
 	case "scan", "check", "run":
 		return RunScan(args[1:], stdout, stderr)
+	case "update", "upgrade":
+		return RunUpdate(args[1:], stdout, stderr)
+	case "uninstall":
+		return RunUninstall(args[1:], stdout, stderr)
 	case "version", "-v", "--version":
 		_, _ = fmt.Fprint(stdout, VersionString())
 		return ExitClean
