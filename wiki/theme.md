@@ -91,7 +91,7 @@ The `theme` subsystem is verified across multiple rigorous testing layers:
 flowchart TD
     subgraph ThemeVerification ["Theme Subsystem Verification Architecture"]
         subgraph SubsystemTests ["1. Subsystem & Unit Tests"]
-            T1["CSS Lexer & Parser (internal/token/theme/parser_test.go)"]
+            T1["CSS Lexer & Parser (internal/parser/css/parser_test.go)"]
             T2["Token Graph Cycles & Budget (internal/token/graph_test.go)"]
             T3["Specificity & Upward Discovery (internal/token/extractor_test.go)"]
         end

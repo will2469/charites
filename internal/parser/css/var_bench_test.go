@@ -1,9 +1,9 @@
-package theme_test
+package css_test
 
 import (
 	"testing"
 
-	"github.com/will2469/charites/internal/token/theme"
+	"github.com/will2469/charites/internal/parser/css"
 )
 
 func BenchmarkVar_ExtractTopLevelVarCalls(b *testing.B) {
@@ -12,7 +12,7 @@ func BenchmarkVar_ExtractTopLevelVarCalls(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		calls := theme.ExtractTopLevelVarCalls(input)
+		calls := css.ExtractTopLevelVarCalls(input)
 		if len(calls) != 3 {
 			b.Fatalf("expected 3 calls, got %d", len(calls))
 		}
@@ -25,7 +25,7 @@ func BenchmarkVar_ExtractAllVarNames(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		names := theme.ExtractAllVarNames(input)
+		names := css.ExtractAllVarNames(input)
 		if len(names) != 4 {
 			b.Fatalf("expected 4 names, got %d", len(names))
 		}
@@ -38,11 +38,11 @@ func BenchmarkLexer_IdentifierEscape(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		lexer := theme.NewLexer(src)
+		lexer := css.NewLexer(src)
 		count := 0
 		for {
 			tok := lexer.NextToken()
-			if tok.Type == theme.TokenEOF {
+			if tok.Type == css.TokenEOF {
 				break
 			}
 			count++

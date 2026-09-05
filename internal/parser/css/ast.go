@@ -1,4 +1,4 @@
-package theme
+package css
 
 // Rule adalah interface penanda seluruh node aturan tingkat tinggi dalam stylesheet CSS.
 type Rule interface {

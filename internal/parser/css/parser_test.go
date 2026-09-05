@@ -1,27 +1,27 @@
-package theme_test
+package css_test
 
 import (
 	"testing"
 
-	"github.com/will2469/charites/internal/token/theme"
+	"github.com/will2469/charites/internal/parser/css"
 )
 
 func TestCSS_ParserRobustness(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     string
-		checkFunc func(t *testing.T, sheet *theme.StyleSheet)
+		checkFunc func(t *testing.T, sheet *css.StyleSheet)
 	}{
 		{
 			name: "Semicolon inside quotes",
 			input: `.foo {
   --value: "hello;world";
 }`,
-			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
+			checkFunc: func(t *testing.T, sheet *css.StyleSheet) {
 				if len(sheet.Rules) != 1 {
 					t.Fatalf("expected 1 rule, got %d", len(sheet.Rules))
 				}
-				style, ok := sheet.Rules[0].(*theme.StyleRule)
+				style, ok := sheet.Rules[0].(*css.StyleRule)
 				if !ok {
 					t.Fatalf("expected StyleRule")
 				}
@@ -42,8 +42,8 @@ func TestCSS_ParserRobustness(t *testing.T) {
 			input: `.foo {
   --image: url("data:image/svg+xml;utf8,<svg>hello</svg>");
 }`,
-			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
-				style := sheet.Rules[0].(*theme.StyleRule)
+			checkFunc: func(t *testing.T, sheet *css.StyleSheet) {
+				style := sheet.Rules[0].(*css.StyleRule)
 				if len(style.Declarations) != 1 {
 					t.Fatalf("expected 1 declaration, got %d", len(style.Declarations))
 				}
@@ -64,8 +64,8 @@ func TestCSS_ParserRobustness(t *testing.T) {
     --surface: blue;
   }
 }`,
-			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
-				style := sheet.Rules[0].(*theme.StyleRule)
+			checkFunc: func(t *testing.T, sheet *css.StyleSheet) {
+				style := sheet.Rules[0].(*css.StyleRule)
 				if style.Selector != ".card" {
 					t.Errorf("expected selector '.card', got %q", style.Selector)
 				}
@@ -75,7 +75,7 @@ func TestCSS_ParserRobustness(t *testing.T) {
 				if len(style.Rules) != 1 {
 					t.Fatalf("expected 1 nested rule, got %d", len(style.Rules))
 				}
-				nested := style.Rules[0].(*theme.StyleRule)
+				nested := style.Rules[0].(*css.StyleRule)
 				if nested.Selector != "&:hover" {
 					t.Errorf("expected nested selector '&:hover', got %q", nested.Selector)
 				}
@@ -93,25 +93,25 @@ func TestCSS_ParserRobustness(t *testing.T) {
     }
   }
 }`,
-			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
+			checkFunc: func(t *testing.T, sheet *css.StyleSheet) {
 				if len(sheet.Rules) != 1 {
 					t.Fatalf("expected 1 top-level rule, got %d", len(sheet.Rules))
 				}
-				layer := sheet.Rules[0].(*theme.AtRule)
+				layer := sheet.Rules[0].(*css.AtRule)
 				if layer.Name != "@layer" || layer.Prelude != "theme" {
 					t.Errorf("expected @layer theme, got %s %s", layer.Name, layer.Prelude)
 				}
 				if len(layer.Rules) != 1 {
 					t.Fatalf("expected 1 nested rule in layer, got %d", len(layer.Rules))
 				}
-				media := layer.Rules[0].(*theme.AtRule)
+				media := layer.Rules[0].(*css.AtRule)
 				if media.Name != "@media" || media.Prelude != "(prefers-color-scheme: dark)" {
 					t.Errorf("expected @media query, got %s %s", media.Name, media.Prelude)
 				}
 				if len(media.Rules) != 1 {
 					t.Fatalf("expected 1 nested rule in media, got %d", len(media.Rules))
 				}
-				root := media.Rules[0].(*theme.StyleRule)
+				root := media.Rules[0].(*css.StyleRule)
 				if root.Selector != ":root" {
 					t.Errorf("expected :root, got %q", root.Selector)
 				}
@@ -127,8 +127,8 @@ func TestCSS_ParserRobustness(t *testing.T) {
   --thing-that-is-definitely-not-primary: red;
   --super-special-design-token: var(--banana);
 }`,
-			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
-				root := sheet.Rules[0].(*theme.StyleRule)
+			checkFunc: func(t *testing.T, sheet *css.StyleSheet) {
+				root := sheet.Rules[0].(*css.StyleRule)
 				if len(root.Declarations) != 3 {
 					t.Fatalf("expected 3 declarations, got %d", len(root.Declarations))
 				}
@@ -150,8 +150,8 @@ func TestCSS_ParserRobustness(t *testing.T) {
   --bracket-val: [col-1; col-2];
   --clean: #ffffff;
 }`,
-			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
-				root := sheet.Rules[0].(*theme.StyleRule)
+			checkFunc: func(t *testing.T, sheet *css.StyleSheet) {
+				root := sheet.Rules[0].(*css.StyleRule)
 				if len(root.Declarations) != 3 {
 					t.Fatalf("expected 3 declarations, got %d", len(root.Declarations))
 				}
@@ -174,15 +174,15 @@ func TestCSS_ParserRobustness(t *testing.T) {
 :is(.btn, .link):focus {
   outline: 2px;
 }`,
-			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
+			checkFunc: func(t *testing.T, sheet *css.StyleSheet) {
 				if len(sheet.Rules) != 2 {
 					t.Fatalf("expected 2 rules, got %d", len(sheet.Rules))
 				}
-				rule1, ok1 := sheet.Rules[0].(*theme.StyleRule)
+				rule1, ok1 := sheet.Rules[0].(*css.StyleRule)
 				if !ok1 || rule1.Selector != "a:hover" {
 					t.Errorf("expected style rule with selector 'a:hover', got %+v", sheet.Rules[0])
 				}
-				rule2, ok2 := sheet.Rules[1].(*theme.StyleRule)
+				rule2, ok2 := sheet.Rules[1].(*css.StyleRule)
 				if !ok2 || rule2.Selector != ":is(.btn, .link):focus" {
 					t.Errorf("expected style rule with selector ':is(.btn, .link):focus', got %+v", sheet.Rules[1])
 				}
@@ -194,8 +194,8 @@ func TestCSS_ParserRobustness(t *testing.T) {
   --pad: 10px;
   --margin: 20px
 }`,
-			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
-				rule := sheet.Rules[0].(*theme.StyleRule)
+			checkFunc: func(t *testing.T, sheet *css.StyleSheet) {
+				rule := sheet.Rules[0].(*css.StyleRule)
 				if len(rule.Declarations) != 2 {
 					t.Fatalf("expected 2 declarations, got %d", len(rule.Declarations))
 				}
@@ -209,8 +209,8 @@ func TestCSS_ParserRobustness(t *testing.T) {
 			input: `.box {
   ;; --a: 1; ; ; --b: 2;;
 }`,
-			checkFunc: func(t *testing.T, sheet *theme.StyleSheet) {
-				rule := sheet.Rules[0].(*theme.StyleRule)
+			checkFunc: func(t *testing.T, sheet *css.StyleSheet) {
+				rule := sheet.Rules[0].(*css.StyleRule)
 				if len(rule.Declarations) != 2 {
 					t.Fatalf("expected 2 declarations, got %d", len(rule.Declarations))
 				}
@@ -223,7 +223,7 @@ func TestCSS_ParserRobustness(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sheet, err := theme.Parse([]byte(tt.input))
+			sheet, err := css.Parse([]byte(tt.input))
 			if err != nil {
 				t.Fatalf("unexpected parse error: %v", err)
 			}

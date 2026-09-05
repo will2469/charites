@@ -3,7 +3,7 @@ package token
 import (
 	"strings"
 
-	"github.com/will2469/charites/internal/token/theme"
+	"github.com/will2469/charites/internal/parser/css"
 )
 
 // ID adalah identifier numerik unik untuk setiap node deklarasi token.
@@ -81,7 +81,7 @@ type AtRule struct {
 
 // Specificity merepresentasikan bobot spesifisitas selektor CSS (A, B, C)
 // sesuai spesifikasi W3C CSS Selectors Level 4.
-type Specificity = theme.Specificity
+type Specificity = css.Specificity
 
 // CascadeRank merepresentasikan tuple pembobotan deklarasi CSS sesuai spesifikasi
 // W3C CSS Cascading and Inheritance Level 5 (Cascade Sort).
@@ -208,15 +208,15 @@ func hasTargetMismatch(k, v string, targetAtRules []AtRule) bool {
 // (misal: :root { --brand: red; } vs .card { --brand: blue; }).
 type Token struct {
 	ID         TokenID
-	Name       string           // Nama custom property, e.g. "--banana", "--color-primary"
-	RawValue   string           // Nilai verbatim CSS, e.g. "#123456", "var(--banana)"
-	Scope      Scope            // Konteks scope deklarasi
-	Span       theme.SourceSpan // Posisi baris & kolom pada berkas sumber
-	References []string         // Nama-nama token lain yang direferensikan melalui var(--...)
+	Name       string         // Nama custom property, e.g. "--banana", "--color-primary"
+	RawValue   string         // Nilai verbatim CSS, e.g. "#123456", "var(--banana)"
+	Scope      Scope          // Konteks scope deklarasi
+	Span       css.SourceSpan // Posisi baris & kolom pada berkas sumber
+	References []string       // Nama-nama token lain yang direferensikan melalui var(--...)
 }
 
 // ComputeSpecificity mem-parse dan menghitung bobot spesifisitas CSS dari string selektor
 // sesuai spesifikasi W3C CSS Selectors Level 4.
 func ComputeSpecificity(selector string) Specificity {
-	return theme.ComputeSpecificity(selector)
+	return css.ComputeSpecificity(selector)
 }

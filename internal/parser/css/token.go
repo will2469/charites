@@ -1,4 +1,4 @@
-package theme
+package css
 
 // TokenType mendefinisikan jenis token CSS hasil pemindaian lexer.
 type TokenType uint8

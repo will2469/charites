@@ -1,23 +1,23 @@
-package theme_test
+package css_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/will2469/charites/internal/token/theme"
+	"github.com/will2469/charites/internal/parser/css"
 )
 
 func TestVar_BalancedParsing(t *testing.T) {
 	tests := []struct {
 		name          string
 		input         string
-		expectedCalls []theme.VarCall
+		expectedCalls []css.VarCall
 		expectedNames []string
 	}{
 		{
 			name:  "User case: var with rgb fallback containing parentheses",
 			input: "var(--foo, rgb(1, 2, 3))",
-			expectedCalls: []theme.VarCall{
+			expectedCalls: []css.VarCall{
 				{
 					Raw:         "var(--foo, rgb(1, 2, 3))",
 					StartOffset: 0,
@@ -32,7 +32,7 @@ func TestVar_BalancedParsing(t *testing.T) {
 		{
 			name:  "Nested var calls in fallback",
 			input: "var(--primary, var(--fallback-color, #123456))",
-			expectedCalls: []theme.VarCall{
+			expectedCalls: []css.VarCall{
 				{
 					Raw:         "var(--primary, var(--fallback-color, #123456))",
 					StartOffset: 0,
@@ -47,7 +47,7 @@ func TestVar_BalancedParsing(t *testing.T) {
 		{
 			name:  "Fallback with quotes and commas",
 			input: `var(--font, "Helvetica, Arial", sans-serif)`,
-			expectedCalls: []theme.VarCall{
+			expectedCalls: []css.VarCall{
 				{
 					Raw:         `var(--font, "Helvetica, Arial", sans-serif)`,
 					StartOffset: 0,
@@ -62,7 +62,7 @@ func TestVar_BalancedParsing(t *testing.T) {
 		{
 			name:  "Multiple vars in calc expression",
 			input: "calc(var(--base-size, 16px) * var(--scale, 1.25))",
-			expectedCalls: []theme.VarCall{
+			expectedCalls: []css.VarCall{
 				{
 					Raw:         "var(--base-size, 16px)",
 					StartOffset: 5,
@@ -85,7 +85,7 @@ func TestVar_BalancedParsing(t *testing.T) {
 		{
 			name:  "Escaped colon in var name",
 			input: `var(--tw-bg-opacity\:1, 0.8)`,
-			expectedCalls: []theme.VarCall{
+			expectedCalls: []css.VarCall{
 				{
 					Raw:         `var(--tw-bg-opacity\:1, 0.8)`,
 					StartOffset: 0,
@@ -101,7 +101,7 @@ func TestVar_BalancedParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			calls := theme.ExtractTopLevelVarCalls(tt.input)
+			calls := css.ExtractTopLevelVarCalls(tt.input)
 			if len(calls) != len(tt.expectedCalls) {
 				t.Fatalf("expected %d calls, got %d", len(tt.expectedCalls), len(calls))
 			}
@@ -124,7 +124,7 @@ func TestVar_BalancedParsing(t *testing.T) {
 				}
 			}
 
-			names := theme.ExtractAllVarNames(tt.input)
+			names := css.ExtractAllVarNames(tt.input)
 			if !reflect.DeepEqual(names, tt.expectedNames) {
 				t.Errorf("expected var names %v, got %v", tt.expectedNames, names)
 			}

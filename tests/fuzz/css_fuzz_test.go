@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/will2469/charites/internal/parser/css"
 	"github.com/will2469/charites/internal/token"
-	"github.com/will2469/charites/internal/token/theme"
 )
 
 // FuzzCSSParser menguji kekebalan parser leksikal CSS terhadap input malformed, byte acak,
@@ -52,7 +52,7 @@ func FuzzCSSParser(f *testing.F) {
 		}()
 
 		// 1. Uji Generic CSS Parser (Layer 1)
-		sheet, _ := theme.Parse(data)
+		sheet, _ := css.Parse(data)
 		if sheet != nil {
 			// Pastikan aturan dapat diiterasi tanpa panic
 			for _, r := range sheet.Rules {

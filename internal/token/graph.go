@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/will2469/charites/internal/token/theme"
+	"github.com/will2469/charites/internal/parser/css"
 )
 
 var (
@@ -56,7 +56,7 @@ func NewTokenGraph() *Graph {
 }
 
 // AddToken mendaftarkan node token baru ke dalam graph dan mengembalikan ID uniknya.
-func (g *Graph) AddToken(name, rawValue string, scope Scope, span theme.SourceSpan, refs []string) ID {
+func (g *Graph) AddToken(name, rawValue string, scope Scope, span css.SourceSpan, refs []string) ID {
 	id := ID(len(g.Nodes)) // #nosec G115 -- length of slice in single CSS file is bounded
 	tok := Token{
 		ID:         id,
@@ -227,7 +227,7 @@ func (g *Graph) resolveString(
 		return input, true, nil
 	}
 
-	calls := theme.ExtractTopLevelVarCalls(input)
+	calls := css.ExtractTopLevelVarCalls(input)
 	if len(calls) == 0 {
 		return input, true, nil
 	}
@@ -250,7 +250,7 @@ func (g *Graph) resolveString(
 }
 
 func (g *Graph) resolveVarReplacement(
-	call theme.VarCall,
+	call css.VarCall,
 	originID TokenID,
 	activePath map[TokenID]bool,
 	budgetCounter *int,

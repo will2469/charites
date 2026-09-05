@@ -78,7 +78,7 @@ Charites enforces correctness, resilience, and zero false positives across four 
 flowchart TD
     subgraph Suite ["The 4-Layer Verification Harness"]
         subgraph L1 ["Layer 1: Unit & Subsystem Tests"]
-            U1["CSS Lexer & Parser Tests (internal/token/theme)"]
+            U1["CSS Lexer & Parser Tests (internal/parser/css)"]
             U2["Token Graph Cycles & DoS Budget (internal/token)"]
             U3["Extractor & Scope Specificity (internal/token)"]
             U4["IR Parser & AST Visitors (internal/parser)"]

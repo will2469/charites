@@ -1,4 +1,4 @@
-package tailwind
+package css
 
 import (
 	"bytes"
@@ -20,9 +20,9 @@ func NewThemeTokenRegistry() *ThemeTokenRegistry {
 
 // ParseTheme memindai konten CSS dan mengekstrak seluruh deklarasi variabel di dalam blok @theme { ... }.
 // Mengabaikan komentar CSS /* ... */ dan whitespace.
-func ParseTheme(css []byte) (*ThemeTokenRegistry, error) {
+func ParseTheme(src []byte) (*ThemeTokenRegistry, error) {
 	registry := NewThemeTokenRegistry()
-	cleaned := stripCSSComments(css)
+	cleaned := stripCSSComments(src)
 
 	// Cari setiap kemunculan blok @theme { ... }
 	idx := 0

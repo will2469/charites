@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/will2469/charites/internal/parser/astro"
-	"github.com/will2469/charites/internal/parser/tailwind"
+	"github.com/will2469/charites/internal/parser/css"
 	"github.com/will2469/charites/internal/parser/tsx"
 )
 
@@ -37,7 +37,7 @@ func TestRegression_Corpus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read css regression fixture: %v", err)
 	}
-	reg, err := tailwind.ParseTheme(cssSrc)
+	reg, err := css.ParseTheme(cssSrc)
 	if err != nil {
 		t.Fatalf("unexpected error parsing unclosed_theme.css: %v", err)
 	}

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/will2469/charites/internal/token/theme"
+	"github.com/will2469/charites/internal/parser/css"
 )
 
 // Standard CSS search paths relative to project root for automatic discovery.
@@ -110,12 +110,12 @@ func registerLayerOrder(prelude string, graph *TokenGraph) {
 }
 
 func processAtRule(
-	node *theme.AtRule,
+	node *css.AtRule,
 	currentScope Scope,
 	graph *TokenGraph,
 	scopeProps map[string][]string,
 	sourceOrder *int,
-	walk func([]theme.Rule, Scope),
+	walk func([]css.Rule, Scope),
 ) {
 	if strings.EqualFold(node.Name, "@layer") && node.Prelude != "" {
 		registerLayerOrder(node.Prelude, graph)
@@ -141,13 +141,13 @@ func processAtRule(
 }
 
 func processStyleRule(
-	node *theme.StyleRule,
+	node *css.StyleRule,
 	currentScope Scope,
 	graph *TokenGraph,
 	scopeProps map[string][]string,
 	sourceOrder *int,
 	scopes *[]Scope,
-	walk func([]theme.Rule, Scope),
+	walk func([]css.Rule, Scope),
 ) {
 	resolvedSelector := resolveNestedSelector(currentScope.Selector, node.Selector)
 	childScope := currentScope
@@ -168,7 +168,7 @@ func processStyleRule(
 
 // ParseCSS mem-parse buffer CSS mentah menjadi Context terstruktur yang design-agnostic.
 func ParseCSS(src []byte) (Context, error) {
-	sheet, err := theme.Parse(src)
+	sheet, err := css.Parse(src)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse css: %w", err)
 	}
@@ -178,13 +178,13 @@ func ParseCSS(src []byte) (Context, error) {
 	scopeProps := make(map[string][]string)
 	sourceOrder := 0
 
-	var walkRules func(rules []theme.Rule, currentScope Scope)
-	walkRules = func(rules []theme.Rule, currentScope Scope) {
+	var walkRules func(rules []css.Rule, currentScope Scope)
+	walkRules = func(rules []css.Rule, currentScope Scope) {
 		for _, r := range rules {
 			switch node := r.(type) {
-			case *theme.AtRule:
+			case *css.AtRule:
 				processAtRule(node, currentScope, graph, scopeProps, &sourceOrder, walkRules)
-			case *theme.StyleRule:
+			case *css.StyleRule:
 				processStyleRule(node, currentScope, graph, scopeProps, &sourceOrder, &scopes, walkRules)
 			}
 		}
@@ -209,7 +209,7 @@ func ParseCSS(src []byte) (Context, error) {
 }
 
 func processDeclaration(
-	decl theme.Declaration,
+	decl css.Declaration,
 	scope Scope,
 	graph *TokenGraph,
 	scopeProps map[string][]string,
@@ -222,7 +222,7 @@ func processDeclaration(
 		*sourceOrder++
 		tokenScope := scope
 		tokenScope.SourceOrder = *sourceOrder
-		unescapedProp := theme.UnescapeCSS(prop)
+		unescapedProp := css.UnescapeCSS(prop)
 		refs := extractVarReferences(val)
 		graph.AddToken(unescapedProp, val, tokenScope, decl.Span, refs)
 		return
@@ -233,7 +233,7 @@ func processDeclaration(
 }
 
 func extractVarReferences(val string) []string {
-	return theme.ExtractAllVarNames(val)
+	return css.ExtractAllVarNames(val)
 }
 
 func resolveNestedSelector(parent, child string) string {

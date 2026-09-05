@@ -246,9 +246,10 @@ func removeLayerBlocks(css string) string {
 func findMatchingBraceEnd(s string, start int) int {
 	depth := 1
 	for i := start; i < len(s); i++ {
-		if s[i] == '{' {
+		switch s[i] {
+		case '{':
 			depth++
-		} else if s[i] == '}' {
+		case '}':
 			depth--
 			if depth == 0 {
 				return i

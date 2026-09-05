@@ -1,8 +1,10 @@
-package tailwind
+package css_test
 
 import (
 	"reflect"
 	"testing"
+
+	"github.com/will2469/charites/internal/parser/css"
 )
 
 func TestTailwind_ThemeExtractor(t *testing.T) {
@@ -109,7 +111,7 @@ func TestTailwind_ThemeExtractor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reg, err := ParseTheme([]byte(tt.input))
+			reg, err := css.ParseTheme([]byte(tt.input))
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
