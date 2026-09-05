@@ -4,11 +4,37 @@ import (
 	"github.com/will2469/charites/internal/rules/theme"
 )
 
-// Invariant static compile-time check: HardcodeOpacityColorRule wajib mengimplementasikan interface Rule.
-var _ Rule = (*theme.HardcodeOpacityColorRule)(nil)
+// Invariant static compile-time check: seluruh rule wajib mengimplementasikan interface Rule.
+var (
+	_ Rule = (*theme.HardcodeOpacityColorRule)(nil)
+	_ Rule = (*theme.HardcodeColorRule)(nil)
+	_ Rule = (*theme.PrimitiveInComponentRule)(nil)
+	_ Rule = (*theme.HardcodeMonochromeRule)(nil)
+	_ Rule = (*theme.HardcodeBorderColorRule)(nil)
+	_ Rule = (*theme.GradientHardcodeRule)(nil)
+	_ Rule = (*theme.InlineStyleHardcodeRule)(nil)
+	_ Rule = (*theme.PseudoHardcodeColorRule)(nil)
+	_ Rule = (*theme.ImportantOverrideRule)(nil)
+)
+
+func builtinRules() []Rule {
+	return []Rule{
+		theme.NewHardcodeOpacityColorRule(),
+		theme.NewHardcodeColorRule(),
+		theme.NewPrimitiveInComponentRule(),
+		theme.NewHardcodeMonochromeRule(),
+		theme.NewHardcodeBorderColorRule(),
+		theme.NewGradientHardcodeRule(),
+		theme.NewInlineStyleHardcodeRule(),
+		theme.NewPseudoHardcodeColorRule(),
+		theme.NewImportantOverrideRule(),
+	}
+}
 
 func init() {
-	_ = Register(theme.NewHardcodeOpacityColorRule())
+	for _, r := range builtinRules() {
+		_ = Register(r)
+	}
 }
 
 // RegisterBuiltinRules mendaftarkan seluruh built-in rule Charites ke registry yang diberikan.
@@ -16,5 +42,10 @@ func RegisterBuiltinRules(reg *Registry) error {
 	if reg == nil {
 		return ErrNilRule
 	}
-	return reg.Register(theme.NewHardcodeOpacityColorRule())
+	for _, r := range builtinRules() {
+		if err := reg.Register(r); err != nil {
+			return err
+		}
+	}
+	return nil
 }

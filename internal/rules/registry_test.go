@@ -220,7 +220,7 @@ func TestDefaultRegistry_BuiltinAndHelpers(t *testing.T) {
 	if err := rules.RegisterBuiltinRules(freshReg); err != nil {
 		t.Fatalf("RegisterBuiltinRules failed: %v", err)
 	}
-	if freshReg.Count() != 1 {
-		t.Errorf("expected 1 rule in freshReg, got %d", freshReg.Count())
+	if freshReg.Count() != rules.Count() {
+		t.Errorf("expected %d rules in freshReg, got %d", rules.Count(), freshReg.Count())
 	}
 }

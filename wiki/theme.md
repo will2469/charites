@@ -8,7 +8,15 @@ The `theme` category contains static analysis rules for code quality, architectu
 
 | Rule ID | Severity | Summary | Full Specification | Status |
 | :--- | :---: | :--- | :--- | :---: |
+| `theme.gradient-hardcode` | `WARN` | Detects hardcoded primitive, arbitrary hex, or monochrome colors in gradient stops | [`theme/gradient-hardcode.md`](theme/gradient-hardcode.md) | `enabled` |
+| `theme.hardcode-border-color` | `WARN` | Detects hardcoded border and divider colors using primitive palettes, raw hex literals, or static monochrome | [`theme/hardcode-border-color.md`](theme/hardcode-border-color.md) | `enabled` |
+| `theme.hardcode-color` | `WARN` | Detects hardcoded arbitrary hex or rgb color literals in Tailwind utility classes and arbitrary properties | [`theme/hardcode-color.md`](theme/hardcode-color.md) | `enabled` |
+| `theme.hardcode-monochrome` | `WARN` | Detects hardcoded monochrome utilities (white/black) that fail to adapt across light and dark themes | [`theme/hardcode-monochrome.md`](theme/hardcode-monochrome.md) | `enabled` |
 | `theme.hardcode-opacity-color` | `ERROR` | Detects utility classes with hardcoded slash opacity modifiers that have official semantic token replacements | [`theme/hardcode-opacity-color.md`](theme/hardcode-opacity-color.md) | `enabled` |
+| `theme.important-override` | `ERROR` | Detects !important modifiers on color utility classes that break theme cascade and specificity hierarchy | [`theme/important-override.md`](theme/important-override.md) | `enabled` |
+| `theme.inline-style-hardcode` | `ERROR` | Detects hardcoded color literals inside HTML/JSX style attributes that prevent theme cascade | [`theme/inline-style-hardcode.md`](theme/inline-style-hardcode.md) | `enabled` |
+| `theme.primitive-in-component` | `ERROR` | Detects direct usage of Tailwind primitive palette colors in component classes instead of semantic tokens | [`theme/primitive-in-component.md`](theme/primitive-in-component.md) | `enabled` |
+| `theme.pseudo-hardcode-color` | `WARN` | Detects hardcoded primitive, arbitrary hex, or monochrome colors inside pseudo-element and pseudo-class variants | [`theme/pseudo-hardcode-color.md`](theme/pseudo-hardcode-color.md) | `enabled` |
 
 ---
 ## How the Theme & Design Token Analysis Pipeline Works

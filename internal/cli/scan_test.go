@@ -16,7 +16,8 @@ func setupCleanTestRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	file1 := filepath.Join(dir, "Button.tsx")
-	_ = os.WriteFile(file1, []byte(`export const Button = () => <button className="bg-primary text-white">Click</button>;`), 0o600)
+	_ = os.WriteFile(file1, []byte(`export const Button = () => <button className="bg-primary text-primary-foreground">Click</button>;`), 0o600)
+
 	file2 := filepath.Join(dir, "Header.astro")
 	_ = os.WriteFile(file2, []byte(`---
 ---
