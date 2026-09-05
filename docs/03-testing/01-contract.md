@@ -95,10 +95,9 @@ Benchmark dijalankan untuk mengukur performa alokasi pada *hot-path* traversal:
 ```go
 func BenchmarkNode_Walk(b *testing.B) {
     root := buildMockSubtree(100) // Membuat 100 node bersarang
-    b.ResetTimer()
     b.ReportAllocs()
 
-    for i := 0; i < b.N; i++ {
+    for b.Loop() {
         count := 0
         for range root.Walk() {
             count++

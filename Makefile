@@ -23,7 +23,7 @@ build:
 # Fast test: depends on build so subprocess E2E smoke tests always find bin/charites
 test: build
 	@if [ -f "go.mod" ]; then \
-		go test -v -race ./...; \
+		CGO_ENABLED=1 go test -v -race ./...; \
 	else \
 		echo "Notice: go.mod not initialized yet. Run Phase 0 setup first."; \
 	fi
@@ -31,7 +31,7 @@ test: build
 # Full test with Go Race Detector
 test-full: build
 	@if [ -f "go.mod" ]; then \
-		go test -race -v ./...; \
+		CGO_ENABLED=1 go test -race -v ./...; \
 	else \
 		echo "Notice: go.mod not initialized yet. Run Phase 0 setup first."; \
 	fi
@@ -41,7 +41,7 @@ test-race: test-full
 # Test Coverage
 COVER_PKGS ?= github.com/will2469/charites/internal/...,github.com/will2469/charites/cmd/...
 test-coverage: build
-	go test -race -coverpkg=$(COVER_PKGS) -coverprofile=coverage.txt -covermode=atomic ./...
+	CGO_ENABLED=1 go test -race -coverpkg=$(COVER_PKGS) -coverprofile=coverage.txt -covermode=atomic ./...
 	@go tool cover -func=coverage.txt | tail -n 1
 	go tool cover -html=coverage.txt -o coverage.html
 	@echo "Coverage report generated at coverage.html"
