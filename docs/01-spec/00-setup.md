@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `SPEC-00-SETUP`
 > **Tahapan:** Fase 0 - Inisialisasi Repositori & Toolchain
 > **Peran Pilar:** SPEC = WHAT (Spesifikasi Fungsional & Kontrak Input/Output)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 
 Dokumen ini mendefinisikan spesifikasi formal untuk penyiapan awal (_setup_) repositori, modul Go, struktur direktori, dan aturan ignorasi berkas proyek **Charites**.
 

@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ROAD-00-SETUP`
 > **Tahapan:** Fase 0 - Inisialisasi Repositori & Toolchain
 > **Peran Pilar:** ROADMAP = PHASE GATE (Gerbang Evaluasi Transisi Antar-Fase)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 
 Dokumen ini mendefinisikan gerbang evaluasi kelulusan (*phase gate*) untuk **Fase 0 (Setup)** sebelum proyek diizinkan melangkah ke **Fase 1 (IR Contract)**. Sesuai prinsip pemisahan otoritas arsitektur:
 - **SPEC** = WHAT (Spesifikasi Kebutuhan & Kontrak Fungsional)

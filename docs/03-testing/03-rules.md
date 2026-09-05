@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `TEST-03-RULES`
 > **Tahapan:** Fase 3 - Rule Contract & Proving Ground Rule (`theme.hardcode-opacity-color`)
 > **Peran Pilar:** TEST = PROOF (Harness Pengujian, Skenario Smoke & Asersi Pembuktian)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 > **Standar Rujukan:** Argus Tri-Corpus Semantic Verification & Table-Driven Unit Testing
 
 Dokumen ini mendefinisikan strategi pengujian ketat untuk modul rule Charites, mencakup **Argus Tri-Corpus Semantic Verification**, matriks pembuktian batas deteksi (*boundary matrix*), dan pengujian determinisme registri in-memory.

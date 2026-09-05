@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ROAD-01-CONTRACT`
 > **Tahapan:** Fase 1 - Kunci Kontrak Data (IR & Diagnostic)
 > **Peran Pilar:** ROADMAP = PHASE GATE (Otoritas Gerbang Evaluasi Kelulusan Transisi)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 
 Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi (*phase gate*) untuk **Fase 1 (Kunci Kontrak Data)** sebelum tim diizinkan melangkah ke **Fase 2 (Parser Frontend & IR Builder)**. Sesuai prinsip pemisahan otoritas arsitektur:
 - **SPEC** = WHAT (Spesifikasi Kontrak Data & Invarian Fungsional)

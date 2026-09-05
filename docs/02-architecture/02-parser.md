@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ARCH-02-PARSER`
 > **Tahapan:** Fase 2 - Parser Frontend & IR Builder
 > **Peran Pilar:** ARCH = HOW (Rancangan Pipeline Parsing, Boundary Netral & Recovery)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 > **Standar Rujukan:** Compiler Frontend Architecture & Zero-CGO Lexer Design
 
 Dokumen ini menjelaskan arsitektur internal dari layer parser frontend (`internal/parser/*`), pembatasan lingkup ekstraksi struktural, dan mekanisme pembangunan pohon IR terpadu (`internal/ir/builder.go`) tanpa menggunakan library C (Zero CGO) maupun runtime Node.js.

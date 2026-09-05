@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `QUAL-01-CONTRACT`
 > **Tahapan:** Fase 1 - Kunci Kontrak Data (IR & Diagnostic)
 > **Peran Pilar:** QUALITY = QUALITY THRESHOLD (Ambang Batas Kualitas Linter, Zero Dep & Hygiene)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 > **Standar Rujukan:** OpenSSF Best Practices & Go Staticcheck Rules
 
 Dokumen ini menetapkan ambang batas kualitas kode statis, kebersihan tipe data, dan batas anggaran performa (*performance budget*) untuk paket kontrak inti **`internal/ir`**.

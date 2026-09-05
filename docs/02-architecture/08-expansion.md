@@ -92,7 +92,7 @@ func (r *HardcodeColorRule) Category() string {
 }
 
 func (r *HardcodeColorRule) DefaultSeverity() ir.Severity {
-    return ir.SeverityWarning
+    return ir.SeverityWarn
 }
 
 func (r *HardcodeColorRule) Description() string {

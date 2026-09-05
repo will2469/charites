@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ARCH-03-RULES`
 > **Tahapan:** Fase 3 - Rule Contract & Proving Ground Rule (`theme.hardcode-opacity-color`)
 > **Peran Pilar:** ARCH = HOW (Rancangan Engine Rule, Registri Deterministik & Normalisasi Varian)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 > **Standar Rujukan:** Micro-Kernel Rule Engine Architecture & Zero-Circular Dependency Pattern
 
 Dokumen ini mendefinisikan arsitektur internal dari layer rule Charites (`internal/rules/*`), mekanisme registri in-memory thread-safe (`sync.RWMutex`) dengan urutan deterministik, integrasi evaluasi murni berbasis `ir.Node`, serta mekanisme normalisasi varian leksikal pada rule pertama: **`theme.hardcode-opacity-color`**.

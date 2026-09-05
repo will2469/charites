@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `TEST-02-PARSER`
 > **Tahapan:** Fase 2 - Parser Frontend & IR Builder
 > **Peran Pilar:** TEST = PROOF (Harness Pengujian, Skenario Smoke & Asersi Pembuktian)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 > **Standar Rujukan:** Modern Testing Principles & Go 1.26 Native Fuzzing Specification
 
 Dokumen ini mendefinisikan strategi pengujian menyeluruh untuk parser Tailwind CSS, Astro, TSX, dan IR Builder, membuktikan invarian batas kedalaman stack, semantik pemulihan kegagalan sintaks, serta pengelolaan korpus regresi mutasi (*permanent regression corpus*).

@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `SPEC-02-PARSER`
 > **Tahapan:** Fase 2 - Parser Frontend & IR Builder
 > **Peran Pilar:** SPEC = WHAT (Spesifikasi Ekstraktor Frontend & Kontrak Normalisasi)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 > **Standar Rujukan:** IETF RFC 2119 / W3C HTML5 / JSX Specification / Tailwind CSS v4 Spec
 
 Dokumen ini mendefinisikan spesifikasi kebutuhan fungsional untuk tiga ekstraktor frontend murni Go (**Tailwind CSS v4 `@theme` Token Extractor**, **Astro Component Lexer**, dan **TSX / JSX Structural Extractor**) serta **IR Builder** yang menormalkan seluruh sintaks menjadi pohon `ir.Node` yang netral (*rule-agnostic substrate*).

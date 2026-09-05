@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ARCH-01-CONTRACT`
 > **Tahapan:** Fase 1 - Kunci Kontrak Data (IR & Diagnostic)
 > **Peran Pilar:** ARCH = HOW (Rancangan Arsitektur, Desain Iterator & Batasan Teknis)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 > **Standar Rujukan:** Go Memory Model & Go 1.26 Standard Iterator Specification
 
 Dokumen ini menjelaskan rancangan teknis internal, batasan kepemilikan konstruksi, optimalisasi memory layout, dan mekanisme traversal pohon **Intermediate Representation (`ir.Node`)** menggunakan Go 1.26 native iterators.

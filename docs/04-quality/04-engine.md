@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `QUAL-04-ENGINE`
 > **Tahapan:** Fase 4 - Konfigurasi, Concurrency Scanner & Traversal Engine
 > **Peran Pilar:** QUALITY = QUALITY THRESHOLD (Ambang Batas Kualitas, Keamanan & Anggaran Sumber Daya)
-> **Status:** Ready for Review
+> **Status:** Ready for Review (Implementation Locked: DO NOT START YET)
 > **Standar Rujukan:** Go Concurrency Guidelines & Defensive Systems Programming
 
 Dokumen ini mendefinisikan batasan kualitas, ketahanan konkurensi antar-goroutine, pencegahan kebocoran goroutine (*goroutine leak*), batas aman I/O disk, serta kriteria kelulusan cakupan pengujian per-paket pada Fase 4.
@@ -56,6 +56,8 @@ Anggaran performa Fase 4 dipecah per-komponen sebagai target desain terukur:
 | **Ignore Matcher** | Evaluasi 1.000 path sekuensial | $\le 1\text{ ms}$ total | Performance Baseline |
 | **Analyzer Traversal** | Throughput evaluasi node AST in-memory | $\ge 50.000\text{ nodes/s/core}$ | Performance Target |
 | **End-to-End Scan** | Throughput pemindaian korpus standar | Baseline terukur | Performance Budget |
+
+> **Catatan Baseline:** Target performa di atas merupakan baseline desain yang akan dibuktikan secara empiris melalui benchmark Fase 4 (`internal/scanner` dan `internal/analyzer`). Pengukuran dilakukan di lingkungan terkontrol tanpa optimasi prematur sebelum kontrak fungsional dan konkurensi terbukti stabil.
 
 ---
 

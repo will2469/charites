@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `SPEC-01-CONTRACT`
 > **Tahapan:** Fase 1 - Kunci Kontrak Data (IR & Diagnostic)
 > **Peran Pilar:** SPEC = WHAT (Spesifikasi Kontrak Data & Invarian Fungsional)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 > **Standar Rujukan:** IETF RFC 2119 / RFC 8174
 
 Dokumen ini mendefinisikan spesifikasi formal kebutuhan fungsional dan representasi data untuk **Intermediate Representation (`ir.Node`)**, **Temuan Diagnosis (`ir.Diagnostic`)**, serta **Interface Evaluasi Rule (`rules.Rule`)** pada mesin Charites.

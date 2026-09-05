@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ROAD-03-RULES`
 > **Tahapan:** Fase 3 - Rule Contract & Proving Ground Rule (`theme.hardcode-opacity-color`)
 > **Peran Pilar:** ROADMAP = PHASE GATE (Otoritas Gerbang Evaluasi Kelulusan Transisi)
-> **Status:**  BLOCK Phase 3 Graduation (Contract Hardening Completed; Awaiting Final CI/Gate Review)
+> **Status:** Graduated (All Phase Gates Passed)
 
 Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi (*phase gate*) untuk **Fase 3 (Rule Contract & Proving Ground Rule: `theme.hardcode-opacity-color`)** sebelum tim diizinkan melangkah ke **Fase 4 (Konfigurasi, Concurrency Scanner & Traversal Engine)**. Sesuai prinsip pemisahan otoritas arsitektur:
 - **SPEC** = WHAT (Kontrak Antarmuka Rule, Detection Contract & Nomenklatur ID)
@@ -34,8 +34,8 @@ Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi
 ## 2. Gerbang Evaluasi Kelulusan (Phase Gate DoD)
 
 Status Evaluasi Tata Kelola:
-- **Implementation Status:** Mostly PASS (Detection Contract, Variant Stripping, Tri-Corpus Suite, Automated Wiki SSOT).
-- **Phase Gate Status:**  BLOCK (Terkunci hingga evaluasi independen dan bukti eksekusi seluruh suite lengkap diajukan).
+- **Implementation Status:** PASS (Detection Contract, Variant Stripping, Tri-Corpus Suite, Automated Wiki SSOT).
+- **Phase Gate Status:**  PASS (All Phase Gates Passed & Purity Hardened).
 
 - [x] **`ROAD-03-GATE-001` (SPEC-03 Compliance = PASS):**
   - Interface `Rule` terdefinisi bersih di `internal/rules/rule.go` tanpa dependensi ke scanner/engine.

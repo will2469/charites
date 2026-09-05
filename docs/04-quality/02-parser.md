@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `QUAL-02-PARSER`
 > **Tahapan:** Fase 2 - Parser Frontend & IR Builder
 > **Peran Pilar:** QUALITY = QUALITY THRESHOLD (Ambang Batas Ketahanan, Security & Resource Budgets)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 > **Standar Rujukan:** OpenSSF Best Practices & Resilient Parser Guidelines
 
 Dokumen ini mendefinisikan ambang batas ketahanan (*robustness*), pencegahan eksploitasi rekursi (*stack overflow*), dan batas efisiensi anggaran sumber daya (*resource budgets*) pada modul parser frontend.

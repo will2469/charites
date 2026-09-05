@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `SPEC-03-RULES`
 > **Tahapan:** Fase 3 - Rule Contract & Proving Ground Rule (`theme.hardcode-opacity-color`)
 > **Peran Pilar:** SPEC = WHAT (Spesifikasi Kontrak Rule, Registry & Detection Domain)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 > **Standar Rujukan:** IETF RFC 2119 / Deterministic Rule Engine Specification
 
 Dokumen ini mendefinisikan spesifikasi kebutuhan fungsional untuk **Interface Evaluasi Rule**, **In-Memory Registry**, dan implementasi rule pembuktian pertama (**`theme.hardcode-opacity-color`**) beserta **Detection Contract** dan standar pengujian semantik model Argus.

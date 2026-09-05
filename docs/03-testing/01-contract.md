@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `TEST-01-CONTRACT`
 > **Tahapan:** Fase 1 - Kunci Kontrak Data (IR & Diagnostic)
 > **Peran Pilar:** TEST = PROOF (Harness Pengujian, Skenario Smoke & Asersi Pembuktian)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 > **Standar Rujukan:** Modern Testing Principles & Go Benchmarking Standards
 
 Dokumen ini mendefinisikan skenario pembuktian empiris, rencana pengujian unit komprehensif, dan benchmark alokasi memori untuk membuktikan pemenuhan seluruh kontrak fungsional pada **`internal/ir`**.

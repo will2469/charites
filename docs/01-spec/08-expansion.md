@@ -63,7 +63,7 @@ Sebagai contoh penerapan kontrak penulisan rule baru:
 ### 2.1. Identitas & Metadata
 - **ID:** `theme.hardcode-color`
 - **Kategori:** `theme`
-- **Default Severity:** `warn` (`ir.SeverityWarning`)
+- **Default Severity:** `warn` (`ir.SeverityWarn`)
 - **Deskripsi:** Mendeteksi penggunaan kode warna mentah yang wajib diganti dengan token semantik dari `global.css`.
 
 ### 2.2. Batas Deteksi (Detection Boundary Matrix)

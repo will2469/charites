@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `QUAL-00-SETUP`
 > **Tahapan:** Fase 0 - Inisialisasi Repositori & Toolchain
 > **Peran Pilar:** QUALITY = QUALITY THRESHOLD (Ambang Batas Kualitas Linter, Zero Dep & Hygiene)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 
 Dokumen ini mendefinisikan ambang batas kualitas (*quality threshold*), konfigurasi linter awal, gerbang analisis statis, dan aturan kebersihan ketergantungan (*dependency hygiene*) pada **Fase 0**.
 

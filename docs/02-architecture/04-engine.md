@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ARCH-04-ENGINE`
 > **Tahapan:** Fase 4 - Konfigurasi, Concurrency Scanner & Traversal Engine
 > **Peran Pilar:** ARCH = HOW (Rancangan Arsitektur, Struktur Data & Enkapsulasi Pipeline)
-> **Status:** Ready for Review
+> **Status:** Ready for Review (Implementation Locked: DO NOT START YET)
 > **Standar Rujukan:** High-Throughput Concurrency Patterns & Pipeline Architecture
 
 Dokumen ini mendefinisikan arsitektur internal dari paket konfigurasi (`internal/config/*`), mesin pemindai direktori paralel berkonkurensi tinggi (`internal/scanner/*`), serta mesin traversal AST (`internal/analyzer/*`).
@@ -101,7 +101,7 @@ func (c *Config) ResolveActiveRules(reg *rules.Registry, categoryFilter, ruleFil
                 case "error":
                     effectiveSev = ir.SeverityError
                 case "warn", "warning":
-                    effectiveSev = ir.SeverityWarning
+                    effectiveSev = ir.SeverityWarn
                 case "info":
                     effectiveSev = ir.SeverityInfo
                 }
@@ -141,6 +141,21 @@ type ignorePattern struct {
     dirOnly  bool
 }
 
+// HasBuiltinAncestor memeriksa apakah ada segmen path yang cocok dengan builtin exclusion.
+// Digunakan untuk proteksi eksplisit target berkas langsung (Explicit Target Safety).
+func (m *IgnoreMatcher) HasBuiltinAncestor(path string) bool {
+    clean := filepath.Clean(path)
+    parts := strings.Split(clean, string(filepath.Separator))
+    for _, part := range parts {
+        for _, b := range builtinExclusions {
+            if part == b {
+                return true
+            }
+        }
+    }
+    return false
+}
+
 func (m *IgnoreMatcher) ShouldIgnoreDir(dirName, relPath string) bool {
     // 1. Invarian Hard Exclusion (Builtin tidak bisa dinegasi)
     for _, b := range builtinExclusions {
@@ -164,7 +179,7 @@ func (m *IgnoreMatcher) ShouldIgnoreDir(dirName, relPath string) bool {
 
 ## 3. Arsitektur Concurrency Scanner (`internal/scanner/`)
 
-### 3.1. Walker Direktori & Proteksi Symlink (`internal/scanner/walker.go`)
+### 3.1. Walker Direktori, Direct-Target Safety & Proteksi Symlink (`internal/scanner/walker.go`)
 
 ```go
 const MaxScanFileSize = 10 * 1024 * 1024 // 10 Megabytes
@@ -175,7 +190,32 @@ type Walker struct {
 }
 
 func (w *Walker) Walk(ctx context.Context, root string, jobs chan<- string) error {
-    return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+    cleanRoot := filepath.Clean(root)
+
+    // 1. Direct-Target Safety Check: Tolak target jika berada di dalam direktori terlarang
+    if w.matcher.HasBuiltinAncestor(cleanRoot) {
+        return fmt.Errorf("scan target %q is within excluded directory (builtin hard exclusion)", cleanRoot)
+    }
+
+    fi, err := os.Stat(cleanRoot)
+    if err != nil {
+        return err
+    }
+
+    // 2. Penanganan Target Berkas Tunggal Secara Langsung (Single File Target)
+    if !fi.IsDir() {
+        if w.extMap[filepath.Ext(cleanRoot)] && fi.Size() <= MaxScanFileSize {
+            select {
+            case jobs <- cleanRoot:
+            case <-ctx.Done():
+                return ctx.Err()
+            }
+        }
+        return nil
+    }
+
+    // 3. Traversal Direktori Rekursif
+    return filepath.WalkDir(cleanRoot, func(path string, d os.DirEntry, err error) error {
         if err != nil {
             return nil // Lanjutkan traversal
         }
@@ -187,14 +227,14 @@ func (w *Walker) Walk(ctx context.Context, root string, jobs chan<- string) erro
         default:
         }
 
-        rel, _ := filepath.Rel(root, path)
+        rel, _ := filepath.Rel(cleanRoot, path)
 
-        // 1. Proteksi Symlink: Jangan ikuti direktori symlink
+        // Proteksi Symlink: Jangan ikuti direktori symlink
         if d.Type()&os.ModeSymlink != 0 {
             return nil
         }
 
-        // 2. Direktori: Evaluasi Early Pruning
+        // Direktori: Evaluasi Early Pruning
         if d.IsDir() {
             if rel != "." && w.matcher.ShouldIgnoreDir(d.Name(), rel) {
                 return filepath.SkipDir
@@ -202,7 +242,7 @@ func (w *Walker) Walk(ctx context.Context, root string, jobs chan<- string) erro
             return nil
         }
 
-        // 3. Batas Ekstensi & Ukuran Berkas
+        // Batas Ekstensi & Ukuran Berkas
         if !w.extMap[filepath.Ext(path)] {
             return nil
         }
@@ -211,21 +251,86 @@ func (w *Walker) Walk(ctx context.Context, root string, jobs chan<- string) erro
             return nil // Abaikan berkas > 10MB
         }
 
-        jobs <- path
+        select {
+        case jobs <- path:
+        case <-ctx.Done():
+            return ctx.Err()
+        }
         return nil
     })
 }
 ```
 
-### 3.2. Worker Pool & Siklus Pembatalan (`internal/scanner/pool.go`)
+### 3.2. Worker Pool & Kepemilikan Channel (Channel Ownership Architecture)
 
-Worker pool membagi pembacaan berkas menggunakan $N = \text{runtime.GOMAXPROCS(0)}$:
+Worker pool menerapkan pola **Single Producer = Single Closer**:
 
-- **State Lifecycle:** `RUNNING` $\longrightarrow$ `CANCELLING` $\longrightarrow$ `STOPPED`.
-- Ketika `ctx.Done()` diterima:
-  - Channel `jobs` ditutup dan tidak ada file baru yang diambil.
-  - Worker aktif menyelesaikan berkas berjalan secara atomik.
-  - Channel `results` dikuras dan diagnostic dibuang untuk mencegah penerbitan laporan parsial.
+```go
+type Pool struct {
+    workers int
+}
+
+func (p *Pool) Run(ctx context.Context, walker *Walker, target string, analyzer *analyzer.Engine) ([]ir.Diagnostic, error) {
+    jobs := make(chan string, p.workers*2)
+    results := make(chan []ir.Diagnostic, p.workers*2)
+
+    var wg sync.WaitGroup
+
+    // 1. Worker Goroutines (Producers untuk results)
+    for i := 0; i < p.workers; i++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            for {
+                select {
+                case <-ctx.Done():
+                    return
+                case path, ok := <-jobs:
+                    if !ok {
+                        return
+                    }
+                    diags, err := analyzer.AnalyzeFile(path)
+                    if err == nil && len(diags) > 0 {
+                        select {
+                        case results <- diags:
+                        case <-ctx.Done():
+                            return
+                        }
+                    }
+                }
+            }
+        }()
+    }
+
+    // 2. Walker Goroutine (Single Producer & Closer untuk jobs)
+    walkErrChan := make(chan error, 1)
+    go func() {
+        defer close(jobs) // Closer tunggal jobs
+        walkErrChan <- walker.Walk(ctx, target, jobs)
+    }()
+
+    // 3. Coordinator Goroutine (Single Closer untuk results)
+    go func() {
+        wg.Wait()
+        close(results) // Closer tunggal results
+    }()
+
+    // 4. Aggregator: Kumpulkan hasil dari results
+    var allDiags []ir.Diagnostic
+    for diags := range results {
+        allDiags = append(allDiags, diags...)
+    }
+
+    if err := <-walkErrChan; err != nil && ctx.Err() == nil {
+        return nil, err
+    }
+    if ctx.Err() != nil {
+        return nil, ctx.Err()
+    }
+
+    return ir.SortDiagnostics(allDiags), nil
+}
+```
 
 ---
 

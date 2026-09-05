@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ROAD-02-PARSER`
 > **Tahapan:** Fase 2 - Parser Frontend & IR Builder
 > **Peran Pilar:** ROADMAP = PHASE GATE (Otoritas Gerbang Evaluasi Kelulusan Transisi)
-> **Status:** PASS (Phase Graduated)
+> **Status:** Graduated (All Phase Gates Passed)
 
 Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi (*phase gate*) untuk **Fase 2 (Parser Frontend & IR Builder)** sebelum tim diizinkan melangkah ke **Fase 3 (Rule Contract & Rule #1 Proving Ground: `theme.hardcode-opacity-color`)**. Sesuai prinsip pemisahan otoritas arsitektur:
 - **SPEC** = WHAT (Spesifikasi Ekstraktor Frontend & Kontrak Normalisasi)

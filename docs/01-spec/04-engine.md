@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `SPEC-04-ENGINE`
 > **Tahapan:** Fase 4 - Konfigurasi, Concurrency Scanner & Traversal Engine
 > **Peran Pilar:** SPEC = WHAT (Spesifikasi Kebutuhan Fungsional & Kontrak Engine)
-> **Status:** Ready for Review
+> **Status:** Ready for Review (Implementation Locked: DO NOT START YET)
 > **Standar Rujukan:** IETF RFC 2119 / Semgrep Engine Architecture / Gitignore Pattern Specification
 
 Dokumen ini mendefinisikan spesifikasi kebutuhan fungsional untuk sistem konfigurasi **`charites.yaml`** (Model Argus: Invarian Default YES & Precedence), sistem pengabaian **`.charitesignore`**, proteksi traversal filesystem, batas sumber daya I/O, *goroutine worker pool*, *AST traversal engine*, serta kontrak determinisme pelaporan.
@@ -95,9 +95,13 @@ Untuk mencegah serangan *directory traversal*, *symlink race condition*, dan *in
 2. **File Symlink:** Diabaikan secara default (`skip by default`).
 
 ### 2.5. Invarian Target Berkas Langsung (Explicit Target Safety)
-Jika user memanggil Charites dengan path berkas langsung (contoh: `charites scan node_modules/foo/Button.tsx`):
-- Panggilan **DILARANG** menjadi celah (*escape hatch*) untuk menerobos *builtin hard exclusion*.
-- Jika path target berada di dalam direktori builtin yang dilarang, scanner menolak pemindaian dan menghentikan eksekusi dengan pesan peringatan keamanan dan status keluar non-zero.
+Jika user memanggil Charites dengan path berkas langsung (contoh: `charites scan node_modules/foo/Button.tsx` atau `charites scan .git/hooks/pre-commit`):
+- Panggilan **DILARANG KERAS** menjadi celah (*escape hatch*) untuk menerobos *builtin hard exclusion*.
+- **Algoritma Ancestry Inspection:** Sebelum memulai scanning atau traversal, scanner memecah `filepath.Clean(target)` menjadi segmen path. Jika ADA segmen yang cocok dengan salah satu `builtinExclusions` (`.git`, `node_modules`, `dist`, `.astro`, `.next`, `.turbo`, `build`, `coverage`):
+  - Scanner menolak pemindaian secara langsung sebelum pembacaan I/O atau parsing dilakukan.
+  - Walker mengembalikan error keamanan dan tepat **0 jobs** dimasukkan ke dalam antrean kerja `jobs`.
+  - CLI keluar dengan status error non-zero (exit code 2).
+- **Target Berkas Tunggal yang Sah:** Jika target adalah berkas tunggal yang sah (di luar direktori terlarang), walker memvalidasi ekstensi (`.astro`, `.tsx`, `.jsx`) dan ukuran berkas ($\le 10\text{ MB}$), langsung memasukkannya ke `jobs`, tanpa menelusuri pohon direktori secara rekursif.
 
 ### 2.6. Batas Maksimal Ukuran Berkas (Resource Invariant)
 - Batas ukuran berkas sumber frontend: **Maksimal 10 Megabytes** ($10 \times 1024 \times 1024\text{ bytes}$).
@@ -123,14 +127,21 @@ Jika user memanggil Charites dengan path berkas langsung (contoh: `charites scan
 - **Kapasitas Konkurensi:** Default mengalokasikan $N = \text{runtime.GOMAXPROCS(0)}$ goroutine pekerja, dibatasi dalam rentang $[1, 256]$. Dapat dikonfigurasi melalui flag `--workers=N`.
 - **Fan-Out / Fan-In:** File yang lolos filter ignore didistribusikan ke worker pool. Setiap worker membaca berkas, mem-parse ke `*ir.Node`, dan mengeksekusi traversal engine.
 
-### 3.3. Kontrak Pembatalan Interupsi (Cancellation Contract)
-Sistem pemindai mendukung terminasi bersih saat menerima sinyal interupsi terminal (`SIGINT`/`SIGTERM`) melalui `context.Context`:
-- **State Machine:** `RUNNING` $\longrightarrow$ `CANCELLING` $\longrightarrow$ `STOPPED`.
-- Ketika context dibatalkan:
-  1. Walker berhenti memasukkan pekerjaan baru dan menutup channel `jobs`.
-  2. Worker yang sedang berjalan menyelesaikan pemrosesan berkas aktif secara atomik lalu segera berhenti.
-  3. Channel diagnostic ditutup dan temuan parsial **DIBUANG** (temuan tidak lengkap dilarang dianggap sebagai hasil pemindaian sah).
-  4. Program keluar dengan kode status interupsi non-zero (exit code 130).
+### 3.3. Kontrak Pembatalan Interupsi & Kepemilikan Channel (Channel Ownership & Cancellation)
+Sistem pemindai mendukung terminasi bersih saat menerima sinyal interupsi terminal (`SIGINT`/`SIGTERM`) melalui `context.Context` dengan **Invarian Single Producer = Single Closer**:
+- **Kepemilikan Channel `jobs` (`chan string`):**
+  - **Producer Tunggal:** `Walker`.
+  - **Closer Tunggal:** `Walker` via `defer close(jobs)` saat traversal selesai atau `ctx.Done()`.
+- **Kepemilikan Channel `results` (`chan []ir.Diagnostic`):**
+  - **Producers:** $N$ goroutine pekerja dalam `WorkerPool` (fan-in).
+  - **Closer Tunggal:** Goroutine koordinator tersinkronisasi `sync.WaitGroup` (`go func() { wg.Wait(); close(results) }()`). Pekerja **DILARANG** menutup channel `results`.
+- **Siklus Hidup Pembatalan (`State: RUNNING -> CANCELLING -> STOPPED`):**
+  1. Ketika `ctx.Done()` diterima:
+     - `Walker` mendeteksi pembatalan, membatalkan traversal, dan menutup channel `jobs`.
+     - Worker yang membaca `jobs` mendeteksi `ctx.Done()` atau channel closed, membatalkan pemrosesan aktif, tidak mengirim hasil parsial, dan memanggil `defer wg.Done()`.
+     - Koordinator menutup `results` setelah seluruh worker berhenti bersih (*zero goroutine leak*).
+     - Hasil diagnostik parsial **DIBUANG** (temuan tidak lengkap dilarang dianggap sah).
+     - Program keluar dengan kode status interupsi non-zero (exit code 130).
 
 ---
 
@@ -146,8 +157,8 @@ for node := range root.Walk() {
             // Terapkan EffectiveSeverity dari konfigurasi
             d.Severity = active.EffectiveSeverity
 
-            // Evaluasi penekanan inline ignore
-            if !ctx.IsIgnored(d.Line, d.Rule, node) {
+            // Evaluasi penekanan inline ignore (signature baku: IsIgnored(d, node))
+            if !ctx.IsIgnored(d, node) {
                 ctx.AddDiagnostic(d)
             }
         }

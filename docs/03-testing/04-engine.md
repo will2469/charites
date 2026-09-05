@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `TEST-04-ENGINE`
 > **Tahapan:** Fase 4 - Konfigurasi, Concurrency Scanner & Traversal Engine
 > **Peran Pilar:** TEST = PROOF (Harness Pengujian, Pembuktian Batas & Asersi Keamanan)
-> **Status:** Ready for Review
+> **Status:** Ready for Review (Implementation Locked: DO NOT START YET)
 > **Standar Rujukan:** Go Concurrency Testing, Stress Benchmarks & Race Detection Standards
 
 Dokumen ini mendefinisikan strategi pengujian menyeluruh untuk memvalidasi paket konfigurasi (`internal/config`), pemindai direktori paralel (`internal/scanner`), serta mesin traversal AST (`internal/analyzer`).
@@ -19,7 +19,7 @@ Dokumen ini mendefinisikan strategi pengujian menyeluruh untuk memvalidasi paket
   - Ekspektasi: `ResolveActiveRules()` mengembalikan seluruh rule di registry dengan severity default masing-masing.
 - **Test Case 2 (Severity Override):**
   - Input: YAML memuat `theme.hardcode-opacity-color: warn`.
-  - Ekspektasi: Rule tetap aktif dalam `ActiveRule`, namun `EffectiveSeverity` berubah menjadi `ir.SeverityWarning`.
+  - Ekspektasi: Rule tetap aktif dalam `ActiveRule`, namun `EffectiveSeverity` berubah menjadi `ir.SeverityWarn`.
 - **Test Case 3 (Presedensi CLI Scope vs Config Policy):**
   - Kondisi: Flag CLI `--rule=theme.hardcode-opacity-color`, namun config menetapkan `theme.hardcode-opacity-color: off`.
   - Ekspektasi: Rule **TIDAK AKTIF** (kebijakan config mengalahkan seleksi CLI).
@@ -49,7 +49,7 @@ Dokumen ini mendefinisikan strategi pengujian menyeluruh untuk memvalidasi paket
 
 - **Test Case 1 (Direct Target Safety):**
   - Input: `charites scan node_modules/react/index.d.ts`.
-  - Ekspektasi: Walker mendeteksi path berada di dalam direktori terlarang dan menolak traversal (0 jobs diantrekan).
+  - Ekspektasi: Walker mendeteksi path target memiliki leluhur terlarang via `HasBuiltinAncestor(target)` dan mengembalikan error validasi sebelum traversal (0 jobs diantrekan).
 - **Test Case 2 (Symlink Safety Guard):**
   - Kondisi: Buat symlink siklis antar-folder temporer (`t.TempDir()`).
   - Ekspektasi: Walker melewati symlink direktori (`DO NOT FOLLOW`) tanpa memicu infinite loop.
@@ -98,12 +98,12 @@ Dokumen ini mendefinisikan strategi pengujian menyeluruh untuk memvalidasi paket
 ```go
 func TestSortDiagnostics_TotalOrdering(t *testing.T) {
     diags := []ir.Diagnostic{
-        {File: "a.tsx", Span: ir.Span{StartLine: 10, StartColumn: 5}, Rule: "theme.b", Severity: ir.SeverityWarning, Message: "msg B", Hint: "hint B"},
-        {File: "a.tsx", Span: ir.Span{StartLine: 10, StartColumn: 5}, Rule: "theme.a", Severity: ir.SeverityError, Message: "msg A", Hint: "hint A"},
-        {File: "a.tsx", Span: ir.Span{StartLine: 10, StartColumn: 5}, Rule: "theme.a", Severity: ir.SeverityError, Message: "msg A2", Hint: "hint A"},
+        {File: "a.tsx", Line: 10, Column: 5, Rule: "theme.b", Severity: ir.SeverityWarn, Message: "msg B", Hint: "hint B"},
+        {File: "a.tsx", Line: 10, Column: 5, Rule: "theme.a", Severity: ir.SeverityError, Message: "msg A", Hint: "hint A"},
+        {File: "a.tsx", Line: 10, Column: 5, Rule: "theme.a", Severity: ir.SeverityError, Message: "msg A2", Hint: "hint A"},
     }
 
-    analyzer.SortDiagnostics(diags)
+    ir.SortDiagnostics(diags)
 
     // Verifikasi total ordering deterministik
     if diags[0].Rule != "theme.a" || diags[0].Message != "msg A" {

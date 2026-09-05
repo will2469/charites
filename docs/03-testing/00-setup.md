@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `TEST-00-SETUP`
 > **Tahapan:** Fase 0 - Inisialisasi Repositori & Toolchain
 > **Peran Pilar:** TEST = PROOF (Harness Pengujian, Skenario Smoke & Asersi Pembuktian)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 
 Dokumen ini mendefinisikan skenario uji coba awal (*smoke tests*) dan pembuktian empiris untuk memverifikasi bahwa seluruh kontrak fungsional pada **Fase 0** (SPEC-00) dan rancangan arsitektur (ARCH-00) terbukti berfungsi 100% tanpa cacat.
 

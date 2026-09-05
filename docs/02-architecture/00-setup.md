@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ARCH-00-SETUP`
 > **Tahapan:** Fase 0 - Inisialisasi Repositori & Toolchain
 > **Peran Pilar:** ARCH = HOW (Rancangan Arsitektur, Boundaries & Metode Teknis)
-> **Status:** Ready for Execution
+> **Status:** Graduated (All Phase Gates Passed)
 
 Dokumen ini menjelaskan rancangan arsitektur penataan modul Go, batasan visibilitas (*package boundaries*), dan mekanisme build pada tahap penyiapan awal (**Fase 0**).
 
