@@ -193,9 +193,13 @@ charites/
 ├── .charitesignore                # Pola ignore bawaan
 ├── .golangci.yml                  # Konfigurasi linter wajib (zero tolerance)
 ├── Makefile                       # Automasi build, test, lint, dan fuzzing
-├── go.mod                         # Go 1.26 module definition
-└── go.sum
+└── go.mod                         # Go 1.26 module definition (zero external dependencies)
 ```
+
+> [!NOTE]
+> - **Zero Dependency Invariant:** Berkas `go.sum` **MUST NOT** be required pada Fase 0 karena ketiadaan dependensi pihak ketiga.
+> - **Skeleton Directory Reservation:** Direktori `internal/` selain `cli/` dan direktori `tests/` selain `e2e/` merupakan reservasi struktur arsitektur repositori yang diisi secara terisolasi per fase sesuai roadmap.
+
 
 ---
 

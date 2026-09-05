@@ -2,9 +2,10 @@
 
 > **Kode Dokumen:** `QUAL-00-SETUP`
 > **Tahapan:** Fase 0 - Inisialisasi Repositori & Toolchain
+> **Peran Pilar:** QUALITY = QUALITY THRESHOLD (Ambang Batas Kualitas Linter, Zero Dep & Hygiene)
 > **Status:** Ready for Execution
 
-Dokumen ini mendefinisikan konfigurasi linter awal, gerbang analisis statis, dan aturan kebersihan ketergantungan (*dependency hygiene*) pada **Fase 0**.
+Dokumen ini mendefinisikan ambang batas kualitas (*quality threshold*), konfigurasi linter awal, gerbang analisis statis, dan aturan kebersihan ketergantungan (*dependency hygiene*) pada **Fase 0**.
 
 ---
 
@@ -50,25 +51,32 @@ issues:
   max-same-issues: 0
 ```
 
+> [!IMPORTANT]
+> **Lint Baseline Scope:** *Lint baseline applies to all code present at the current phase.*
+> Konfigurasi 9 linter dan `govet enable-all` dievaluasi secara ketat terhadap seluruh kode Go yang eksis pada Fase 0 (`cmd/charites` dan `internal/cli`). Aturan ini tidak menuntut keberadaan kode untuk fase mendatang yang belum dibangun.
+
 ---
 
-## 2. Kebijakan Zero-Dependency di `go.mod`
+## 2. Kebijakan Zero-Dependency di `go.mod` & Status `go.sum`
 
 Pada Fase 0:
-- File `go.mod` hanya memuat deklarasi modul dan versi Go:
+- Berkas `go.mod` hanya memuat deklarasi modul dan versi Go:
   ```text
   module github.com/will2469/charites
 
-  go 1.26.0
+  go 1.26
   ```
-- **Larangan Keras:** Tidak boleh ada blok `require` pihak ketiga yang belum disetujui. File `go.sum` harus kosong atau belum ada jika tidak ada dependensi eksternal.
+- **Go Toolchain:** Dikelola via standar `go1.26.x`.
+- **Kebijakan Dependensi Eksternal:** Dilarang keras menambahkan blok `require` pihak ketiga (*zero third-party dependencies*).
+- **Status `go.sum`:** Berkas `go.sum` **MUST NOT** be required pada Fase 0 saat dependensi eksternal bernilai nol.
 
 ---
 
 ## 3. Quality Gate Command
 
-Sebelum commit pertama di-push:
+Sebelum transisi fase disetujui:
 ```bash
 golangci-lint run ./...
 ```
-Perintah ini **MUST** menghasilkan output kosong dan exit code `0`.
+Perintah ini **MUST** menghasilkan output bersih tanpa warning/error dan keluar dengan exit code `0`.
+

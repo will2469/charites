@@ -2,98 +2,60 @@
 
 > **Kode Dokumen:** `SPEC-00-SETUP`
 > **Tahapan:** Fase 0 - Inisialisasi Repositori & Toolchain
+> **Peran Pilar:** SPEC = WHAT (Spesifikasi Fungsional & Kontrak Input/Output)
 > **Status:** Ready for Execution
 
 Dokumen ini mendefinisikan spesifikasi formal untuk penyiapan awal (_setup_) repositori, modul Go, struktur direktori, dan aturan ignorasi berkas proyek **Charites**.
 
 ---
 
-## 1. Spesifikasi Modul Go
+## 1. Spesifikasi Modul Go & Toolchain
 
 - **Module Path:** `github.com/will2469/charites`
-- **Go Toolchain Version:** Go `1.26.0`.
+- **Go Version:** `1.26` (dideklarasikan di `go.mod` sebagai `go 1.26`)
+- **Go Toolchain:** `go1.26.x`
 - **Vendor Policy:** Dilarang mengimpor library pihak ketiga (_third-party dependencies_) pada Fase 0. Seluruh scaffolding entrypoint murni menggunakan **Go Standard Library**.
 - **CGO Policy:** Wajib mendukung kompilasi `CGO_ENABLED=0` secara native tanpa memerlukan library C sistem.
+- **Dependency File Policy:** Berkas `go.sum` **MUST NOT** be required pada Fase 0 saat dependensi eksternal bernilai nol (*zero external dependencies*).
 
 ---
 
-## 2. Struktur Direktori Wajib (Directory Skeleton)
+## 2. Struktur Direktori Wajib & Reservasi Skeleton (Directory Skeleton)
 
-Eksekusi Fase 0 **MUST** menginisialisasi arsitektur repositori secara utuh sesuai **Single Source of Truth (SSOT)** pada [docs/stratch.md](file:///home/will/Monorepo/charites/docs/stratch.md):
+Struktur repositori memisahkan secara tegas antara **berkas implementasi wajib Fase 0** dengan **reservasi direktori arsitektur** (*repository skeleton reservation*) untuk fase-fase berikutnya:
 
-```text
-.
-├── cmd/
-│   └── charites/                  # Entrypoint binary utama (`charites`)
-│       └── main.go                # [FASE 0] Entrypoint trampoline os.Exit(cli.Execute(...))
-├── internal/                      # Private core packages (Enkapsulasi Go internal)
-│   ├── cli/                       # Routing subcommands & flag parsing
-│   │   ├── root.go                # [FASE 0] Root dispatcher, --version & --help flags
-│   │   ├── scan.go                # [FASE 5] Subcommand: charites scan (aliases: check, run)
-│   │   ├── mcp.go                 # [FASE 7] Subcommand daemon: charites mcp (JSON-RPC 2.0)
-│   │   ├── wiki.go                # [FASE 8] Subcommand: charites wiki (Markdown catalog)
-│   │   └── version.go             # [FASE 0] Metadata rilis & runtime version info
-│   ├── config/                    # Konfigurasi & ignore engine
-│   │   ├── config.go              # [FASE 4] Parser charites.yaml (severity, overrides)
-│   │   └── ignore.go              # [FASE 4] Engine pattern matching (.charitesignore)
-│   ├── ir/                        # Intermediate Representation (SSOT Data Contract)
-│   │   ├── node.go                # [FASE 1] Unified node: Tag, Attribute, ClassList, Span
-│   │   ├── diagnostic.go          # [FASE 1] Struct Diagnostic & Severity (SSOT Rule, CLI, & MCP)
-│   │   └── builder.go             # [FASE 2] Normalisasi AST Astro & TSX ke IR tree
-│   ├── parser/                    # Layer ekstraksi AST mentah
-│   │   ├── tailwind/              # [FASE 2] Parser CSS @theme di global.css
-│   │   ├── astro/                 # [FASE 2] Lexer frontmatter (---) & template Astro
-│   │   └── tsx/                   # [FASE 2] TSX & JSX AST visitor
-│   ├── rules/                     # Rule Registry & Interface
-│   │   ├── registry.go            # [FASE 3] Rule lookup table & filter
-│   │   ├── rule.go                # [FASE 3] Interface baku Rule (Evaluate pure function)
-│   │   └── theme/
-│   │       └── hardcode_opacity_color.go # [FASE 3] Rule #1: theme.hardcode-opacity-color
-│   ├── analyzer/                  # Traversal engine & diagnostic accumulator
-│   │   ├── context.go             # [FASE 3] State per-file, token scope, diagnostic buffer
-│   │   └── engine.go              # [FASE 4] Traversal IR -> Rule Dispatcher (Go 1.26 iter)
-│   ├── scanner/                   # Fast walker & konkurensi worker
-│   │   ├── walker.go              # [FASE 5] Dirwalker patuh terhadap .charitesignore
-│   │   └── pool.go                # [FASE 5] Worker pool distribusi file ke analyzer
-│   ├── reporter/                  # Format output presentasi
-│   │   ├── inline.go              # [FASE 4] Output terminal (ANSI color, file:line:col)
-│   │   ├── json.go                # [FASE 4] Structured JSON datar untuk tooling/jq
-│   │   └── markdown.go            # [FASE 5] Ringkasan tabel markdown
-│   ├── mcp/                       # Server MCP Stdio (Offline mode AI Agent)
-│   │   ├── server.go              # [FASE 7] Loop JSON-RPC 2.0 via os.Stdin / os.Stdout
-│   │   ├── protocol.go            # [FASE 7] Protocol mapping spec 2026-07-28
-│   │   └── tools.go               # [FASE 7] Tools: charites_scan, charites_explain_rule
-│   ├── wiki/                      # Generator katalog rule otomatis
-│   │   ├── generator.go           # [FASE 8] Ekspor metadata rule ke markdown di wiki/
-│   │   └── templates/             # [FASE 8] Template panduan remediasi
-│   └── lifecycle/                 # Distribusi & update binary
-│       ├── installer.go           # [FASE 8] Manajemen path & symlink
-│       ├── updater.go             # [FASE 8] Self-binary replace via GitHub Release
-│       └── uninstaller.go         # [FASE 8] Pembersihan binary dari PATH
-├── wiki/                          # Ensiklopedia detail rules ringkas per bidang (theme, a11y, perf, dll.)
-│   └── .gitkeep                   # Diisi pada Fase 8
-├── scripts/                       # Shell automation helper
-│   ├── install.sh                 # [FASE 8] One-liner curl installer
-│   └── uninstall.sh               # [FASE 8] Uninstaller script
-├── tests/                         # Test fixtures, correctness corpus, & suites
-│   ├── correctness/               # [FASE 3] Model Evaluasi Semantik Argus (Tri-Corpus)
-│   │   └── theme.hardcode-opacity-color/
-│   │       ├── positive/          # True violations (Wajib terdeteksi > 0)
-│   │       ├── negative/          # Clean valid code (Zero-Noise Invariant == 0)
-│   │       └── adversarial/       # False positive bait & syntax stress tests
-│   ├── golden/                    # [FASE 4] Snapshot regression (JSON & ANSI output)
-│   ├── fixtures/                  # [FASE 2] Berkas mentah (.astro, .tsx, global.css)
-│   ├── integration/               # [FASE 5] Test pipeline end-to-end
-│   ├── fuzz/                      # [FASE 2] Go 1.26 native fuzzing untuk Parser & IR
-│   └── e2e/                       # [FASE 0] Subprocess CLI runner smoke tests
-│       └── smoke_test.go          # [FASE 0] Verifikasi binary terkompilasi
-├── .charitesignore                # [FASE 0] Default ignore patterns (Semgrep-compatible)
-├── .golangci.yml                  # [FASE 0] Konfigurasi 9 linter wajib
-├── charites.example.yaml          # [FASE 0] Template konfigurasi rule & severity
-├── Makefile                       # [FASE 0] Perintah build, test, lint, format
-├── go.mod                         # [FASE 0] Modul github.com/will2469/charites (Go 1.26)
-└── go.sum
-```
+### A. Berkas Implementasi Wajib Fase 0 (Mandatory Phase 0 Files)
+Fase 0 **MUST** menginisialisasi dan menyediakan berkas-berkas berikut:
+1. `cmd/charites/main.go` - Entrypoint trampoline `os.Exit(cli.Execute(os.Args[1:]))`.
+2. `internal/cli/root.go` - Root command dispatcher, routing flags `-v, --version`, `-h, --help`, subcommand `version`, dan unknown command handler.
+3. `internal/cli/version.go` - Metadata rilis & runtime version info.
+4. `internal/cli/root_test.go` - Unit test routing flag, subcommand, dan exit codes.
+5. `tests/e2e/smoke_test.go` - Subprocess E2E smoke test binary terkompilasi.
+6. Berkas konfigurasi root:
+   - `go.mod` (Go 1.26, zero external dependencies)
+   - `Makefile` (target `all`, `build`, `test`, `lint`, `clean`)
+   - `.charitesignore` (pola ignore default Semgrep-compatible)
+   - `.golangci.yml` (konfigurasi baseline linter)
+   - `charites.example.yaml` (template konfigurasi rule & severity)
+
+### B. Reservasi Direktori Arsitektur (Repository Skeleton Directory Reservation)
+Direktori-direktori berikut dipersiapkan sebagai reservasi struktur arsitektur repositori (*directory reservation*). Direktori ini **TIDAK** diwajibkan telah memiliki implementasi logika pada Fase 0, melainkan diimplementasikan secara terisolasi per fase sesuai roadmap:
+- `internal/ir/` - Diimplementasikan pada **Fase 1** (Leaf IR Data Contract: node, diagnostic).
+- `internal/parser/` - Diimplementasikan pada **Fase 2** (Parser Tailwind CSS v4 `@theme`, Astro, TSX).
+- `internal/rules/` - Diimplementasikan pada **Fase 3** (Rule interface, registry & Rule #1).
+- `internal/analyzer/` - Diimplementasikan pada **Fase 3 & 4** (Context buffer & traversal engine).
+- `internal/config/` - Diimplementasikan pada **Fase 4** (Parser charites.yaml & engine ignore).
+- `internal/reporter/` - Diimplementasikan pada **Fase 4 & 5** (Terminal ANSI, JSON, markdown reporter).
+- `internal/scanner/` - Diimplementasikan pada **Fase 5** (Dirwalker & worker pool).
+- `internal/cli/scan.go` - Subcommand `scan` (aliases: `check`, `run`) diimplementasikan pada **Fase 5**.
+- `internal/mcp/` & `internal/cli/mcp.go` - Subcommand `mcp` (JSON-RPC 2.0 daemon) diimplementasikan pada **Fase 7**.
+- `internal/wiki/`, `internal/lifecycle/`, & `internal/cli/wiki.go` - Subcommand `wiki` & binary updater diimplementasikan pada **Fase 8**.
+- `tests/fixtures/`, `tests/fuzz/` - Diimplementasikan pada **Fase 2**.
+- `tests/correctness/` - Diimplementasikan pada **Fase 3** (Tri-Corpus test harness).
+- `tests/golden/` - Diimplementasikan pada **Fase 4** (Regression golden snapshots).
+- `tests/integration/` - Diimplementasikan pada **Fase 5**.
+
+Pemisahan ini menjamin isolasi fase (*phase isolation*) yang bersih tanpa kebocoran kode masa depan (*future code leakage*) ke dalam build Fase 0.
 
 ---
 
@@ -159,40 +121,51 @@ Thumbs.db
 
 ---
 
-## 4. Spesifikasi Entrypoint Binary (`cmd/charites/main.go`)
+## 4. Spesifikasi Kontrak Entrypoint Binary (`cmd/charites/main.go` & `internal/cli`)
 
 - **Nama Binary Output:** `charites`
-- **Behavior Fase 0:**
-  - Jika dipanggil tanpa argumen atau dengan flag `-v, --version`: Mencetak informasi versi:
-    ```text
-    charites version 0.1.0-dev (go1.26)
-    ```
-    dan keluar dengan exit code `0`.
-  - Jika dipanggil dengan flag `-h, --help`: Mencetak panduan penggunaan dasar:
+- **Kontrak CLI Fase 0 (Input, Output, Exit Codes):**
+  1. **Flag Versi (`--version` dan `-v`) serta Subcommand `version`:**
+     - Mencetak informasi versi ke `stdout`:
+       ```text
+       charites version 0.1.0-dev (go1.26.x)
+       ```
+     - Keluar dengan exit code `0`.
+  2. **Flag Bantuan (`--help` dan `-h`):**
+     - Mencetak panduan penggunaan dasar ke `stdout`:
+       ```text
+       Usage: charites <command> [options] [path]
 
-    ```text
-    Usage: charites <command> [options] [path]
+       Commands:
+         scan       Scan frontend files for design system, a11y, and performance issues
+                    Aliases: check, run
+         version    Print binary version
 
-    Commands:
-      scan       Scan frontend files for design system, a11y, and performance issues
-                 Aliases: check, run
-      version    Print binary version
-
-    Options for 'scan':
-      -f, --format string      Output format: inline (default ANSI) or json
-      --ext string             Filter by extension: astro, tsx, jsx
-      --category string        Filter by category: theme, a11y, perf, layout, seo
-      --rule string            Filter by single rule ID: theme.hardcode-opacity-color
-      --ignore string          Additional custom ignore pattern
-    ```
-
-    dan keluar dengan exit code `0`.
+       Options for 'scan':
+         -f, --format string      Output format: inline (default ANSI) or json
+         --ext string             Filter by extension: astro, tsx, jsx
+         --category string        Filter by category: theme, a11y, perf, layout, seo
+         --rule string            Filter by single rule ID: theme.hardcode-opacity-color
+         --ignore string          Additional custom ignore pattern
+       ```
+     - Keluar dengan exit code `0`.
+  3. **Pemanggilan Tanpa Argumen (`[]string{}`):**
+     - Mencetak panduan penggunaan dasar (Usage) ke `stdout`.
+     - Keluar dengan exit code `0`.
+  4. **Subcommand / Flag Tidak Dikenal (*Unknown Command / Invalid Flag*):**
+     - Jika pengguna memberikan argumen atau subcommand yang tidak dikenali (contoh: `charites unknown-command` atau `charites --bogus`), CLI **MUST** mencetak pesan kesalahan deskriptif ke `stderr`.
+     - Keluar dengan exit code `2` (CLI argument syntax error).
 
 ---
 
-## 5. Acceptance Criteria (Kriteria Lolos Fase 0)
+## 5. Acceptance Criteria (Kriteria Fungsional Lolos Fase 0)
 
-1. Perintah `go build -o bin/charites ./cmd/charites` berhasil tanpa error dan tanpa warning.
-2. Binary `bin/charites --version` mencetak string versi dan keluar dengan exit code `0`.
-3. Berkas `.charitesignore` ada dan memuat seluruh direktori build/dependency umum.
-4. Seluruh skeleton folder di `internal/` dan `tests/` telah dibuat dan terdaftar.
+1. Perintah `go build -o bin/charites ./cmd/charites` berhasil tanpa error dan tanpa warning dengan `CGO_ENABLED=0`.
+2. Binary `./bin/charites --version` dan `./bin/charites -v` serta `./bin/charites version` mencetak string versi dan keluar dengan exit code `0`.
+3. Binary `./bin/charites --help` dan `./bin/charites -h` mencetak panduan penggunaan dan keluar dengan exit code `0`.
+4. Binary `./bin/charites` (tanpa argumen) mencetak panduan penggunaan dan keluar dengan exit code `0`.
+5. Binary `./bin/charites unknown-command` mencetak pesan kesalahan ke `stderr` dan keluar dengan exit code `2`.
+6. Berkas `.charitesignore` tersedia di root dan memuat seluruh default pattern ignorasi Semgrep-compatible.
+7. Berkas `go.sum` **MUST NOT** be required pada Fase 0 karena ketiadaan dependensi pihak ketiga (*zero external dependencies*).
+8. Seluruh skeleton folder di `internal/` dan `tests/` telah dibuat sebagai *directory reservations*.
+
