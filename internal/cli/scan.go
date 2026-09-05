@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -43,7 +44,8 @@ func (c *countingAnalyzer) AnalyzeFile(path string) ([]ir.Diagnostic, error) {
 // RunScan mengorkestrasi pipeline pemindaian kode frontend sesuai kontrak SPEC-05-CLI.
 func RunScan(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
-	fs.SetOutput(stderr)
+	fs.SetOutput(io.Discard)
+	fs.Usage = func() {}
 
 	var format string
 	var category string
@@ -77,6 +79,11 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 	reorderedArgs, positionalArgs := partitionArgs(args)
 
 	if err := fs.Parse(reorderedArgs); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			_, _ = fmt.Fprint(stdout, UsageString())
+			return ExitClean
+		}
+		_, _ = fmt.Fprintf(stderr, "charites: error: %v. Run 'charites --help' for usage.\n", err)
 		return ExitOperational
 	}
 

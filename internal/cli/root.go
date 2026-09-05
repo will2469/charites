@@ -14,10 +14,21 @@ func UsageString() string {
 
 Available Commands:
   scan        Pindai berkas frontend untuk audit kualitas dan token semantik (Default)
-  check       Alias identik untuk 'scan'
-  run         Alias identik untuk 'scan'
+              Aliases: check, run
   version     Cetak versi kompilasi binary, commit git, dan Go runtime
   help        Bantuan penggunaan perintah
+
+Flags:
+  -f, --format string      Format output: inline (default ANSI) atau json (default "inline")
+  -e, --ext string         Filter ekstensi yang dipindai (default "astro,tsx,jsx")
+  -c, --category string    Filter kategori rule (theme, a11y, perf, dll.)
+  -r, --rule string        Filter satu Charites Rule ID spesifik (<category>.<slug>)
+      --config string      Path kustom berkas konfigurasi (default "charites.yaml")
+      --ignore string      Pola glob ignore tambahan (dapat berulang atau koma)
+      --no-color           Matikan pewarnaan ANSI di terminal
+      --fail-on-warn       Kembalikan exit code 1 jika hanya terdapat warning
+  -h, --help               Bantuan penggunaan perintah
+  -v, --version            Cetak versi binary
 `
 }
 
