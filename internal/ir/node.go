@@ -27,15 +27,16 @@ type Span struct {
 // Node adalah representasi pohon sintaks seragam (Unified AST/IR) untuk Astro, React TSX, dan HTML.
 // Memiliki tata letak memori teroptimasi (136 bytes pada target 64-bit) dengan 7-byte padding eksplisit.
 type Node struct {
-	Span       Span              // 32 bytes (4 int @ 8 bytes)
-	Parent     *Node             // 8 bytes (pointer ke node induk)
-	Tag        string            // 16 bytes (pointer + panjang string)
-	RawClasses string            // 16 bytes (string asli atribut class sebelum pemisahan)
-	Attributes map[string]string // 8 bytes (pointer map atribut mentah)
-	Classes    []string          // 24 bytes (slice token class yang sudah di-split & di-trim)
-	Children   []*Node           // 24 bytes (slice pointer ke node anak)
-	Type       NodeType          // 1 byte (uint8)
-	_          [7]byte           // 7 bytes explicit padding agar rata dengan word boundary 8-byte
+	Span              Span              // 32 bytes (4 int @ 8 bytes)
+	Parent            *Node             // 8 bytes (pointer ke node induk)
+	Tag               string            // 16 bytes (pointer + panjang string)
+	RawClasses        string            // 16 bytes (string asli atribut class sebelum pemisahan)
+	Attributes        map[string]string // 8 bytes (pointer map atribut mentah)
+	Classes           []string          // 24 bytes (slice token class yang sudah di-split & di-trim)
+	Children          []*Node           // 24 bytes (slice pointer ke node anak)
+	Type              NodeType          // 1 byte (uint8)
+	HasDynamicClasses bool              // 1 byte (boolean penanda keberadaan kelas dinamis interpolasi ${...})
+	_                 [6]byte           // 6 bytes explicit padding agar rata dengan word boundary 8-byte
 }
 
 // Walk melakukan pre-order depth-first traversal pada pohon IR.

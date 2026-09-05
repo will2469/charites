@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+/* Design token registry for Tailwind CSS v4 */
+@theme {
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: rgba(37, 99, 235, 0.1);
+  --color-primary-subtle: rgba(37, 99, 235, 0.05);
+
+  --color-secondary: #64748b;
+  --color-secondary-hover: #475569;
+  --color-secondary-light: rgba(100, 116, 139, 0.1);
+
+  --color-danger: #ef4444;
+  --color-danger-light: rgba(239, 68, 68, 0.1);
+
+  --color-accent: oklch(0.623 0.214 259.815);
+  --color-accent-hover: oklch(0.546 0.245 262.881);
+  --color-accent-light: oklch(0.623 0.214 259.815 / 10%);
+  --color-accent-subtle: oklch(0.623 0.214 259.815 / 5%);
+
+  --color-surface: #ffffff;
+  --color-surface-dark: #0f172a;
+
+  --font-sans: Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: JetBrains Mono, monospace;
+
+  --spacing-container: 1280px;
+}

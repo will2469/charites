@@ -1,0 +1,4 @@
+/* Regression fixture: unclosed theme block */
+@theme {
+  --color-unclosed: #2563eb;
+  --color-unclosed-light: rgba(37, 99, 235, 0.1);
