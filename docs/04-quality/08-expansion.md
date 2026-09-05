@@ -2,59 +2,52 @@
 
 > **Kode Dokumen:** `QUAL-08-EXPANSION`
 > **Tahapan:** Fase 8 - Repetitive Pattern Flow Guide & Rule Authoring Template (Core Assessment)
+> **Peran Pilar:** QUALITY = QUALITY THRESHOLD (Ambang Batas Kualitas, Anti-Sycophancy & Anggaran Kinerja)
 > **Status:** Ready for Review
 > **Standar Rujukan:** OpenSSF Best Practices & Anti-Sycophancy Static Analyzer Guidelines
 
-Dokumen ini mendefinisikan batasan kualitas ketat, penegakan integritas fungsi murni, pelarangan jalan pintas rahasia (*anti-sycophancy / zero-bypass invariant*), serta jaminan nol-regresi (*non-regression invariant*) saat menambahkan rule baru.
+Dokumen ini mendefinisikan batasan kualitas, penegakan integritas fungsi murni, pelarangan jalan pintas rahasia (*anti-sycophancy invariant*), serta pemisahan tegas antara invarian mutlak, target kualitas, dan anggaran performa.
 
 ---
 
-## 1. Invarian Integritas Evaluasi (Anti-Sycophancy Invariant)
+## 1. Invarian Mutlak (Hard Non-Negotiable Invariants)
 
-Dalam pengembangan linter statis, pengembang sering kali tergoda membuat "jalan pintas rahasia" (*hardcoded secret whitelists*) agar kode tertentu tidak memicu error tanpa memperbaiki akar masalah. Pada Charites:
-
-1. **Zero Secret Bypass Invariant:**
-   **DILARANG KERAS** menyisipkan pengecualian nama berkas tersembunyi di dalam kode rule (contoh dosa linter legacy: `if strings.Contains(file, "Vendor")` atau `if file == "OpenApiDocs.tsx"`).
-2. **Pengecualian Transparan:**
-   Seluruh bentuk pengecualian berkas atau direktori **WAJIB** dikonfigurasikan secara transparan melalui:
-   - Pola pengabaian `.charitesignore` resmi, ATAU
-   - Blok `ignore:` pada berkas konfigurasi `charites.yaml`, ATAU
-   - Komentar direktif inline ignore: `// charites:ignore <rule-id>`.
-3. **Pesan Diagnostik yang Jujur & Konstruktif:**
-   Setiap rule wajib menyertakan alasan teknis yang jujur pada field `Message` dan solusi konkret pada field `Hint`. Rule dilarang menghasilkan pesan ambigu tanpa petunjuk perbaikan.
+1. **Anti-Sycophancy / Zero Secret Bypass Invariant:**
+   **DILARANG KERAS** menyisipkan pengecualian nama berkas tersembunyi di dalam kode rule (contoh larangan: `if strings.Contains(file, "Vendor")` atau `if file == "SpecialPage.tsx"`). Seluruh pengecualian wajib melalui mekanisme transparan: `.charitesignore`, config `charites.yaml`, atau direktif inline `// charites:ignore`.
+2. **Pure Function Invariant:**
+   Fungsi `rule.Evaluate(*ir.Node)` wajib murni tanpa disk/network I/O, memperlakukan pointer `*ir.Node` sebagai *immutable*, dan bersifat idempoten deterministik.
+3. **Concurrency Safety Invariant:**
+   Rule singleton wajib aman dievaluasi secara paralel oleh puluhan goroutine tanpa mutable state sharing (`0 data races` di bawah flag `-race`).
 
 ---
 
-## 2. Invarian Performa & Alokasi Memori Rule
+## 2. Target Kualitas Kode (Quality Targets)
 
-Penambahan puluhan rule baru tidak boleh mendegradasi kecepatan pemindaian Charites:
-
-1. **Fast-Path Character Check:**
-   Sebelum menjalankan perulangan atau operasi pemecahan string, rule wajib melakukan pengecekan awal cepat (*quick filter*). Contoh pada `theme.hardcode-color`: jika string tidak memuat karakter `#` atau `rgb`, lewati token tersebut secara instan.
-2. **Zero Allocation pada Kasus Bersih:**
-   Jika sebuah node tidak melanggar aturan, pemanggilan `Evaluate(node)` wajib mengembalikan `nil` tanpa alokasi heap (`0 B/op`).
-3. **Batas Kompleksitas Siklomatik:**
-   Fungsi `Evaluate()` wajib memiliki *Cyclomatic Complexity* $\le 10$. Jika logika pemeriksaan terlalu kompleks, pecah menjadi fungsi-fungsi pembantu (*helper functions*) yang teruji secara terpisah.
+1. **Cakupan Pengujian Pernyataan (Statement Coverage):**
+   Setiap berkas rule baru di `internal/rules/<domain>/` wajib memiliki coverage $\ge 90\%$.
+2. **Kompleksitas Siklomatik Terkendali:**
+   Fungsi `Evaluate()` dan helper-nya wajib memiliki *Cyclomatic Complexity* $\le 10$ (`gocyclo -over 10`).
+3. **Pesan Diagnostik Konstruktif:**
+   Setiap pelanggaran wajib menyertakan deskripsi masalah objektif di `Message` dan saran perbaikan konkret di `Hint`.
 
 ---
 
-## 3. Invarian Nol Regresi (Non-Regression Invariant)
+## 3. Anggaran Performa & Alokasi Memori (`QUAL-08-PERF-001`)
 
-1. **Integritas Registry:**
-   Pendaftaran rule baru tidak boleh menimpa atau merusak urutan pendaftaran rule yang sudah ada di dalam `Registry`.
-2. **Throughput Preservation:**
-   Penambahan 1 rule baru dilarang meningkatkan waktu pemindaian total repositori lebih dari **3%**.
-3. **Core Isolation:**
-   File rule baru dilarang mengimpor atau memanipulasi komponen di luar `internal/ir` dan `internal/rules`.
+1. **Fast-Path Check pada Node Bersih:**
+   Rule wajib menyediakan pemeriksaan cepat (*quick filter*) di awal fungsi untuk menghindari alokasi heap saat mengevaluasi node legal (Target Desain: `0 B/op` dan `0 allocs/op` pada node bersih).
+2. **Throughput Preservation Budget:**
+   Penambahan satu rule baru tidak boleh mendegradasi throughput pemindaian repositori lebih dari batas wajar yang terukur pada benchmark pipeline standar.
 
 ---
 
-## 4. Ambang Batas Kualitas Kode untuk Rule Baru
+## 4. Ambang Batas Kualitas & Metrik Kelulusan
 
-| Metrik Kualitas | Ambang Batas Minimum | Cara Pengukuran |
-| :--- | :---: | :--- |
-| **Branch Coverage Logika Rule** | $100\%$ | Menguji seluruh cabang `if/else` pada file `<rule>.go` |
-| **Tri-Corpus Gate Test** | $100\%$ Lulus | `RuleCorrectnessMetric == Pass` |
-| **Kompleksitas Siklomatik** | $\le 10$ per fungsi | `gocyclo -over 10 internal/rules/<domain>/<rule>.go` |
-| **Alokasi Heap Node Bersih** | `0 B/op` | `go test -bench=BenchmarkEvaluate_<Rule> -benchmem` |
-| **Linter Compliance** | $0$ issues | `golangci-lint run internal/rules/<domain>/...` |
+| Metrik Kualitas | Ambang Batas Minimum | Cara Pengukuran | Klasifikasi |
+| :--- | :---: | :--- | :--- |
+| **Data Race Safety** | $0$ data race detected | `go test -race ./internal/rules/...` | Hard Invariant |
+| **Zero Secret Bypass** | $0$ hardcoded whitelists | Code audit & adversarial corpus | Hard Invariant |
+| **Tri-Corpus Matrix Match** | $100\%$ exact match | `go test -run TestTriCorpus` | Hard Invariant |
+| **Statement Coverage** | $\ge 90\%$ | `go test -cover ./internal/rules/...` | Quality Target |
+| **Kompleksitas Siklomatik** | $\le 10$ per fungsi | `gocyclo -over 10 ./internal/rules` | Quality Target |
+| **Linter Compliance** | $0$ issues | `golangci-lint run ./internal/rules/...` | Quality Target |
