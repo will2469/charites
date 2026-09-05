@@ -161,3 +161,44 @@ func BenchmarkContext_AllTokens_Iter(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkCascade_ResolveScope(b *testing.B) {
+	input := []byte(`:root {
+  --brand: #111111;
+}
+@layer theme {
+  :root {
+    --brand: #222222;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brand: #333333;
+  }
+}
+.card {
+  --brand: #444444;
+  --active: var(--brand);
+}`)
+	ctx, err := token.ParseCSS(input)
+	if err != nil {
+		b.Fatalf("failed to parse: %v", err)
+	}
+
+	toks := ctx.ByName("--active")
+	if len(toks) != 1 {
+		b.Fatalf("expected --active")
+	}
+	id := toks[0].ID
+	opts := token.ResolveOptions{}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for b.Loop() {
+		val, ok, err := ctx.Resolve(id, opts)
+		if err != nil || !ok || val != "#444444" {
+			b.Fatalf("unexpected resolve: %v", val)
+		}
+	}
+}

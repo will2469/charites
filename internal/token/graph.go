@@ -37,6 +37,7 @@ type Graph struct {
 	ByName     map[string][]ID
 	DependsOn  map[ID][]ID
 	Dependents map[ID][]ID
+	LayerOrder map[string]int
 }
 
 // TokenGraph adalah alias untuk Graph demi kenyamanan penamaan.
@@ -51,6 +52,7 @@ func NewTokenGraph() *Graph {
 		ByName:     make(map[string][]ID),
 		DependsOn:  make(map[ID][]ID),
 		Dependents: make(map[ID][]ID),
+		LayerOrder: make(map[string]int),
 	}
 }
 
@@ -86,24 +88,74 @@ func (g *Graph) BuildDependencies() {
 	}
 }
 
-// matchBestScope memilih TokenID terbaik dari daftar kandidat yang cocok dengan scope referer.
+func (g *Graph) computeCascadeRank(cID TokenID, currentScope Scope) CascadeRank {
+	tok := g.Nodes[cID]
+	candScope := tok.Scope
+
+	// 1. ConditionScore
+	condScore := 1 // default unconditional
+	hasConditions := false
+	for _, at := range candScope.AtRules {
+		if len(at.Conditions) > 0 {
+			hasConditions = true
+			break
+		}
+	}
+	if hasConditions {
+		if candScope.MatchesConditions(currentScope) {
+			condScore = 2
+		} else {
+			condScore = 0
+		}
+	}
+
+	// 2. LayerRank (Unlayered styles win over layered styles in CSS)
+	layerRank := 1000000
+	if len(candScope.Layers) > 0 {
+		topLayer := candScope.Layers[len(candScope.Layers)-1]
+		if order, ok := g.LayerOrder[topLayer]; ok {
+			layerRank = order
+		} else {
+			layerRank = 1
+		}
+	}
+
+	// 3. SelectorAffinity
+	selAffinity := 0
+	if candScope.Selector == currentScope.Selector && currentScope.Selector != "" {
+		selAffinity = 2
+	} else if candScope.IsRoot() {
+		selAffinity = 1
+	}
+
+	return CascadeRank{
+		ConditionScore:   condScore,
+		LayerRank:        layerRank,
+		Specificity:      candScope.Specificity,
+		SelectorAffinity: selAffinity,
+		SourceOrder:      candScope.SourceOrder,
+	}
+}
+
+// matchBestScope memilih TokenID pemenang dari daftar kandidat sesuai semantik CSS Cascade penuh:
+// 1. Conditional At-Rule applicability (@media, @supports, @container)
+// 2. CSS Cascade Layer precedence (unlayered > later layers > earlier layers)
+// 3. Selector Specificity (A, B, C)
+// 4. Selector Affinity (exact selector match > root fallback)
+// 5. Source Order (order of appearance in file: later declaration wins)
 func (g *Graph) matchBestScope(candidates []TokenID, currentScope Scope) TokenID {
 	if len(candidates) == 1 {
 		return candidates[0]
 	}
 
-	// 1. Prioritaskan selector yang sama persis
-	for _, id := range candidates {
-		if g.Nodes[id].Scope.Selector == currentScope.Selector {
-			return id
-		}
-	}
-
-	// 2. Prioritaskan kandidat dengan spesifisitas tertinggi
 	bestID := candidates[0]
-	for _, id := range candidates {
-		if g.Nodes[id].Scope.Specificity.GreaterThan(g.Nodes[bestID].Scope.Specificity) {
+	bestRank := g.computeCascadeRank(bestID, currentScope)
+
+	for _, id := range candidates[1:] {
+		rank := g.computeCascadeRank(id, currentScope)
+		if rank.GreaterThan(bestRank) {
 			bestID = id
+			bestRank = rank
 		}
 	}
 

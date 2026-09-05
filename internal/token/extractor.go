@@ -108,6 +108,18 @@ func ParseCSS(src []byte) (Context, error) {
 		for _, r := range rules {
 			switch node := r.(type) {
 			case *theme.AtRule:
+				if strings.EqualFold(node.Name, "@layer") && node.Prelude != "" {
+					// Daftarkan layer order berurutan (misal: @layer base, theme, utilities;)
+					for _, part := range strings.Split(node.Prelude, ",") {
+						lName := strings.TrimSpace(part)
+						if lName != "" {
+							if _, ok := graph.LayerOrder[lName]; !ok {
+								graph.LayerOrder[lName] = len(graph.LayerOrder) + 1
+							}
+						}
+					}
+				}
+
 				at := AtRule{
 					Name:       node.Name,
 					Prelude:    node.Prelude,
@@ -214,23 +226,13 @@ func resolveNestedSelector(parent, child string) string {
 
 func parseConditions(atName, prelude string) []Condition {
 	name := strings.ToLower(atName)
-	var condType string
-	switch name {
-	case "@media":
-		condType = "media"
-	case "@supports":
-		condType = "supports"
-	case "@container":
-		condType = "container"
-	default:
-		condType = strings.TrimPrefix(name, "@")
+	if name != "@media" && name != "@supports" && name != "@container" {
+		return nil
 	}
-
 	if prelude == "" {
 		return nil
 	}
-
 	return []Condition{
-		{Type: condType, Query: prelude},
+		ParseCondition(atName, prelude),
 	}
 }
