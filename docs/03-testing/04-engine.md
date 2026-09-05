@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `TEST-04-ENGINE`
 > **Tahapan:** Fase 4 - Konfigurasi, Concurrency Scanner & Traversal Engine
 > **Peran Pilar:** TEST = PROOF (Harness Pengujian, Pembuktian Batas & Asersi Keamanan)
-> **Status:** Ready for Review (Implementation Locked: DO NOT START YET)
+> **Status:** Ready for Review
 > **Standar Rujukan:** Go Concurrency Testing, Stress Benchmarks & Race Detection Standards
 
 Dokumen ini mendefinisikan strategi pengujian menyeluruh untuk memvalidasi paket konfigurasi (`internal/config`), pemindai direktori paralel (`internal/scanner`), serta mesin traversal AST (`internal/analyzer`).

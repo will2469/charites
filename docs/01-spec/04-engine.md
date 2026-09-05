@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `SPEC-04-ENGINE`
 > **Tahapan:** Fase 4 - Konfigurasi, Concurrency Scanner & Traversal Engine
 > **Peran Pilar:** SPEC = WHAT (Spesifikasi Kebutuhan Fungsional & Kontrak Engine)
-> **Status:** Ready for Review (Implementation Locked: DO NOT START YET)
+> **Status:** Ready for Review
 > **Standar Rujukan:** IETF RFC 2119 / Semgrep Engine Architecture / Gitignore Pattern Specification
 
 Dokumen ini mendefinisikan spesifikasi kebutuhan fungsional untuk sistem konfigurasi **`charites.yaml`** (Model Argus: Invarian Default YES & Precedence), sistem pengabaian **`.charitesignore`**, proteksi traversal filesystem, batas sumber daya I/O, *goroutine worker pool*, *AST traversal engine*, serta kontrak determinisme pelaporan.
