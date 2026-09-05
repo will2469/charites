@@ -28,31 +28,31 @@ Dokumen ini mendefinisikan gerbang evaluasi kelulusan (*phase gate*) untuk **Fas
 
 Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi gerbang berikut berstatus **PASS**:
 
-- [ ] **`ROAD-00-GATE-001` (SPEC-00 Compliance = PASS):**
-  - [ ] Kontrak CLI Entrypoint (Version, Usage, Unknown Commands, Exit Codes 0 & 2) terpenuhi.
-  - [ ] Kontrak Stream Routing (Stdout vs Stderr terisolasi penuh) terpenuhi.
-  - [ ] Kontrak Ignorasi Gitignore-compatible (`.charitesignore`) terpenuhi.
-  - [ ] Kontrak Modul Go & Zero External Dependencies (`go.sum` not required) terpenuhi.
-  - [ ] Kontrak Kompilasi `SPEC-00-BUILD-001` (Zero-CGO) & `SPEC-00-BUILD-002` (4 Target Resmi) terpenuhi.
+- [x] **`ROAD-00-GATE-001` (SPEC-00 Compliance = PASS):**
+  - [x] Kontrak CLI Entrypoint (Version, Usage, Unknown Commands, Exit Codes 0 & 2) terpenuhi.
+  - [x] Kontrak Stream Routing (Stdout vs Stderr terisolasi penuh) terpenuhi.
+  - [x] Kontrak Ignorasi Gitignore-compatible (`.charitesignore`) terpenuhi.
+  - [x] Kontrak Modul Go & Zero External Dependencies (`go.sum` not required) terpenuhi.
+  - [x] Kontrak Kompilasi `SPEC-00-BUILD-001` (Zero-CGO) & `SPEC-00-BUILD-002` (4 Target Resmi) terpenuhi.
 
-- [ ] **`ROAD-00-GATE-002` (ARCH-00 Compliance = PASS):**
-  - [ ] Enkapsulasi `internal/` terpenuhi tanpa kebocoran kontrak publik.
-  - [ ] Pola entrypoint trampoline `cmd/charites/main.go` terpenuhi.
-  - [ ] Isolasi fase skeleton directory reservations terpenuhi tanpa kebocoran logika fase masa depan.
-  - [ ] Automasi Makefile mengimplementasikan urutan dependensi deterministik (`ARCH-00-BUILD-ORDER`).
+- [x] **`ROAD-00-GATE-002` (ARCH-00 Compliance = PASS):**
+  - [x] Enkapsulasi `internal/` terpenuhi tanpa kebocoran kontrak publik.
+  - [x] Pola entrypoint trampoline `cmd/charites/main.go` terpenuhi.
+  - [x] Isolasi fase skeleton directory reservations terpenuhi tanpa kebocoran logika fase masa depan.
+  - [x] Automasi Makefile mengimplementasikan urutan dependensi deterministik (`ARCH-00-BUILD-ORDER`).
 
-- [ ] **`ROAD-00-GATE-003` (TEST-00 Verification = PASS):**
-  - [ ] `TEST-00-CLI-001` (Unit Test CLI Dispatcher) = PASS.
-  - [ ] `TEST-00-SMOKE-001` (Subprocess E2E Smoke & Stream Routing) = PASS.
-  - [ ] `TEST-00-BUILD-001` (Zero-CGO Binary Compilation) = PASS.
-  - [ ] `TEST-00-BUILD-002` (Cross-Platform 4 Target Compilation) = PASS.
-  - [ ] `TEST-00-BUILD-ORDER` (Fresh Checkout Build Before Test Verification) = PASS.
+- [x] **`ROAD-00-GATE-003` (TEST-00 Verification = PASS):**
+  - [x] `TEST-00-CLI-001` (Unit Test CLI Dispatcher) = PASS.
+  - [x] `TEST-00-SMOKE-001` (Subprocess E2E Smoke & Stream Routing) = PASS.
+  - [x] `TEST-00-BUILD-001` (Zero-CGO Binary Compilation) = PASS.
+  - [x] `TEST-00-BUILD-002` (Cross-Platform 4 Target Compilation) = PASS.
+  - [x] `TEST-00-BUILD-ORDER` (Fresh Checkout Build Before Test Verification) = PASS.
 
-- [ ] **`ROAD-00-GATE-004` (QUAL-00 Threshold = PASS):**
-  - [ ] `QUAL-00-LINT-001` (Baseline 9 Linters + Govet Enable-All) = PASS.
-  - [ ] `QUAL-00-DEPS-001` (Zero Third-Party Dependencies Policy) = PASS.
-  - [ ] `QUAL-00-INVAR-001` (Zero CGO Repository Surface Invariant) = PASS.
-  - [ ] `QUAL-00-REPRO-001` (GitHub Actions CI Pinned Toolchain `go1.26.0`) = PASS.
+- [x] **`ROAD-00-GATE-004` (QUAL-00 Threshold = PASS):**
+  - [x] `QUAL-00-LINT-001` (Baseline 9 Linters + Govet Enable-All) = PASS.
+  - [x] `QUAL-00-DEPS-001` (Zero Third-Party Dependencies Policy) = PASS.
+  - [x] `QUAL-00-INVAR-001` (Zero CGO Repository Surface Invariant) = PASS.
+  - [x] `QUAL-00-REPRO-001` (GitHub Actions CI Pinned Toolchain `go1.26.0`) = PASS.
 
 ---
 
