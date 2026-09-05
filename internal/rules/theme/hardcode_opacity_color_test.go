@@ -24,6 +24,31 @@ func TestHardcodeOpacityColorRule_Metadata(t *testing.T) {
 	}
 }
 
+func TestHardcodeOpacityColorRule_ReplacementFor(t *testing.T) {
+	tests := []struct {
+		token     string
+		wantRep   string
+		wantFound bool
+	}{
+		{"primary/10", "primary-light", true},
+		{"primary/20", "primary-light", true},
+		{"primary/5", "primary-subtle", true},
+		{"destructive/10", "destructive-light", true},
+		{"nonexistent/10", "", false},
+		{"primary/30", "", false},
+	}
+
+	for _, tt := range tests {
+		got, ok := theme.ReplacementFor(tt.token)
+		if ok != tt.wantFound {
+			t.Errorf("ReplacementFor(%q) ok = %v, want %v", tt.token, ok, tt.wantFound)
+		}
+		if got != tt.wantRep {
+			t.Errorf("ReplacementFor(%q) = %q, want %q", tt.token, got, tt.wantRep)
+		}
+	}
+}
+
 func TestHardcodeOpacityColorRule_TableDrivenBoundary(t *testing.T) {
 	rule := theme.NewHardcodeOpacityColorRule()
 

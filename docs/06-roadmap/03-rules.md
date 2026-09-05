@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ROAD-03-RULES`
 > **Tahapan:** Fase 3 - Rule Contract & Proving Ground Rule (`theme.hardcode-opacity-color`)
 > **Peran Pilar:** ROADMAP = PHASE GATE (Otoritas Gerbang Evaluasi Kelulusan Transisi)
-> **Status:** Graduated (All Phase Gates Passed)
+> **Status:**  BLOCK Phase 3 Graduation (Contract Hardening Completed; Awaiting Final CI/Gate Review)
 
 Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi (*phase gate*) untuk **Fase 3 (Rule Contract & Proving Ground Rule: `theme.hardcode-opacity-color`)** sebelum tim diizinkan melangkah ke **Fase 4 (Konfigurasi, Concurrency Scanner & Traversal Engine)**. Sesuai prinsip pemisahan otoritas arsitektur:
 - **SPEC** = WHAT (Kontrak Antarmuka Rule, Detection Contract & Nomenklatur ID)
@@ -19,8 +19,8 @@ Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi
 1. **`internal/rules/rule.go`**: Interface `Rule` (`ID`, `Description`, `Category`, `DefaultSeverity`, `Evaluate`).
 2. **`internal/rules/registry.go`**: In-memory registry thread-safe dengan `sync.RWMutex`, pencarian $O(1)$, dan metode `All()` / `ByCategory()` dengan pengurutan deterministik berdasarkan `Rule.ID()`.
 3. **`internal/rules/registry_test.go`**: Unit test pendaftaran rule, validasi penolakan ID duplikat, pengujian urutan deterministik, dan concurrent read/write test (`-race`).
-4. **`internal/rules/theme/hardcode_opacity_color.go`**: Implementasi Rule #1 (`theme.hardcode-opacity-color`) dengan normalisasi Tailwind variant (`stripVariants`), lookup `OPACITY_TOKEN_MAP`, dan dynamic hint generator.
-5. **`internal/rules/theme/hardcode_opacity_color_test.go`**: Table-driven unit test mencakup 20 skenario batas (in-scope, variants, clean negative, out-of-scope baits, arbitrary colors) serta benchmark alokasi memori.
+4. **`internal/rules/theme/hardcode_opacity_color.go`**: Implementasi Rule #1 (`theme.hardcode-opacity-color`) dengan normalisasi Tailwind variant (`stripVariants`), unexported `opacityTokenMap`, read-only `ReplacementFor()`, dan dynamic hint generator.
+5. **`internal/rules/theme/hardcode_opacity_color_test.go`**: Table-driven unit test mencakup 28 skenario batas (in-scope, variants, clean negative, out-of-scope baits, arbitrary colors) serta benchmark alokasi memori.
 6. **`tests/correctness/theme/hardcode-opacity-color/`**: Tiga sub-korpus uji nyata:
    - `positive/`: Berkas contoh dengan pelanggaran `bg-primary/10`, `border-destructive/20`, variant `hover:bg-primary/10`.
    - `negative/`: Berkas contoh bersih dengan token semantik resmi `bg-primary-light`, `text-muted`.
@@ -33,24 +33,27 @@ Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi
 
 ## 2. Gerbang Evaluasi Kelulusan (Phase Gate DoD)
 
-Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi gerbang berikut berstatus **PASS**:
+Status Evaluasi Tata Kelola:
+- **Implementation Status:** Mostly PASS (Detection Contract, Variant Stripping, Tri-Corpus Suite, Automated Wiki SSOT).
+- **Phase Gate Status:**  BLOCK (Terkunci hingga evaluasi independen dan bukti eksekusi seluruh suite lengkap diajukan).
 
 - [x] **`ROAD-03-GATE-001` (SPEC-03 Compliance = PASS):**
   - Interface `Rule` terdefinisi bersih di `internal/rules/rule.go` tanpa dependensi ke scanner/engine.
   - Menggunakan canonical Charites Rule ID (`theme.hardcode-opacity-color`).
-  - Detection Contract Rule #1 terkunci: hanya mendeteksi utility color dengan pemetaan token semantik resmi (`OPACITY_TOKEN_MAP`).
+  - Detection Contract Rule #1 terkunci: hanya mendeteksi utility color dengan pemetaan token semantik resmi (`opacityTokenMap`).
   - Out-of-Scope ditegakkan: layout fraction (`w-1/2`), aspect ratio (`aspect-16/9`), grid fraction (`grid-cols-2/3`), line-height (`text-sm/6`), unmapped opacity (`bg-primary/30`), dan arbitrary color (`bg-[#123456]/10`) diabaikan (0 diagnostic).
   - Diagnostic message dan hint di-generate secara dinamis sesuai mapping token pengganti.
   - Rule `Evaluate()` terpisah dari inline comment suppression (didelegasikan ke engine layer Fase 4).
 
 - [x] **`ROAD-03-GATE-002` (ARCH-03 Compliance = PASS):**
   - Rule bersifat murni (*pure function*) dan *stateless*.
+  - Map mapping token dienkapsulasi sebagai unexported `opacityTokenMap` (immutable-by-convention) untuk mencegah mutasi state eksternal atau data race saat scan konkuren. Akses read-only disediakan via `ReplacementFor()`.
   - Registri rule aman dari race condition menggunakan `sync.RWMutex`.
   - `Registry.All()` dan `Registry.ByCategory()` menjamin urutan deterministik (sorted by `Rule.ID()`).
   - Normalisasi varian (`stripVariants`) mengekstrak base utility untuk deteksi multi-prefix (`hover:`, `dark:`, `md:hover:`).
 
 - [x] **`ROAD-03-GATE-003` (TEST-03 Compliance = PASS):**
-  - Matriks pengujian batas 20 skenario lolos 100% pada unit test.
+  - Matriks pengujian batas 28 skenario lolos 100% pada unit test table-driven.
   - Charites 1-SSOT Tri-Corpus Verification lolos:
     - `PositiveViolations > 0` (Terbukti mendeteksi pelanggaran).
     - `NegativeViolations == 0` (Zero Noise Invariant terpenuhi).
@@ -68,6 +71,14 @@ Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi 
 
 ## 3. Gerbang Transisi ke Fase 4 (Engine & Scanner)
 
-Begitu keempat gerbang di atas berstatus **PASS**:
-1. Buat git commit: `feat(rules): implement rule interface, deterministic registry, and theme.hardcode-opacity-color rule with tri-corpus suite`.
-2. Melangkah ke Fase 4: Buka dokumen `docs/01-spec/04-engine.md` untuk merancang parser konfigurasi `charites.yaml`, `.charitesignore` matcher, worker pool concurrency scanner, diagnostic suppression filter, dan traversal engine.
+Transisi ke Fase 4 dibuka setelah:
+1. Hardening kontrak selesai: unexport `OpacityTokenMap` -> `opacityTokenMap`, read-only helper `ReplacementFor`.
+2. Seluruh verifikasi diverifikasi ulang dengan bukti eksekusi lengkap:
+   - `go test -race ./...`
+   - `go test ./...`
+   - `go test -cover ./internal/rules/...`
+   - `golangci-lint run ./internal/rules/...`
+   - Tri-Corpus verification (`tests/correctness_gate_test.go`)
+   - Benchmark allocation validation (`BenchmarkEvaluateHardcodeOpacityColor_Clean`)
+3. Melangkah ke Fase 4: Buka dokumen `docs/01-spec/04-engine.md` untuk merancang parser konfigurasi `charites.yaml`, `.charitesignore` matcher, worker pool concurrency scanner, diagnostic suppression filter, dan traversal engine.
+

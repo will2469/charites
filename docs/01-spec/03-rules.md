@@ -101,8 +101,8 @@ Prinsip Deteksi: **"Slash opacity yang memiliki semantic token replacement adala
    Rule **MUST** melakukan normalisasi leksikal membuang prefix variant tunggal maupun bersarang sebelum mencocokkan utility dasar:
    - Single variant: `hover:bg-primary/10`, `dark:text-primary/20`, `focus:ring-warning/10`
    - Chained variants: `md:hover:bg-primary/10`, `dark:hover:border-destructive/20`, `sm:dark:bg-primary/5`
-4. **Supported Opacity Mappings (`OPACITY_TOKEN_MAP`):**
-   Hanya pasangan warna dan angka opacity berikut yang memicu pelanggaran:
+4. **Supported Opacity Mappings (`opacityTokenMap`):**
+   Mapping ini dienkapsulasi sebagai variabel unexported package-private (`opacityTokenMap`) yang bersifat *immutable-by-convention*, dengan helper read-only `ReplacementFor(token string) (string, bool)`. Hal ini menjamin prinsip pure function dan mencegah data race saat scan paralel. Hanya pasangan warna dan angka opacity berikut yang memicu pelanggaran:
 
 | Base Utility Pattern | Replacement Semantic Token |
 | :--- | :--- |

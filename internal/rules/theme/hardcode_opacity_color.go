@@ -6,9 +6,10 @@ import (
 	"github.com/will2469/charites/internal/ir"
 )
 
-// OpacityTokenMap memetakan utility warna dengan modifier slash opacity ke token semantik resmi pengganti.
+// opacityTokenMap memetakan utility warna dengan modifier slash opacity ke token semantik resmi pengganti.
+// Bersifat unexported dan immutable-by-convention untuk menjamin purity, thread-safety, dan determinisme total.
 // Sesuai SPEC-03-RULES Section 3.2.A.
-var OpacityTokenMap = map[string]string{
+var opacityTokenMap = map[string]string{
 	"primary/10":     "primary-light",
 	"primary/20":     "primary-light",
 	"primary/5":      "primary-subtle",
@@ -28,6 +29,13 @@ var OpacityTokenMap = map[string]string{
 	"amber/5":        "amber-subtle",
 	"emerald/10":     "emerald-light",
 	"emerald/5":      "emerald-subtle",
+}
+
+// ReplacementFor mengembalikan token semantik pengganti untuk pasangan warna/opacity tertentu secara read-only.
+// Mengembalikan replacement token dan true jika token terdaftar, atau string kosong dan false jika tidak terdaftar.
+func ReplacementFor(token string) (string, bool) {
+	rep, ok := opacityTokenMap[token]
+	return rep, ok
 }
 
 // HardcodeOpacityColorRule mengimplementasikan aturan static analysis "theme.hardcode-opacity-color".
@@ -178,7 +186,7 @@ func (r *HardcodeOpacityColorRule) Evaluate(node *ir.Node) []ir.Diagnostic {
 			continue
 		}
 
-		replacement, ok := OpacityTokenMap[colorSlash]
+		replacement, ok := opacityTokenMap[colorSlash]
 		if !ok {
 			continue
 		}

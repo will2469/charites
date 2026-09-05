@@ -29,7 +29,7 @@ flowchart TD
         subgraph Proving_Ground ["Rule Proving Ground"]
             RuleTheme["theme/hardcode_opacity_color.go\n(theme.hardcode-opacity-color)"]
             VariantStripper["Lexical Normalizer\n(Strips hover:, dark:, md: etc.)"]
-            Map["OPACITY_TOKEN_MAP\n(Pre-compiled Semantic Lookup)"]
+            Map["opacityTokenMap\n(Unexported Immutable Lookup)"]
         end
     end
 
@@ -191,7 +191,7 @@ flowchart TD
     StripVar --> MatchPrefix{"Cocok prefix utility?\n(bg-, text-, border-, ring-)"}
 
     MatchPrefix -- Tidak --> NextClass
-    MatchPrefix -- Ya --> MapLookup{"Key ada di OPACITY_TOKEN_MAP?"}
+    MatchPrefix -- Ya --> MapLookup{"Key ada di opacityTokenMap?"}
 
     MapLookup -- Tidak --> NextClass
     MapLookup -- Ya --> EmitDiag["Buat ir.Diagnostic Dinamis:\nMsg: Hardcode opacity color: <original_class>\nHint: Use semantic token <replacement>"]
@@ -207,6 +207,6 @@ flowchart TD
 
 ## 4. Pemisahan Tanggung Jawab: Evaluasi vs Pengabaian Direktif (*Separation of Concerns*)
 
-1. **Tanggung Jawab Rule:** Fungsi `rule.Evaluate(node)` murni membandingkan token terhadap `OPACITY_TOKEN_MAP` dan menghasilkan diagnosis mentah. Rule **TIDAK PERLU** memeriksa komentar ignore `charites:ignore`.
+1. **Tanggung Jawab Rule:** Fungsi `rule.Evaluate(node)` murni membandingkan token terhadap `opacityTokenMap` dan menghasilkan diagnosis mentah. Rule **TIDAK PERLU** memeriksa komentar ignore `charites:ignore`.
 2. **Tanggung Jawab Engine Analyzer (Fase 4):** Lapisan engine traversal menerima diagnosis dari rule, memeriksa keberadaan direktif ignore pada node atau scope terkait, lalu menyaring (*suppress*) temuan yang diabaikan sebelum dikirim ke reporter.
 
