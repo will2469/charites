@@ -9,7 +9,7 @@ The `{{ .Category }}` category contains static analysis rules for code quality, 
 | Rule ID | Severity | Summary | Full Specification | Status |
 | :--- | :---: | :--- | :--- | :---: |
 {{- range .Rules }}
-| `{{ .ID }}` | `{{ .Severity }}` | {{ .Description }} | [`{{ $.Category }}/{{ .Slug }}.md`]({{ $.Category }}/{{ .Slug }}.md) | `enabled` |
+| `{{ .ID }}` | `{{ .Severity }}` | {{ .Description }} | [`{{ .ID }}.md`]({{ .ID }}.md) | `enabled` |
 {{- end }}
 
 ---

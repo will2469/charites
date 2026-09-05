@@ -6,6 +6,10 @@
 
 ### Rule Categories
 {{range .Categories}}
-* [**{{.Title}}**]({{.Name}}.md) ({{.Count}} rules)
-{{range .Rules}}  * [`{{.ID}}`]({{.Category}}/{{.Slug}}.md)
-{{end}}{{end}}
+<details open>
+<summary><b>{{.Title}}</b> ({{.Count}} rules) - <a href="{{.Name}}.md">Overview</a></summary>
+
+{{range .Rules}}* [`{{.ID}}`]({{.ID}}.md)
+{{end}}
+</details>
+{{end}}

@@ -37,8 +37,8 @@ func TestGenerator_Generate(t *testing.T) {
 	if !strings.Contains(homeContent, "theme") {
 		t.Errorf("Home.md missing 'theme' category")
 	}
-	if !strings.Contains(homeContent, "theme/hardcode-opacity-color.md") {
-		t.Errorf("Home.md missing 'theme/hardcode-opacity-color.md'")
+	if !strings.Contains(homeContent, "theme.hardcode-opacity-color.md") {
+		t.Errorf("Home.md missing 'theme.hardcode-opacity-color.md'")
 	}
 
 	// 2. Verify theme.md
@@ -51,15 +51,15 @@ func TestGenerator_Generate(t *testing.T) {
 	if !strings.Contains(themeContent, "# Theme Rules (`theme`)") {
 		t.Errorf("theme.md missing header")
 	}
-	if !strings.Contains(themeContent, "theme/hardcode-opacity-color.md") {
-		t.Errorf("theme.md missing link to theme/hardcode-opacity-color.md")
+	if !strings.Contains(themeContent, "theme.hardcode-opacity-color.md") {
+		t.Errorf("theme.md missing link to theme.hardcode-opacity-color.md")
 	}
 
-	// 3. Verify theme/hardcode-opacity-color.md
-	rulePath := filepath.Join(tmpDir, "theme", "hardcode-opacity-color.md")
+	// 3. Verify theme.hardcode-opacity-color.md
+	rulePath := filepath.Join(tmpDir, "theme.hardcode-opacity-color.md")
 	ruleBytes, readErr := os.ReadFile(filepath.Clean(rulePath)) //nolint:gosec // controlled test path
 	if readErr != nil {
-		t.Fatalf("theme/hardcode-opacity-color.md was not generated: %v", readErr)
+		t.Fatalf("theme.hardcode-opacity-color.md was not generated: %v", readErr)
 	}
 	ruleContent := string(ruleBytes)
 	if !strings.Contains(ruleContent, "# theme.hardcode-opacity-color") {
@@ -76,11 +76,14 @@ func TestGenerator_Generate(t *testing.T) {
 	if !strings.Contains(sidebarContent, "* [**Home**](Home.md)") {
 		t.Errorf("_Sidebar.md missing Home link")
 	}
-	if !strings.Contains(sidebarContent, "* [**Theme**](theme.md)") {
-		t.Errorf("_Sidebar.md missing Theme category header")
+	if !strings.Contains(sidebarContent, "<details open>") {
+		t.Errorf("_Sidebar.md missing collapsible details")
 	}
-	if !strings.Contains(sidebarContent, "  * [`theme.hardcode-opacity-color`](theme/hardcode-opacity-color.md)") {
-		t.Errorf("_Sidebar.md missing nested rule entry with indentation")
+	if !strings.Contains(sidebarContent, "<summary><b>Theme</b> (15 rules)") {
+		t.Errorf("_Sidebar.md missing Theme category summary")
+	}
+	if !strings.Contains(sidebarContent, "* [`theme.hardcode-opacity-color`](theme.hardcode-opacity-color.md)") {
+		t.Errorf("_Sidebar.md missing rule entry in sidebar")
 	}
 }
 
@@ -107,9 +110,9 @@ func TestGenerator_WithCustomRegistry(t *testing.T) {
 		t.Errorf("expected theme.md to be created")
 	}
 
-	rulePath := filepath.Join(tmpDir, "theme", "hardcode-opacity-color.md")
+	rulePath := filepath.Join(tmpDir, "theme.hardcode-opacity-color.md")
 	if _, statErr := os.Stat(rulePath); os.IsNotExist(statErr) {
-		t.Errorf("expected theme/hardcode-opacity-color.md to be created")
+		t.Errorf("expected theme.hardcode-opacity-color.md to be created")
 	}
 }
 
@@ -140,7 +143,7 @@ func TestWikiGenerator_DynamicCategoriesAndAtomic(t *testing.T) {
 		t.Errorf("Home.md missing rule entry: %v", err)
 	}
 
-	ruleDoc, err := os.ReadFile(filepath.Clean(filepath.Join(tmpTarget, "theme", "hardcode-opacity-color.md"))) //nolint:gosec // controlled test path
+	ruleDoc, err := os.ReadFile(filepath.Clean(filepath.Join(tmpTarget, "theme.hardcode-opacity-color.md"))) //nolint:gosec // controlled test path
 	if err != nil || !strings.Contains(string(ruleDoc), "## 1. Overview & Core Invariant") {
 		t.Errorf("rule 8-pillars document missing or corrupted: %v", err)
 	}
@@ -151,8 +154,8 @@ func TestWikiGenerator_DynamicCategoriesAndAtomic(t *testing.T) {
 		t.Fatalf("second generation failed: %v", err)
 	}
 
-	firstBytes, _ := os.ReadFile(filepath.Clean(filepath.Join(tmpTarget, "theme", "hardcode-opacity-color.md")))     //nolint:gosec // controlled test path
-	secondBytes, _ := os.ReadFile(filepath.Clean(filepath.Join(secondTarget, "theme", "hardcode-opacity-color.md"))) //nolint:gosec // controlled test path
+	firstBytes, _ := os.ReadFile(filepath.Clean(filepath.Join(tmpTarget, "theme.hardcode-opacity-color.md")))     //nolint:gosec // controlled test path
+	secondBytes, _ := os.ReadFile(filepath.Clean(filepath.Join(secondTarget, "theme.hardcode-opacity-color.md"))) //nolint:gosec // controlled test path
 	if !bytes.Equal(firstBytes, secondBytes) {
 		t.Errorf("Wiki output is not byte-for-byte identical across runs")
 	}

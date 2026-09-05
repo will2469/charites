@@ -152,22 +152,25 @@ func (g *Generator) Generate(outputDir string) error {
 		}
 	}
 
-	// 4. Pastikan direktori target ada
+	// 4. Pastikan direktori target ada dan bersihkan subdirektori lawas
 	if mErr := os.MkdirAll(outputDir, 0o750); mErr != nil {
 		return fmt.Errorf("failed to create output directory %s: %w", outputDir, mErr)
+	}
+	for _, cat := range categories {
+		_ = os.RemoveAll(filepath.Join(outputDir, cat))
 	}
 
 	// 5. Salin struktur dari staging ke target direktori secara rekursif
 	return copyTree(tmpDir, outputDir)
 }
 
-func (g *Generator) renderRuleDoc(catSubDir, cat string, r rules.Rule) error {
+func (g *Generator) renderRuleDoc(tmpDir, cat string, r rules.Rule) error {
 	slug := strings.TrimPrefix(r.ID(), cat+".")
 	ruleContent, rErr := g.renderRule(r, cat, slug)
 	if rErr != nil {
 		return fmt.Errorf("failed to render rule %s: %w", r.ID(), rErr)
 	}
-	rulePath := filepath.Join(catSubDir, slug+".md")
+	rulePath := filepath.Join(tmpDir, r.ID()+".md")
 	if wErr := os.WriteFile(rulePath, []byte(ruleContent), 0o600); wErr != nil {
 		return fmt.Errorf("failed to write rule doc %s: %w", rulePath, wErr)
 	}
@@ -184,13 +187,8 @@ func (g *Generator) renderCategoryDocs(tmpDir, cat string, cRules []rules.Rule) 
 		return fmt.Errorf("failed to write %s.md: %w", cat, wErr)
 	}
 
-	catSubDir := filepath.Join(tmpDir, cat)
-	if mErr := os.MkdirAll(catSubDir, 0o750); mErr != nil {
-		return fmt.Errorf("failed to create category directory %s: %w", catSubDir, mErr)
-	}
-
 	for _, r := range cRules {
-		if err := g.renderRuleDoc(catSubDir, cat, r); err != nil {
+		if err := g.renderRuleDoc(tmpDir, cat, r); err != nil {
 			return err
 		}
 	}
