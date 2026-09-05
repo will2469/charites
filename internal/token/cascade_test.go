@@ -158,8 +158,9 @@ func TestCascade_ConditionalAtRules(t *testing.T) {
 	}
 }
 
-func TestCascade_ExactSelectorAffinity(t *testing.T) {
-	// Selektor yang persis sama (.card) harus mengalahkan root fallback (:root)
+func TestCascade_ElementDirectOverInheritedRoot(t *testing.T) {
+	// Sesuai aturan CSS property inheritance: deklarasi langsung pada elemen (.card)
+	// mendahului nilai yang diwarisi dari root (:root) terlepas dari urutan penulisan.
 	input := []byte(`:root {
   --pad: 10px;
 }
@@ -184,6 +185,83 @@ func TestCascade_ExactSelectorAffinity(t *testing.T) {
 		t.Fatalf("failed to resolve: %v", err)
 	}
 	if val != "24px" {
-		t.Errorf("expected exact selector affinity '24px', got %q", val)
+		t.Errorf("expected direct element declaration '24px', got %q", val)
+	}
+}
+
+func TestCascade_UnlayeredBeatsConditionalLayered(t *testing.T) {
+	// W3C CSS Cascade 5: Deklarasi unlayered selalu mengalahkan deklarasi layered,
+	// bahkan jika deklarasi layered dibungkus oleh kondisi @media yang cocok!
+	// (Membuktikan tidak ada artificial ConditionScore yang membajak cascade layer).
+	input := []byte(`@media (prefers-color-scheme: dark) {
+  @layer theme {
+    :root {
+      --surface: #layered-dark;
+    }
+  }
+}
+
+:root {
+  --surface: #unlayered-wins;
+}
+
+@media (prefers-color-scheme: dark) {
+  .consumer {
+    --active: var(--surface);
+  }
+}`)
+
+	ctx, err := token.ParseCSS(input)
+	if err != nil {
+		t.Fatalf("ParseCSS failed: %v", err)
+	}
+
+	toks := ctx.ByName("--active")
+	if len(toks) != 1 {
+		t.Fatalf("expected 1 --active token")
+	}
+
+	val, ok, err := ctx.Resolve(toks[0].ID, token.ResolveOptions{})
+	if err != nil || !ok {
+		t.Fatalf("failed to resolve: %v", err)
+	}
+	if val != "#unlayered-wins" {
+		t.Errorf("expected unlayered token '#unlayered-wins' to beat layered even under media query, got %q", val)
+	}
+}
+
+func TestCascade_IsVsWhereSpecificity(t *testing.T) {
+	// W3C CSS Selectors 4:
+	// :is(#hero) memiliki spesifisitas ID (1, 0, 0).
+	// :where(#hero) memiliki spesifisitas NOL (0, 0, 0).
+	// Oleh karena itu, aturan dengan :is() harus mengalahkan :where() meskipun :where() ditulis belakangan!
+	input := []byte(`:is(#hero) {
+  --accent: #is-wins;
+}
+
+:where(#hero) {
+  --accent: #where-loses;
+}
+
+#hero {
+  --resolved: var(--accent);
+}`)
+
+	ctx, err := token.ParseCSS(input)
+	if err != nil {
+		t.Fatalf("ParseCSS failed: %v", err)
+	}
+
+	toks := ctx.ByName("--resolved")
+	if len(toks) != 1 {
+		t.Fatalf("expected 1 --resolved token")
+	}
+
+	val, ok, err := ctx.Resolve(toks[0].ID, token.ResolveOptions{})
+	if err != nil || !ok {
+		t.Fatalf("failed to resolve: %v", err)
+	}
+	if val != "#is-wins" {
+		t.Errorf("expected :is(#hero) '#is-wins' (1,0,0) to beat :where(#hero) (0,0,0), got %q", val)
 	}
 }

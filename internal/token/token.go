@@ -79,36 +79,20 @@ type AtRule struct {
 	Conditions []Condition // Rincian kondisi terurai
 }
 
-// Specificity merepresentasikan bobot spesifisitas selektor CSS (A, B, C).
-// A: ID selectors (#header)
-// B: Class, attribute, & pseudo-classes (.card, [data-theme], :root, :hover)
-// C: Elements & pseudo-elements (div, html, ::before)
-type Specificity struct {
-	A int
-	B int
-	C int
-}
-
-// GreaterThan mengembalikan true jika s memiliki spesifisitas lebih tinggi dari other.
-func (s Specificity) GreaterThan(other Specificity) bool {
-	if s.A != other.A {
-		return s.A > other.A
-	}
-	if s.B != other.B {
-		return s.B > other.B
-	}
-	return s.C > other.C
-}
+// Specificity merepresentasikan bobot spesifisitas selektor CSS (A, B, C)
+// sesuai spesifikasi W3C CSS Selectors Level 4.
+type Specificity = theme.Specificity
 
 // CascadeRank merepresentasikan tuple pembobotan deklarasi CSS sesuai spesifikasi
 // W3C CSS Cascading and Inheritance Level 5 (Cascade Sort).
+//
+// Standar W3C Cascade 5 (§6):
+//  1. Layer Order: Unlayered styles selalu mengalahkan layered styles.
+//     Di antara layered styles, layer yang dideklarasikan belakangan memiliki rank lebih tinggi.
+//  2. Specificity: Selektor dengan bobot spesifisitas (A, B, C) tertinggi menang.
+//  3. Order of Appearance (Source Order): Jika layer dan spesifisitas identik,
+//     deklarasi yang muncul belakangan dalam berkas sumber yang menang.
 type CascadeRank struct {
-	// ConditionScore:
-	// 2 = kondisi cocok persis dengan scope konteks (misal prefers-color-scheme: dark di dark context)
-	// 1 = tanpa kondisi (universal fallback e.g. :root biasa)
-	// 0 = kondisi berkonflik atau tidak dapat diaplikasikan (inapplicable)
-	ConditionScore int
-
 	// LayerRank:
 	// Unlayered styles selalu mengalahkan layered styles (LayerRank = 1_000_000).
 	// Di antara layered styles, layer yang dideklarasikan belakangan memiliki LayerRank lebih tinggi.
@@ -117,22 +101,13 @@ type CascadeRank struct {
 	// Specificity: bobot spesifisitas selektor CSS (A, B, C).
 	Specificity Specificity
 
-	// SelectorAffinity:
-	// 2 = selektor persis sama dengan referer
-	// 1 = selektor root (:root atau html)
-	// 0 = selektor lain
-	SelectorAffinity int
-
 	// SourceOrder: urutan kemunculan deklarasi dalam berkas CSS.
-	// Jika seluruh kriteria di atas imbang, deklarasi terakhir (source order lebih besar) yang menang.
 	SourceOrder int
 }
 
-// GreaterThan mengembalikan true jika r memiliki prioritas cascade lebih tinggi daripada other.
+// GreaterThan mengembalikan true jika r memiliki prioritas cascade lebih tinggi daripada other
+// sesuai urutan W3C Cascade 5: Layer -> Specificity -> SourceOrder.
 func (r CascadeRank) GreaterThan(other CascadeRank) bool {
-	if r.ConditionScore != other.ConditionScore {
-		return r.ConditionScore > other.ConditionScore
-	}
 	if r.LayerRank != other.LayerRank {
 		return r.LayerRank > other.LayerRank
 	}
@@ -143,9 +118,6 @@ func (r CascadeRank) GreaterThan(other CascadeRank) bool {
 		if other.Specificity.GreaterThan(r.Specificity) {
 			return false
 		}
-	}
-	if r.SelectorAffinity != other.SelectorAffinity {
-		return r.SelectorAffinity > other.SelectorAffinity
 	}
 	return r.SourceOrder > other.SourceOrder
 }
@@ -233,50 +205,8 @@ type Token struct {
 	References []string         // Nama-nama token lain yang direferensikan melalui var(--...)
 }
 
-// ComputeSpecificity menghitung bobot spesifisitas CSS dari string selektor.
+// ComputeSpecificity mem-parse dan menghitung bobot spesifisitas CSS dari string selektor
+// sesuai spesifikasi W3C CSS Selectors Level 4.
 func ComputeSpecificity(selector string) Specificity {
-	s := strings.TrimSpace(selector)
-	if s == "" {
-		return Specificity{}
-	}
-
-	var spec Specificity
-	parts := strings.FieldsFunc(s, func(r rune) bool {
-		return r == ' ' || r == '>' || r == '+' || r == '~' || r == ','
-	})
-
-	for _, part := range parts {
-		if part == "" {
-			continue
-		}
-		// Hitung ID (#)
-		spec.A += strings.Count(part, "#")
-
-		// Hitung Classes (.)
-		spec.B += strings.Count(part, ".")
-
-		// Hitung Attributes ([...])
-		spec.B += strings.Count(part, "[")
-
-		// Hitung Pseudo-classes & Pseudo-elements (:)
-		colons := strings.Count(part, ":")
-		doubleColons := strings.Count(part, "::")
-		spec.C += doubleColons                  // Pseudo-elements (::before)
-		spec.B += (colons - (doubleColons * 2)) // Pseudo-classes (:hover, :root)
-
-		// Elemen dasar (html, div, body, svg, etc.)
-		cleaned := strings.Map(func(r rune) rune {
-			if r == '.' || r == '#' || r == ':' || r == '[' || r == ']' || r == '*' {
-				return ' '
-			}
-			return r
-		}, part)
-		for _, el := range strings.Fields(cleaned) {
-			if el != "" && !strings.HasPrefix(el, "&") {
-				spec.C++
-			}
-		}
-	}
-
-	return spec
+	return theme.ComputeSpecificity(selector)
 }

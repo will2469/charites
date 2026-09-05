@@ -88,28 +88,11 @@ func (g *Graph) BuildDependencies() {
 	}
 }
 
-func (g *Graph) computeCascadeRank(cID TokenID, currentScope Scope) CascadeRank {
+func (g *Graph) computeCascadeRank(cID TokenID) CascadeRank {
 	tok := g.Nodes[cID]
 	candScope := tok.Scope
 
-	// 1. ConditionScore
-	condScore := 1 // default unconditional
-	hasConditions := false
-	for _, at := range candScope.AtRules {
-		if len(at.Conditions) > 0 {
-			hasConditions = true
-			break
-		}
-	}
-	if hasConditions {
-		if candScope.MatchesConditions(currentScope) {
-			condScore = 2
-		} else {
-			condScore = 0
-		}
-	}
-
-	// 2. LayerRank (Unlayered styles win over layered styles in CSS)
+	// LayerRank (Unlayered styles win over layered styles in CSS Cascade 5)
 	layerRank := 1000000
 	if len(candScope.Layers) > 0 {
 		topLayer := candScope.Layers[len(candScope.Layers)-1]
@@ -120,39 +103,65 @@ func (g *Graph) computeCascadeRank(cID TokenID, currentScope Scope) CascadeRank 
 		}
 	}
 
-	// 3. SelectorAffinity
-	selAffinity := 0
-	if candScope.Selector == currentScope.Selector && currentScope.Selector != "" {
-		selAffinity = 2
-	} else if candScope.IsRoot() {
-		selAffinity = 1
-	}
-
 	return CascadeRank{
-		ConditionScore:   condScore,
-		LayerRank:        layerRank,
-		Specificity:      candScope.Specificity,
-		SelectorAffinity: selAffinity,
-		SourceOrder:      candScope.SourceOrder,
+		LayerRank:   layerRank,
+		Specificity: candScope.Specificity,
+		SourceOrder: candScope.SourceOrder,
 	}
 }
 
-// matchBestScope memilih TokenID pemenang dari daftar kandidat sesuai semantik CSS Cascade penuh:
-// 1. Conditional At-Rule applicability (@media, @supports, @container)
-// 2. CSS Cascade Layer precedence (unlayered > later layers > earlier layers)
-// 3. Selector Specificity (A, B, C)
-// 4. Selector Affinity (exact selector match > root fallback)
-// 5. Source Order (order of appearance in file: later declaration wins)
+// matchBestScope memilih TokenID pemenang dari daftar kandidat sesuai semantik W3C CSS Cascade 5:
+// 1. Applicability Filtering: Deklarasi yang kondisinya tidak kompatibel dengan konteks difilter keluar.
+// 2. Element Scoping (Inheritance): Deklarasi langsung pada elemen mengalahkan nilai warisan dari :root / ancestor.
+// 3. Cascade Sorting (§6): Diurutkan murni berdasarkan LayerRank -> Specificity -> SourceOrder.
 func (g *Graph) matchBestScope(candidates []TokenID, currentScope Scope) TokenID {
 	if len(candidates) == 1 {
 		return candidates[0]
 	}
 
-	bestID := candidates[0]
-	bestRank := g.computeCascadeRank(bestID, currentScope)
+	// 1. Filter deklarasi yang applicable terhadap kondisi konteks (media queries, supports, container)
+	applicable := make([]TokenID, 0, len(candidates))
+	for _, id := range candidates {
+		candScope := g.Nodes[id].Scope
+		if candScope.MatchesConditions(currentScope) {
+			applicable = append(applicable, id)
+		}
+	}
 
-	for _, id := range candidates[1:] {
-		rank := g.computeCascadeRank(id, currentScope)
+	// Jika tidak ada yang applicable (misal evaluasi pada konteks tanpa kondisi spesifik),
+	// ambil deklarasi tanpa kondisi sebagai fallback alami.
+	if len(applicable) == 0 {
+		for _, id := range candidates {
+			if len(g.Nodes[id].Scope.AtRules) == 0 {
+				applicable = append(applicable, id)
+			}
+		}
+		if len(applicable) == 0 {
+			applicable = candidates
+		}
+	}
+
+	// 2. Element Scoping vs Root Inheritance:
+	// Deklarasi langsung pada elemen konteks selalu mendahului nilai yang diwarisi dari :root.
+	if currentScope.Selector != "" && !currentScope.IsRoot() {
+		direct := make([]TokenID, 0, len(applicable))
+		for _, id := range applicable {
+			candScope := g.Nodes[id].Scope
+			if candScope.Selector == currentScope.Selector {
+				direct = append(direct, id)
+			}
+		}
+		if len(direct) > 0 {
+			applicable = direct
+		}
+	}
+
+	// 3. W3C Cascade Sorting: LayerRank -> Specificity -> SourceOrder
+	bestID := applicable[0]
+	bestRank := g.computeCascadeRank(bestID)
+
+	for _, id := range applicable[1:] {
+		rank := g.computeCascadeRank(id)
 		if rank.GreaterThan(bestRank) {
 			bestID = id
 			bestRank = rank
