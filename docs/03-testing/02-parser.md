@@ -15,50 +15,63 @@ Dokumen ini mendefinisikan strategi pengujian menyeluruh untuk parser Tailwind C
 ### 1.1. Uji Coba Tailwind Parser (`internal/parser/tailwind/theme_test.go`)
 - **Input:** Berkas `tests/fixtures/global.css` yang memuat blok `@theme`.
 - **Verifikasi:**
-  - Token warna `--color-primary: #2563eb` berhasil diekstrak dengan key `primary`.
-  - Token opacity `--color-primary-light` berhasil diekstrak dan dipetakan sesuai konvensi default.
+  - Token `--color-primary: #2563eb` berhasil diekstrak ke dalam `ThemeTokenRegistry.Variables["--color-primary"]`.
+  - Token `--color-primary-light: rgba(37, 99, 235, 0.1)` berhasil diekstrak mentah tanpa pemetaan ekuivalensi semantik prematur.
   - Deklarasi di luar blok `@theme` diabaikan dengan benar.
 
 ### 1.2. Uji Coba Astro Component Lexer (`internal/parser/astro/lexer_test.go`)
 - **Test Case 1 (Line Offset Preservation):**
   - Input: File `.astro` dengan 10 baris frontmatter.
   - Ekspektasi: Tag pembuka pertama template di baris 11 memiliki `Span.Line == 11`.
-- **Test Case 2 (Nested Components):**
-  - Input: Komponen `<Card><Button class="p-2">Klik</Button></Card>`.
-  - Ekspektasi: Terbentuk hierarki 2 tingkat dengan pointer `Parent` yang valid.
-- **Test Case 3 (Batas Kedalaman Nesting 255, 256, 257):**
-  - Input dokumen dengan tag bersarang:
-    - 255 tingkat nesting: berhasil diparse utuh (*accepted*).
-    - 256 tingkat nesting: berhasil diparse utuh (*accepted*, batas puncak tercapai).
-    - 257+ tingkat nesting: diproses secara deterministik tanpa stack overflow panic (*depth bounded*).
-- **Test Case 4 (Semantik Pemulihan / Recovery Semantics):**
-  - Input:
-    ```html
-    <div>
-      <span>
-        <broken
-        <button class="valid">Klik</button>
-      </span>
-    </div>
-    ```
-  - Ekspektasi: Token `<broken` dibuang, parser melakukan resinkronisasi pada `<button`, dan elemen `button` dengan kelas `valid` berhasil diekstrak normal ke dalam IR tree.
+- **Test Case 2 (Nested & Custom Components):**
+  - Input: Komponen `<Card><HeaderNavigation /><Button class="p-2">Klik</Button></Card>`.
+  - Ekspektasi: Komponen PascalCase teridentifikasi dengan relasi `Parent`/`Children` valid.
+- **Test Case 3 (Astro Slots & Fragments):**
+  - Input: `<Fragment><slot name="header" /><slot /></Fragment>`.
+  - Ekspektasi: Elemen slot dan fragment terurai menjadi node IR yang tepat.
+- **Test Case 4 (Void Elements Autoclosing):**
+  - Input: `<div><img src="pic.jpg"><input type="text"><p>Teks</p></div>`.
+  - Ekspektasi: `<img>` dan `<input>` tidak menjebak `<p>` sebagai elemen anak; ketiga elemen bersaudara sejajar di bawah `<div>`.
+- **Test Case 5 (Batas Kedalaman Nesting 255, 256, 257+):**
+  - 255 tingkat: diparse normal (*accepted*).
+  - 256 tingkat: diparse normal (*accepted* pada kedalaman puncak).
+  - 257+ tingkat: elemen anak disematkan sebagai anak flat di bawah node tingkat-256 (*depth-256 flat siblings*), stack tidak pernah melebihi 256.
 
 ### 1.3. Uji Coba JSX Structural Extractor (`internal/parser/tsx/extractor_test.go`)
 - **Test Case 1 (JSX Attributes & Self-Closing):**
   - Input: `<div className="p-4 bg-primary" id="main" />`.
   - Ekspektasi: Terbaca tag `div`, atribut `className` dan `id`.
-- **Test Case 2 (Static Template Literal Classes):**
+- **Test Case 2 (Fragments `<>...</>`):**
+  - Input: `<><span>A</span><span>B</span></>`.
+  - Ekspektasi: Menghasilkan `NodeFragment` dengan dua anak `span`.
+- **Test Case 3 (Static Template Literal Classes):**
   - Input: ``<div className={`p-4 bg-primary`} />``.
-  - Ekspektasi: String di dalam backtick berhasil diekstrak ke dalam `Classes`.
-- **Test Case 3 (Dynamic Template Literal & Interpolation):**
-  - Input: ``<div className={`p-4 ${cond ? "bg-red" : "bg-blue"}`} />``.
+  - Ekspektasi: String di dalam backtick diekstrak ke dalam `Classes`.
+- **Test Case 4 (Dynamic Template Literal & Opaque Interpolation):**
+  - Input: ``<div className={`p-4 ${cond ? "bg-red" : "bg-blue"} text-sm`} />``.
   - Ekspektasi:
-    - `Classes` memuat `["p-4"]`.
-    - `RawClasses` memuat string mentah lengkap.
-    - Flag penanda kelas dinamis aktif.
-- **Test Case 4 (Ternary JSX Expressions):**
-  - Input: `const x = a < b ? <Foo /> : <Bar />;`.
-  - Ekspektasi: Simbol `<` dalam ekspresi ternary tidak merusak deteksi elemen `<Foo />` dan `<Bar />`.
+    - `Classes` tepat memuat `["p-4", "text-sm"]`.
+    - Wilayah `${...}` diisolasi buram (*opaque*), tidak memicu parsing JS AST.
+    - `RawClasses` menyimpan string mentah lengkap.
+    - Flag kelas dinamis aktif pada node.
+- **Test Case 5 (Disambiguasi Karakter `<` Non-Tag):**
+  - Sub-test 5a (Komentar): `{/* <div class="ignore"> */}` dan `<!-- <div /> -->` tidak menghasilkan node elemen.
+  - Sub-test 5b (String Atribut): `<input placeholder="a < b" />` tidak memicu pembukaan tag baru.
+  - Sub-test 5c (Ekspresi JSX): `{count < 10 && <Badge />}` membedakan operator perbandingan `<` dengan tag `<Badge />`.
+
+### 1.4. Uji Coba Semantik Pemulihan (*Recovery Semantics* / `internal/ir/builder_test.go`)
+- **Test Case 1 (Single Malformed Opening Tag):**
+  - Input: `<div><span><broken <button class="valid">Klik</button></span></div>`.
+  - Ekspektasi: `<broken` dibuang, resinkronisasi ke `<button`, tombol diekstrak normal.
+- **Test Case 2 (Multiple Consecutive Sibling Malformations):**
+  - Input: `<broken1 <broken2 <div class="ok">Text</div>`.
+  - Ekspektasi: Seluruh token cacat dilewati, `<div class="ok">` berhasil dirakit.
+- **Test Case 3 (Unmatched Closing Tag Discard):**
+  - Input: `<div><p>Hello</p></unknown><span>World</span></div>`.
+  - Ekspektasi: Token `</unknown>` dibuang secara hening (*discarded*), stack `div` tidak terganggu, `<span>` tetap menjadi anak dari `div`.
+- **Test Case 4 (Stack Unwinding pada Unclosed Intermediate Elements):**
+  - Input: `<div><span><button>Teks</div>`.
+  - Ekspektasi: Tag `</div>` mem-pop `<button>` dan `<span>` secara implisit hingga menutup `<div>`. Stack kembali ke kondisi stabil tanpa crash.
 
 ---
 

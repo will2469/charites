@@ -48,17 +48,16 @@ flowchart TD
 ## 2. Arsitektur Sub-Parser
 
 ### 2.1. Tailwind `@theme` Token Extractor (`internal/parser/tailwind/`)
-- **Tugas:** Membaca blok `@theme { ... }` pada berkas `global.css`.
-- **Mekanisme:**
-  1. State-machine lexer memindai deklarasi CSS variable `--color-*`.
-  2. Menyimpan pasangan `key: value` ke dalam `ThemeContext`.
-  3. Mengidentifikasi token berakhiran `-light` dan `-subtle` sebagai token opacity bawaan (*Charites opinionated design convention*).
+- **Tugas:** Membaca blok `@theme { ... }` pada berkas `global.css` dan mengekstrak deklarasi variabel mentah.
+- **Mekanisme & Netralitas Substrat:**
+  1. State-machine lexer memindai deklarasi CSS variable `--*` (termasuk `--color-*`).
+  2. Menyimpan pasangan `variabel: nilai` mentah ke dalam `ThemeTokenRegistry`:
      ```go
-     type ThemeContext struct {
-         Colors    map[string]string // misal: "primary": "#2563eb"
-         Opacities map[string]string // misal: "primary/10": "primary-light"
+     type ThemeTokenRegistry struct {
+         Variables map[string]string // misal: "--color-primary": "#2563eb", "--color-primary-light": "rgba(37, 99, 235, 0.1)"
      }
      ```
+  3. **Zero Semantic Coupling:** Parser **TIDAK** memetakan ekuivalensi semantik (misal tidak mengonversi `primary/10` menjadi `primary-light`). Seluruh logika ekuivalensi opacity didelegasikan secara murni ke Rule #1 (`theme.hardcode-opacity-color`) pada Fase 3.
 
 ### 2.2. Astro Component Lexer (`internal/parser/astro/`)
 - **Tugas:** Memisahkan frontmatter dari template tanpa menggeser penomoran baris.
@@ -67,9 +66,10 @@ flowchart TD
   // Hitung jumlah baris frontmatter
   lines := bytes.Count(frontmatterBytes, []byte("\n"))
   // Berikan baseLineOffset ke template lexer
-  templateLexer := html.NewLexer(templateBytes, lines + 1)
+  templateLexer := astro.NewLexer(templateBytes, lines + 1)
   ```
 - Dengan cara ini, node pertama template otomatis memiliki nomor baris akurat sesuai dengan posisi fisik di dalam berkas sumber `.astro`.
+- Mendukung tag HTML standar, komponen kustom PascalCase, serta tag bawaan Astro (`<Fragment>`, `<slot />`, `<slot name="..." />`).
 
 ### 2.3. JSX Structural Extractor (`internal/parser/tsx/`)
 - **Pendekatan Desain (Option B):**
@@ -77,18 +77,31 @@ flowchart TD
 - **Strategi Pemrosesan:**
   - Memindai tag pembuka JSX (`<[A-Za-z0-9_.-]+`), atribut target (`className`, `class`, `id`, `role`), dan tag penutup.
   - Memisahkan string literal statis ke dalam token kelas terpisah.
-  - Jika menemukan template literal dengan interpolasi dinamis (misal `` `p-4 ${cond ? 'a' : 'b'}` ``), scanner mempertahankan teks mentah pada `RawClasses` dan mengekstrak fragmen statis yang pasti ke `Classes`.
+  - **Kontrak Template Literal Dinamis:**
+    - Memindai teks di luar `${...}` dan memasukkan token kelas ke `Classes`.
+    - Mengisolasi seluruh isi di dalam `${...}` sebagai wilayah dinamis buram (*opaque dynamic region*). Scanner **TIDAK** menafsirkan ekspresi ternary atau logika boolean di dalam interpolasi.
+    - Menandai node memiliki kelas dinamis (`HasDynamicClasses`) dan menyimpan string mentah lengkap pada `RawClasses`.
+  - **Disambiguasi Lexer:**
+    - Mengabaikan karakter `<` di dalam komentar (`<!-- ... -->`, `{/* ... */}`).
+    - Mengabaikan karakter `<` di dalam string atribut (`title="a < b"`).
+    - Membedakan operator perbandingan `<` di dalam ekspresi JSX `{...}` dengan tag elemen.
 
 ---
 
 ## 3. Mekanisme Assembly IR Builder & Penanganan Kedalaman Stack (`internal/ir/builder.go`)
 
-IR Builder merangkai token mentah menjadi pohon objek:
+IR Builder merangkai token mentah menjadi pohon objek `*ir.Node`:
 
-1. **Stack-Based Tree Reconstruction & Nesting Guard:**
-   - Mempertahankan stack elemen `[]*ir.Node` untuk melacak hierarki bersarang.
-   - **Batas Kedalaman 256:** Saat opening tag masuk, jika `len(stack) >= 256`, elemen anak berikutnya tidak lagi menambah level stack (diperlakukan *flattened* di level 256) untuk mencegah bahaya eksploitasi *call-stack exhaustion*.
-2. **Resynchronization & Panic-Safe Recovery:**
-   - Menangani void elements (`img`, `input`, `br`, `hr`, `meta`, `link`) secara otomatis tanpa menunggu closing tag.
-   - Jika terjadi token korup atau tag tidak seimbang, parser melakukan resinkronisasi ke karakter pembuka tag berikutnya (`<`) dan melakukan pop stack secara deterministik.
+1. **Stack-Based Tree Reconstruction & Nesting Guard (Batas 256):**
+   - Mempertahankan stack elemen `[]*ir.Node` untuk melacak hierarki bersarang (akar pada kedalaman 1).
+   - **Aturan Flattening Kedalaman 256:** Saat tag pembuka masuk, jika `len(stack) == 256`, elemen baru tetap diekstrak sebagai `*ir.Node` yang valid dan disematkan sebagai anak di bawah node tingkat-256, namun **TIDAK DI-PUSH** ke dalam stack (*attached as flat siblings under the depth-256 parent*). Dengan demikian kedalaman stack dijamin $\le 256$.
+2. **Aturan Resolusi Closing Tag & Stack Unwinding (`</X>`):**
+   - Ketika menemukan tag penutup `</X>`:
+     - Cari kecocokan tag `X` dari puncak stack ke bawah.
+     - Jika ditemukan: pop seluruh elemen hingga elemen `X`. Node perantara yang tidak ditutup tetap berada di bawah induknya masing-masing.
+     - Jika TIDAK ditemukan: buang token penutup `</X>` secara hening, stack tidak berubah.
+3. **Void Elements & Panic-Safe Recovery:**
+   - Menangani void elements (`img`, `input`, `br`, `hr`, `meta`, `link`) secara mandiri (*self-closing*) tanpa dimasukkan ke stack.
+   - Jika terjadi token korup (`<broken` tanpa `>`), token dibuang dan parser melakukan resinkronisasi ke karakter `<` berikutnya.
+   - Menjamin *Zero-Panic Invariant* pada segala bentuk input malformed.
 

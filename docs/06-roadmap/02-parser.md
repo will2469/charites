@@ -30,25 +30,25 @@ Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi
 Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi gerbang berikut berstatus **PASS**:
 
 - [ ] **`ROAD-02-GATE-001` (SPEC-02 Compliance = PASS):**
-  - Ekstraksi token Tailwind `@theme` mematuhi konvensi default opacity semantik.
+  - Ekstraksi token Tailwind `@theme` menghasilkan `ThemeTokenRegistry` variabel mentah murni tanpa kopling pemetaan semantik opacity di parser.
   - Parser Astro terbukti mempertahankan offset baris template (tidak ter-reset ke line 1).
-  - JSX Structural Extractor mendukung grammar subset target (elemen, fragment, static/dynamic classes di `RawClasses`).
-  - Semantik pemulihan kegagalan sintaks (*recovery semantics*) berjalan deterministik tanpa partial corrupted node di IR.
+  - JSX Structural Extractor mengekstrak token kelas statis di luar `${...}`, mengisolasi wilayah dinamis secara buram (*opaque*) tanpa parsing JS AST, serta menandai `HasDynamicClasses`.
+  - Semantik pemulihan kegagalan sintaks (*recovery semantics*) berjalan deterministik: membuang opening tag rusak, membuang unmatched closing tag tanpa merusak stack, dan melakukan stack unwinding teratur pada unclosed intermediate elements.
   - Substrat murni netral (*rule-agnostic*), tanpa evaluasi rule apa pun di layer parser.
 
 - [ ] **`ROAD-02-GATE-002` (ARCH-02 Compliance = PASS):**
   - Seluruh sub-parser terimplementasi menggunakan Go Standard Library tanpa runtime Node.js atau CGO.
-  - Mekanisme assembly IR Builder mengunci batas kedalaman hierarki hingga maksimal 256 tingkat (*stack guard*).
+  - Mekanisme assembly IR Builder mengunci batas kedalaman hierarki hingga maksimal 256 tingkat (*stack guard*) dengan semantik penyematan anak flat di bawah node tingkat-256 (*flat siblings*).
 
 - [ ] **`ROAD-02-GATE-003` (TEST-02 Compliance = PASS):**
-  - Pengujian unit lolos 100%: verifikasi line offset, kedalaman nesting 255/256/257, semantik recovery, dan template literal dinamis.
+  - Pengujian unit lolos 100%: verifikasi line offset, kedalaman nesting 255/256/257+, pemulihan unmatched closing & malformed opening, dynamic template literals, void elements, fragments, slots, dan disambiguasi karakter `<`.
   - Fuzz test `FuzzAstroParser` dan `FuzzTSXParser` lolos minimal 60 detik tanpa panic.
   - Korpus regresi permanen terbentuk di `tests/fixtures/regression/`.
 
 - [ ] **`ROAD-02-GATE-004` (QUAL-02 Compliance = PASS):**
   - Invarian Zero-Panic terpenuhi pada input arbitrer.
   - Scanning linear tanpa ketergantungan regex rawan ReDoS.
-  - Anggaran memori terpenuhi (peak heap live bytes $\le 4\times$ ukuran berkas sumber).
+  - Anggaran memori terpenuhi sesuai protokol benchmark kanonikal ($\le 4\times$ ukuran berkas).
   - Unit test mencapai coverage $\ge 85\%$ dan `golangci-lint` menghasilkan exit code `0`.
 
 ---
