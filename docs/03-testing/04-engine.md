@@ -2,106 +2,127 @@
 
 > **Kode Dokumen:** `TEST-04-ENGINE`
 > **Tahapan:** Fase 4 - Konfigurasi, Concurrency Scanner & Traversal Engine
+> **Peran Pilar:** TEST = PROOF (Harness Pengujian, Pembuktian Batas & Asersi Keamanan)
 > **Status:** Ready for Review
 > **Standar Rujukan:** Go Concurrency Testing, Stress Benchmarks & Race Detection Standards
 
-Dokumen ini mendefinisikan strategi pengujian komprehensif untuk paket konfigurasi (`internal/config`), pemindai direktori paralel (`internal/scanner`), dan mesin traversal AST (`internal/analyzer`), termasuk pengujian *data race* dan *inline ignore suppression*.
+Dokumen ini mendefinisikan strategi pengujian menyeluruh untuk memvalidasi paket konfigurasi (`internal/config`), pemindai direktori paralel (`internal/scanner`), serta mesin traversal AST (`internal/analyzer`).
 
 ---
 
-## 1. Skenario Pengujian Unit Konfigurasi & Ignore (`internal/config/`)
+## 1. Skenario Pengujian Paket Konfigurasi (`internal/config/`)
 
-### 1.1. Uji Coba Konfigurasi Default YES (`internal/config/config_test.go`)
-- **Test Case 1 (Nil Config / Absent File):**
-  - Kondisi: Berkas `charites.yaml` tidak ada pada root direktori.
-  - Ekspektasi: `ResolveActiveRules()` mengembalikan seluruh rule yang terdaftar di registry tanpa ada yang terpotong.
-- **Test Case 2 (Rule Override - Off):**
-  - Input: YAML memuat `theme.hardcode-opacity-color: off`.
-  - Ekspektasi: Rule tersebut tidak masuk ke dalam slice `[]rules.Rule` hasil resolusi.
-- **Test Case 3 (Severity Override):**
-  - Input: YAML memuat `theme.hardcode-color: warn`.
-  - Ekspektasi: Rule tetap aktif, namun diagnosis yang dihasilkan menggunakan severity `warn`.
+### 1.1. Uji Resolusi & Presedensi Rule (`internal/config/config_test.go`)
 
-### 1.2. Uji Coba Engine Ignore (`internal/config/ignore_test.go`)
-- **Test Case 1 (Builtin Pruning):**
-  - Path: `node_modules/lodash/index.js`, `.git/HEAD`, `dist/bundle.js`.
-  - Ekspektasi: `ShouldIgnoreDir()` mengembalikan `true` secara instan.
-- **Test Case 2 (Custom Glob Patterns):**
-  - Pola: `legacy-vendor/**`, `*.test.tsx`, `temp_*`.
-  - Ekspektasi: Seluruh berkas yang cocok diabaikan secara akurat.
-- **Test Case 3 (Negation Rules):**
-  - Pola: `vendor/**` diikuti `!vendor/special.tsx`.
-  - Ekspektasi: `vendor/foo.tsx` diabaikan, namun `vendor/special.tsx` diizinkan lewat.
+- **Test Case 1 (Default YES Invariant):**
+  - Kondisi: Berkas `charites.yaml` absen (`nil`).
+  - Ekspektasi: `ResolveActiveRules()` mengembalikan seluruh rule di registry dengan severity default masing-masing.
+- **Test Case 2 (Severity Override):**
+  - Input: YAML memuat `theme.hardcode-opacity-color: warn`.
+  - Ekspektasi: Rule tetap aktif dalam `ActiveRule`, namun `EffectiveSeverity` berubah menjadi `ir.SeverityWarning`.
+- **Test Case 3 (Presedensi CLI Scope vs Config Policy):**
+  - Kondisi: Flag CLI `--rule=theme.hardcode-opacity-color`, namun config menetapkan `theme.hardcode-opacity-color: off`.
+  - Ekspektasi: Rule **TIDAK AKTIF** (kebijakan config mengalahkan seleksi CLI).
+
+### 1.2. Uji Matcher Ignore & Semantik Negasi (`internal/config/ignore_test.go`)
+
+- **Test Case 1 (Builtin Hard Exclusion Immunity):**
+  - Input `.charitesignore`: `!node_modules/my-pkg/**`.
+  - Ekspektasi: `node_modules` tetap diabaikan (`ShouldIgnoreDir == true`). Negasi tidak dapat membuka direktori builtin.
+- **Test Case 2 (Sequential Evaluation & Last-Rule-Wins):**
+  - Input:
+    ```gitignore
+    vendor/**
+    !vendor/special/**
+    vendor/special/private/**
+    ```
+  - Ekspektasi:
+    - `vendor/other.tsx` $\rightarrow$ Ignored.
+    - `vendor/special/public.tsx` $\rightarrow$ Allowed.
+    - `vendor/special/private/secret.tsx` $\rightarrow$ Ignored.
 
 ---
 
 ## 2. Skenario Pengujian Concurrency Scanner (`internal/scanner/`)
 
 ### 2.1. Uji Fast Directory Walker (`internal/scanner/walker_test.go`)
-- **Test Case 1 (Direct File Targeting - Ergonomi A):**
-  - Input: Path langsung ke file `src/Button.tsx`.
-  - Ekspektasi: Channel pekerjaan menerima tepat 1 path file tanpa melakukan `ReadDir` pada folder lain.
-- **Test Case 2 (Extension Filtering - Ergonomi B):**
-  - Input: Direktori memuat `.astro`, `.tsx`, `.json`, `.md`. Flag `--ext=astro`.
-  - Ekspektasi: Hanya berkas `.astro` yang dikirim ke channel pekerjaan.
-- **Test Case 3 (Early Directory Pruning Verification):**
-  - Kondisi: Buat folder tiruan `node_modules` berisi 5.000 file dummy di direktori temporer (`t.TempDir()`).
-  - Ekspektasi: Pemindaian selesai dalam waktu $< 2\text{ ms}$ karena folder `node_modules` sama sekali tidak dibaca isinya.
 
-### 2.2. Uji Beban Concurrency Worker Pool (`internal/scanner/pool_test.go`)
-- **Uji Stres 1.000 Berkas:**
-  - Mengirim 1.000 file mock ke worker pool yang dikonfigurasi dengan $N = \text{runtime.NumCPU()}$ goroutine.
-  - Memastikan seluruh berkas selesai diproses dan channel tertutup bersih tanpa ada goroutine yang menggantung (*leak-free*).
-- **Deteksi Race Condition:**
-  - Menjalankan seluruh pengujian scanner dengan flag balap:
-    ```bash
-    go test -race -v ./internal/scanner/...
-    ```
-  - Ekspektasi: **0 data race detected**.
+- **Test Case 1 (Direct Target Safety):**
+  - Input: `charites scan node_modules/react/index.d.ts`.
+  - Ekspektasi: Walker mendeteksi path berada di dalam direktori terlarang dan menolak traversal (0 jobs diantrekan).
+- **Test Case 2 (Symlink Safety Guard):**
+  - Kondisi: Buat symlink siklis antar-folder temporer (`t.TempDir()`).
+  - Ekspektasi: Walker melewati symlink direktori (`DO NOT FOLLOW`) tanpa memicu infinite loop.
+- **Test Case 3 (Max File Size Guard):**
+  - Kondisi: Buat dummy file sebesar 12 MB berekstensi `.tsx`.
+  - Ekspektasi: Berkas diabaikan dari antrean `jobs` dan tidak dibaca ke memori.
+
+### 2.2. Uji Concurrency Worker Pool & Pembatalan (`internal/scanner/pool_test.go`)
+
+- **Test Case 1 (Beban Konkuren & Race Detection):**
+  - Mengirim 1.000 berkas mock ke worker pool ($N = \text{runtime.GOMAXPROCS(0)}$).
+  - Verifikasi: `go test -race ./internal/scanner/...` menghasilkan **0 data race**.
+- **Test Case 2 (Context Cancellation Clean Exit):**
+  - Batalkan `context.Context` di tengah pemrosesan 500 berkas.
+  - Ekspektasi:
+    - Seluruh goroutine worker berhenti dengan bersih (*zero goroutine leak*).
+    - Channel ditutup rapi dan tidak ada diagnostic parsial yang dikirim ke reporter.
 
 ---
 
 ## 3. Skenario Pengujian Traversal Analyzer Engine (`internal/analyzer/`)
 
-### 3.1. Uji Inline Ignore Suppression (`internal/analyzer/context_test.go`)
-- **Test Case 1 (Same-Line Directive):**
+### 3.1. Uji Direktif Inline Ignore & Span Scope (`internal/analyzer/context_test.go`)
+
+- **Test Case 1 (Grammar Parsing: Whitespace & Deduplication):**
+  - Direktif: `// charites:ignore  theme.hardcode-opacity-color  ,  theme.hardcode-opacity-color  `.
+  - Ekspektasi: Spasi dipangkas bersih dan ID duplikat disaring.
+- **Test Case 2 (Wildcard Suppression):**
+  - Direktif: `// charites:ignore *`.
+  - Ekspektasi: Seluruh temuan rule pada baris/node tersebut ditekan.
+- **Test Case 3 (Node Span Scope: Multi-Line JSX Element):**
   - Kode sumber:
     ```tsx
-    <div className="bg-primary/10">Test</div> // charites:ignore theme.hardcode-opacity-color
+    // charites:ignore theme.hardcode-opacity-color
+    <div
+      id="hero"
+      className="
+        bg-primary/10
+      "
+    />
     ```
-  - Ekspektasi: Diagnostic pada baris tersebut disaring (hasil akhir 0 diagnostic).
-- **Test Case 2 (Next-Line Directive):**
-  - Kode sumber:
-    ```astro
-    <!-- charites:ignore theme.hardcode-opacity-color -->
-    <div class="bg-primary/10">Hero</div>
-    ```
-  - Ekspektasi: Diagnostic pada baris tepat di bawah comment disaring.
-- **Test Case 3 (Multi-Rule Directive):**
-  - Komentar: `// charites:ignore rule.a, rule.b`.
-  - Ekspektasi: Baik pelanggaran `rule.a` maupun `rule.b` pada baris tersebut ditekan.
+  - Ekspektasi: Karena komentar berada di baris $N$ dan opening tag berada di baris $N+1$, rentang node mencakup baris attribute `bg-primary/10`, sehingga diagnostic berhasil ditekan (0 diagnostic).
 
-### 3.2. Uji Determinisme Pengurutan Diagnostic (`internal/analyzer/engine_test.go`)
-- Jalankan analisis pada AST dengan beberapa pelanggaran yang terdistribusi acak.
-- Ekspektasi: Hasil akhir selalu terurut stabil: `File` $\rightarrow$ `Line` $\rightarrow$ `Column` $\rightarrow$ `Rule`.
-
----
-
-## 4. Benchmark Throughput Engine & Scanner
+### 3.2. Uji Pengurutan Determinis Total Ordering (`internal/analyzer/sort_test.go`)
 
 ```go
-func BenchmarkScannerAndEngineThroughput(b *testing.B) {
-    // Siapkan 500 file AST fixtures di memori
-    fixtures := prepareMockASTFiles(500)
-    engine := analyzer.NewEngine()
-    rules := loadActiveRules()
+func TestSortDiagnostics_TotalOrdering(t *testing.T) {
+    diags := []ir.Diagnostic{
+        {File: "a.tsx", Span: ir.Span{StartLine: 10, StartColumn: 5}, Rule: "theme.b", Severity: ir.SeverityWarning, Message: "msg B", Hint: "hint B"},
+        {File: "a.tsx", Span: ir.Span{StartLine: 10, StartColumn: 5}, Rule: "theme.a", Severity: ir.SeverityError, Message: "msg A", Hint: "hint A"},
+        {File: "a.tsx", Span: ir.Span{StartLine: 10, StartColumn: 5}, Rule: "theme.a", Severity: ir.SeverityError, Message: "msg A2", Hint: "hint A"},
+    }
 
-    b.ResetTimer()
-    for i := 0; i < b.N; i++ {
-        _ = runBenchmarkScan(engine, fixtures, rules)
+    analyzer.SortDiagnostics(diags)
+
+    // Verifikasi total ordering deterministik
+    if diags[0].Rule != "theme.a" || diags[0].Message != "msg A" {
+        t.Errorf("urutan tidak memenuhi total ordering: got %+v", diags[0])
     }
 }
 ```
 
-### Ambang Batas Throughput:
-- Mampu memproses $\ge 5.000$ file per detik per core CPU SSD modern.
+---
+
+## 4. Metodologi Benchmark Throughput (`TEST-04-BENCH-001`)
+
+Benchmark performa dipecah menjadi modul terisolasi untuk mengukur hotspot secara akurat:
+
+1. **`BenchmarkWalker_DirectoryTraversal`**: Mengukur throughput pembacaan struktur direktori tanpa parsing.
+2. **`BenchmarkIgnore_Matcher`**: Mengukur throughput evaluasi pola glob sekuensial pada 1.000 path.
+3. **`BenchmarkAnalyzer_EngineTraversal`**: Mengukur throughput penelusuran AST dan evaluasi active rules pada AST in-memory.
+4. **`BenchmarkEndToEnd_ScanPipeline`**: Mengukur throughput end-to-end pada korpus fixture standar.
+
+### Protokol Benchmark:
+- Toolchain: Go 1.26 (`go1.26.x`), `CGO_ENABLED=0`.
+- Perintah: `go test -bench=. -benchmem ./internal/...`.

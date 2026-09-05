@@ -2,10 +2,11 @@
 
 > **Kode Dokumen:** `ARCH-04-ENGINE`
 > **Tahapan:** Fase 4 - Konfigurasi, Concurrency Scanner & Traversal Engine
+> **Peran Pilar:** ARCH = HOW (Rancangan Arsitektur, Struktur Data & Enkapsulasi Pipeline)
 > **Status:** Ready for Review
 > **Standar Rujukan:** High-Throughput Concurrency Patterns & Pipeline Architecture
 
-Dokumen ini mendefinisikan arsitektur internal dari sistem konfigurasi (`internal/config/*`), mesin pemindai direktori berkonkurensi tinggi (`internal/scanner/*`), serta mesin traversal pohon AST (`internal/analyzer/*`).
+Dokumen ini mendefinisikan arsitektur internal dari paket konfigurasi (`internal/config/*`), mesin pemindai direktori paralel berkonkurensi tinggi (`internal/scanner/*`), serta mesin traversal AST (`internal/analyzer/*`).
 
 ---
 
@@ -15,29 +16,29 @@ Dokumen ini mendefinisikan arsitektur internal dari sistem konfigurasi (`interna
 flowchart TD
     subgraph Config_Layer ["Configuration & Ignore Engine (internal/config)"]
         ConfigFile["charites.yaml\n(Default: YES / Overrides)"] --> ConfigParser["config.go\n(ResolveActiveRules)"]
-        IgnoreFiles[".charitesignore +\nBuiltin Defaults"] --> IgnoreMatcher["ignore.go\n(Fast Glob Matcher)"]
+        IgnoreFiles[".charitesignore +\nBuiltin Defaults"] --> IgnoreMatcher["ignore.go\n(Sequential Glob Matcher)"]
     end
 
     subgraph Scan_Layer ["Traversal & Concurrency (internal/scanner)"]
-        DirWalker["walker.go\n(Fast Dir Walker)"] -->|Early Prune Check| IgnoreMatcher
-        DirWalker -->|Push Paths| JobsChan["jobs channel (chan string)"]
+        DirWalker["walker.go\n(Fast Dir Walker)"] -->|Early Prune & Symlink Guard| IgnoreMatcher
+        DirWalker -->|Push Paths <= 10MB| JobsChan["jobs channel (chan string)"]
 
-        JobsChan --> WorkerPool["pool.go\n(Worker Pool: NumCPU Goroutines)"]
+        JobsChan --> WorkerPool["pool.go\n(Worker Pool: GOMAXPROCS Goroutines)"]
     end
 
     subgraph Analysis_Layer ["Parser & AST Traversal (internal/analyzer)"]
         WorkerPool -->|Parse File| AST["internal/parser/*\n(ir.Node Root)"]
-        WorkerPool -->|Extract Directives| InlineMap["Inline Ignore Map\n(map[line][]rules)"]
+        WorkerPool -->|Extract Directives| InlineMap["Inline Ignore Map\n(map[int][]string)"]
         AST --> Traversal["engine.go\n(root.Walk() Iterator)"]
         InlineMap --> Traversal
 
-        Traversal --> ActiveRules["Active Rules\n(From Registry)"]
-        ActiveRules --> DiagCollector["context.go\n(Filter by Inline Ignore)"]
+        Traversal --> ActiveRules["Active Rules Wrapper\n(Rule + EffectiveSeverity)"]
+        ActiveRules --> DiagCollector["context.go\n(Span-Aware Filter)"]
     end
 
     subgraph Output_Queue ["Results Collection"]
         DiagCollector --> ResultsChan["results channel (chan []ir.Diagnostic)"]
-        ResultsChan --> Sorter["Deterministic Sorter\n(File:Line:Col)"]
+        ResultsChan --> Sorter["Deterministic Sorter\n(Total Ordering Comparator)"]
     end
 ```
 
@@ -45,96 +46,219 @@ flowchart TD
 
 ## 2. Arsitektur Paket Konfigurasi (`internal/config/`)
 
-Paket `internal/config` menjamin prinsip **Default: YES** (Model Argus) dan penyaringan berkas efisien:
+Paket `internal/config` menjamin prinsip **Default: YES** (Model Argus) serta enkapsulasi aturan resolusi rule:
 
-### 2.1. Rule Resolution Logic (`internal/config/config.go`)
+### 2.1. Rule Resolution & ActiveRule Wrapper (`internal/config/config.go`)
+
+Untuk mempertahankan sifat *stateless* dan *immutable* dari `rules.Rule` (Fase 3), penyesuaian severity dibungkus dalam struct `ActiveRule`:
 
 ```go
 package config
 
 import (
+    "strings"
+
     "github.com/will2469/charites/internal/ir"
     "github.com/will2469/charites/internal/rules"
 )
 
-type Config struct {
-    Rules  map[string]string `yaml:"rules"`  // "rule-id": "off" | "warn" | "error"
-    Ignore []string          `yaml:"ignore"` // Path patterns tambahan
+// ActiveRule membungkus rule singleton dengan EffectiveSeverity hasil resolusi konfigurasi.
+type ActiveRule struct {
+    Rule              rules.Rule
+    EffectiveSeverity ir.Severity
 }
 
-func (c *Config) ResolveActiveRules(reg *rules.Registry, categoryFilter, ruleFilter string) []rules.Rule {
-    var active []rules.Rule
+type Config struct {
+    Rules  map[string]string `yaml:"rules"`  // "rule-id": "off" | "warn" | "error" | "info"
+    Ignore []string          `yaml:"ignore"` // Pola path tambahan
+}
+
+// ResolveActiveRules menerapkan presedensi: Registry -> CLI Filter -> Config Policy.
+func (c *Config) ResolveActiveRules(reg *rules.Registry, categoryFilter, ruleFilter string) []ActiveRule {
+    var active []ActiveRule
+
+    // Iterasi deterministik (All() terurut leksikografis berdasarkan Rule.ID())
     for _, rule := range reg.All() {
         id := rule.ID()
 
-        // 1. Filter CLI flag (--rule)
+        // 1. CLI Candidate Scope Filter
         if ruleFilter != "" && id != ruleFilter {
             continue
         }
-        // 2. Filter CLI flag (--category)
         if categoryFilter != "" && rule.Category() != categoryFilter {
             continue
         }
-        // 3. Filter charites.yaml overrides (Default: YES)
-        if override, exists := c.Rules[id]; exists {
-            if override == "off" || override == "false" || override == "disable" {
-                continue // Rule dinonaktifkan
+
+        // 2. Config Policy Resolution
+        effectiveSev := rule.DefaultSeverity()
+        if c != nil && c.Rules != nil {
+            if override, exists := c.Rules[id]; exists {
+                val := strings.ToLower(strings.TrimSpace(override))
+                if val == "off" || val == "false" || val == "disable" || val == "disabled" {
+                    continue // Policy mematikan rule (bahkan jika dipilih via CLI)
+                }
+                switch val {
+                case "error":
+                    effectiveSev = ir.SeverityError
+                case "warn", "warning":
+                    effectiveSev = ir.SeverityWarning
+                case "info":
+                    effectiveSev = ir.SeverityInfo
+                }
             }
         }
 
-        active = append(active, rule)
+        active = append(active, ActiveRule{
+            Rule:              rule,
+            EffectiveSeverity: effectiveSev,
+        })
     }
     return active
 }
 ```
 
-### 2.2. Fast Pattern Matcher & Early Pruning (`internal/config/ignore.go`)
-Matcher mengkompilasi aturan glob menjadi pola yang dapat dievaluasi secara instan:
-- **`ShouldIgnoreDir(dirName, relativePath string) bool`**:
-  Dipanggil pada setiap level direktori. Jika direktori cocok dengan pola ignore (misal `node_modules` atau `dist`), fungsi mengembalikan `true`, dan walker langsung melewati pembacaan anak direktori.
-- **`ShouldIgnoreFile(fileName, relativePath string) bool`**:
-  Dipanggil saat walker menemukan berkas reguler sebelum berkas dimasukkan ke antrean worker pool.
+### 2.2. Fast Pattern Matcher & Builtin Pruning (`internal/config/ignore.go`)
+
+```go
+package config
+
+import (
+    "path/filepath"
+    "strings"
+)
+
+var builtinExclusions = []string{
+    ".git", "node_modules", "dist", ".astro", ".next", ".turbo", "build", "coverage",
+}
+
+type IgnoreMatcher struct {
+    patterns []ignorePattern
+}
+
+type ignorePattern struct {
+    raw      string
+    negation bool
+    dirOnly  bool
+}
+
+func (m *IgnoreMatcher) ShouldIgnoreDir(dirName, relPath string) bool {
+    // 1. Invarian Hard Exclusion (Builtin tidak bisa dinegasi)
+    for _, b := range builtinExclusions {
+        if dirName == b || strings.HasPrefix(relPath, b+string(filepath.Separator)) {
+            return true
+        }
+    }
+
+    // 2. Evaluasi Sekuensial .charitesignore (Last matching pattern wins)
+    ignored := false
+    for _, p := range m.patterns {
+        if matchPattern(p, relPath, true) {
+            ignored = !p.negation
+        }
+    }
+    return ignored
+}
+```
 
 ---
 
 ## 3. Arsitektur Concurrency Scanner (`internal/scanner/`)
 
-### 3.1. Walker Direktori Non-Blocking (`internal/scanner/walker.go`)
-- **Direct Target Optimization:** Jika target berupa file tunggal (`os.Stat` mengindikasikan `!info.IsDir()`), walker langsung mengirimkan path tersebut ke channel tanpa penelusuran pohon direktori.
-- **Batched Dir Read:** Menggunakan `os.ReadDir` yang lebih hemat alokasi dibandingkan `filepath.Walk` warisan karena tidak melakukan pemanggilan `os.Lstat` berulang pada setiap file.
+### 3.1. Walker Direktori & Proteksi Symlink (`internal/scanner/walker.go`)
 
-### 3.2. Worker Pool Berkinerja Tinggi (`internal/scanner/pool.go`)
-- Arsitektur worker pool mengadopsi pola **Fan-Out / Fan-In**:
-  ```go
-  type Pool struct {
-      numWorkers int
-      jobs       chan string
-      results    chan []ir.Diagnostic
-      wg         sync.WaitGroup
-  }
-  ```
-- Setiap worker beroperasi secara mandiri tanpa berbagi state mutable (*share-nothing architecture*), membaca isi berkas, mengurai AST, dan memanggil traversal analyzer engine.
+```go
+const MaxScanFileSize = 10 * 1024 * 1024 // 10 Megabytes
+
+type Walker struct {
+    matcher *config.IgnoreMatcher
+    extMap  map[string]bool
+}
+
+func (w *Walker) Walk(ctx context.Context, root string, jobs chan<- string) error {
+    return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+        if err != nil {
+            return nil // Lanjutkan traversal
+        }
+
+        // Cek interupsi context
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        default:
+        }
+
+        rel, _ := filepath.Rel(root, path)
+
+        // 1. Proteksi Symlink: Jangan ikuti direktori symlink
+        if d.Type()&os.ModeSymlink != 0 {
+            return nil
+        }
+
+        // 2. Direktori: Evaluasi Early Pruning
+        if d.IsDir() {
+            if rel != "." && w.matcher.ShouldIgnoreDir(d.Name(), rel) {
+                return filepath.SkipDir
+            }
+            return nil
+        }
+
+        // 3. Batas Ekstensi & Ukuran Berkas
+        if !w.extMap[filepath.Ext(path)] {
+            return nil
+        }
+        info, err := d.Info()
+        if err != nil || info.Size() > MaxScanFileSize {
+            return nil // Abaikan berkas > 10MB
+        }
+
+        jobs <- path
+        return nil
+    })
+}
+```
+
+### 3.2. Worker Pool & Siklus Pembatalan (`internal/scanner/pool.go`)
+
+Worker pool membagi pembacaan berkas menggunakan $N = \text{runtime.GOMAXPROCS(0)}$:
+
+- **State Lifecycle:** `RUNNING` $\longrightarrow$ `CANCELLING` $\longrightarrow$ `STOPPED`.
+- Ketika `ctx.Done()` diterima:
+  - Channel `jobs` ditutup dan tidak ada file baru yang diambil.
+  - Worker aktif menyelesaikan berkas berjalan secara atomik.
+  - Channel `results` dikuras dan diagnostic dibuang untuk mencegah penerbitan laporan parsial.
 
 ---
 
 ## 4. Arsitektur Traversal Analyzer Engine (`internal/analyzer/`)
 
-### 4.1. Analisis Konteks Mandiri (`internal/analyzer/context.go`)
-Struktur `Context` membungkus seluruh data yang dibutuhkan selama proses analisis satu berkas:
+### 4.1. Analisis Konteks & Direktif Span-Aware (`internal/analyzer/context.go`)
+
 ```go
 type Context struct {
     FilePath      string
-    Source        []byte
     InlineIgnores map[int][]string // Line -> []RuleIDs
     Diagnostics   []ir.Diagnostic
 }
 
-func (c *Context) IsIgnored(line int, ruleID string) bool {
-    // Periksa apakah ada ignore pada baris yang sama atau baris tepat di atasnya
-    for _, targetLine := range []int{line, line - 1} {
-        if rules, ok := c.InlineIgnores[targetLine]; ok {
-            for _, r := range rules {
-                if r == ruleID || r == "*" {
+// IsIgnored memeriksa apakah diagnostic ditekan pada barisnya atau rentang node AST.
+func (c *Context) IsIgnored(diag ir.Diagnostic, node *ir.Node) bool {
+    // 1. Same-line trailing comment
+    if rules, ok := c.InlineIgnores[diag.Line]; ok {
+        if matchesRule(rules, diag.Rule) {
+            return true
+        }
+    }
+    // 2. Next-line preceding comment
+    if rules, ok := c.InlineIgnores[diag.Line-1]; ok {
+        if matchesRule(rules, diag.Rule) {
+            return true
+        }
+    }
+    // 3. Node Span Scope (jika node dimulai pada baris setelah directive)
+    if node != nil && node.Span.StartLine > 1 {
+        if rules, ok := c.InlineIgnores[node.Span.StartLine-1]; ok {
+            if diag.Line >= node.Span.StartLine && diag.Line <= node.Span.EndLine {
+                if matchesRule(rules, diag.Rule) {
                     return true
                 }
             }
@@ -142,35 +266,43 @@ func (c *Context) IsIgnored(line int, ruleID string) bool {
     }
     return false
 }
-```
 
-### 4.2. Engine Traversal Loop (`internal/analyzer/engine.go`)
-Engine memanfaatkan Go 1.26 Range-Over-Func iterator `root.Walk()`:
-```go
-func (e *Engine) Analyze(ctx *Context, root *ir.Node, activeRules []rules.Rule) {
-    if root == nil {
-        return
-    }
-
-    // Zero-alloc depth-first traversal
-    for node := range root.Walk() {
-        for _, rule := range activeRules {
-            findings := rule.Evaluate(node)
-            for _, diag := range findings {
-                // Terapkan penekanan inline ignore
-                if !ctx.IsIgnored(diag.Line, diag.Rule) {
-                    ctx.Diagnostics = append(ctx.Diagnostics, diag)
-                }
-            }
+func matchesRule(rules []string, ruleID string) bool {
+    for _, r := range rules {
+        if r == "*" || r == ruleID {
+            return true
         }
     }
+    return false
 }
 ```
 
-### 4.3. Deterministic Results Sorting
-Karena pemrosesan berkas di worker pool bersifat asinkron, hasil diagnostic dari seluruh worker dikumpulkan dan diurutkan secara stabil sebelum dicetak:
-1. Urutkan berdasarkan `File` (alfabetis).
-2. Urutkan berdasarkan `Line` (numerik menaik).
-3. Urutkan berdasarkan `Column` (numerik menaik).
-4. Urutkan berdasarkan `Rule` (alfabetis).
-Dengan demikian, output pemindaian dijamin 100% deterministik dan idempoten.
+### 4.2. Engine Traversal & Total Ordering Sorter (`internal/analyzer/sort.go`)
+
+```go
+func SortDiagnostics(diags []ir.Diagnostic) {
+    sort.Slice(diags, func(i, j int) bool {
+        a, b := diags[i], diags[j]
+        if a.File != b.File {
+            return a.File < b.File
+        }
+        if a.Span.StartLine != b.Span.StartLine {
+            return a.Span.StartLine < b.Span.StartLine
+        }
+        if a.Span.StartColumn != b.Span.StartColumn {
+            return a.Span.StartColumn < b.Span.StartColumn
+        }
+        if a.Rule != b.Rule {
+            return a.Rule < b.Rule
+        }
+        if a.Severity != b.Severity {
+            return a.Severity > b.Severity // Error > Warning > Info
+        }
+        if a.Message != b.Message {
+            return a.Message < b.Message
+        }
+        return a.Hint < b.Hint
+    })
+}
+```
+Komparator total ordering ini memastikan bahwa urutan temuan bersifat deterministik mutlak tanpa kemungkinan kolisi acak.
