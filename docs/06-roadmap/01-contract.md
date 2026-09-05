@@ -30,21 +30,23 @@ Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi 
 
 - [ ] **`ROAD-01-GATE-001` (SPEC-01 Compliance = PASS):**
   - Seluruh invarian fungsional `ir.Node` (deterministic pre-order traversal, immediate early exit, post-construction immutability, parent-child bidirectional pointer, whitespace class tokenization, 1-indexed span) terpenuhi.
-  - Penamaan Charites Rule ID dan determinisme byte-level serialisasi JSON `Diagnostic` terpenuhi.
+  - Penamaan Charites Rule ID, serialisasi flat JSON, dan 7-level Canonical Diagnostic Total Ordering (`DiagnosticOrderKey`) terpenuhi.
 
 - [ ] **`ROAD-01-GATE-002` (ARCH-01 Compliance = PASS):**
   - Paket `internal/ir` terbukti asiklik murni sebagai *pure leaf package* tanpa impor paket internal lain.
   - Traversal `Walk()` memanfaatkan `iter.Seq` Go 1.26 native.
   - Batasan siklus kepemilikan dipatuhi (`internal/parser` memiliki hak konstruksi, konsumen read-only).
+  - Penyortir total `CompareDiagnostics` dan `SortDiagnostics` tersedia di `internal/ir`.
 
 - [ ] **`ROAD-01-GATE-003` (TEST-01 Compliance = PASS):**
-  - Seluruh unit test lolos 100%: `TestNode_Walk`, `TestNode_EarlyExit`, `TestNode_ParentChildInvariant`, `TestNode_ClassTokenization`, `TestNode_SpanIndexing`, `TestNode_StructSize`, `TestNode_Helpers`, dan `TestDiagnostic_*`.
+  - Seluruh unit test lolos 100%: `TestNode_Walk`, `TestNode_EarlyExit`, `TestNode_ParentChildInvariant`, `TestNode_ClassTokenization`, `TestNode_SpanIndexing`, `TestNode_StructSize`, `TestNode_Helpers`, `TestDiagnostic_JSONDeterminism`, dan `TestDiagnostic_CollectionOrdering`.
   - `BenchmarkNode_Walk` berhasil dieksekusi dan dicatat dalam baseline performa.
 
 - [ ] **`ROAD-01-GATE-004` (QUAL-01 Compliance = PASS):**
   - Code coverage `internal/ir` mencapai $\ge 90\%$.
   - `golangci-lint run ./internal/ir/...` menghasilkan exit code `0` tanpa peringatan.
   - Ukuran struct `ir.Node` terbukti $\le 136$ bytes pada target 64-bit.
+  - Invarian determinisme total ordering `QUAL-01-INVAR-001` terbukti 100% permutation-invariant.
   - Zero third-party dependencies di `go.mod`.
 
 ---

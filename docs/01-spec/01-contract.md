@@ -99,7 +99,20 @@ type Diagnostic struct {
   - Setiap objek `Diagnostic` individual direpresentasikan sebagai **flat JSON object** (kunci-kunci datar tanpa objek bersarang).
   - Koleksi diagnosis direpresentasikan sebagai **JSON array of Diagnostic objects** (`[]Diagnostic`).
 - **Byte-Level Determinism:** Untuk setiap objek `Diagnostic` dengan seluruh field bernilai identik, hasil serialisasi JSON **MUST** bersifat deterministik dan byte-per-byte identik.
-- **Collection Ordering Determinism:** Koleksi diagnosis **MUST** memiliki urutan yang deterministik saat dilaporkan, diurutkan berdasarkan tuple lokasi dan rule `(File, Line, Column, Rule)`.
+- **Canonical Diagnostic Total Ordering Contract (`DiagnosticOrderKey`):**
+  Untuk menjamin determinisme level byte pada output JSON, reporter, dan verifikasi snapshot kebenaran mutlak (Golden Corpus pada Fase 6), pengurutan koleksi diagnosis **DILARANG** hanya mengandalkan tuple lokasi parsial `(File, Line, Column, Rule)`. Koleksi diagnosis **MUST** memiliki urutan total deterministik (*strict total order*) berdasarkan **7 Kunci Pengurutan Kanonikal (`DiagnosticOrderKey`)**:
+  1. `File` (ASCII lexical ascending, path normalisasi POSIX `/`)
+  2. `Line` (numerical ascending, 1-indexed)
+  3. `Column` (numerical ascending, 1-indexed)
+  4. `Rule` (ASCII lexical ascending, Charites Rule ID)
+  5. `Severity` (ordinal ascending: `error` < `warn` < `info`)
+  6. `Message` (ASCII lexical ascending)
+  7. `Hint` (ASCII lexical ascending)
+
+  **Sifat Total Ordering:**
+  - Menghilangkan ambiguitas tie-break: Setiap pasang diagnosis yang berbeda dipastikan memiliki relasi urutan strict ($A < B$ atau $B < A$).
+  - Idempotent Deduplication: Jika dua diagnosis memiliki seluruh 7 field yang identik ($A \equiv B$), entri kedua diperlakukan sebagai duplikat dan dipangkas (*deduplicated*).
+  - Race Resilience: Variasi urutan kedatangan diagnosis dari eksekusi paralel worker pool (Fase 4) dijamin selalu terkonvergensi menjadi deretan diagnosis yang **100% byte-identical**.
 
 ---
 

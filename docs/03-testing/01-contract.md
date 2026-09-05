@@ -63,17 +63,28 @@ Paket `internal/ir` wajib memiliki pengujian unit deterministik yang membuktikan
 
 ---
 
-## 2. Skenario Uji Coba Serialisasi Diagnostic (`internal/ir/diagnostic_test.go`)
+## 2. Skenario Uji Coba Serialisasi & Pengurutan Diagnostic (`internal/ir/diagnostic_test.go`)
 
-### Test Case 1: Struktur JSON Flat & Determinisme Byte-Level
-- **Tujuan:** Membuktikan bahwa `Diagnostic` menghasilkan serialisasi flat JSON deterministik.
+### Test Case 1: Struktur JSON Flat & Determinisme Byte-Level (`TestDiagnostic_JSONDeterminism`)
+- **Tujuan:** Membuktikan bahwa `Diagnostic` menghasilkan serialisasi flat JSON deterministik tanpa objek bersarang.
 - **Asersi Pembuktian:**
-  - Hasil `json.Marshal(diag)` menghasilkan flat JSON object dengan kunci tepat: `file`, `line`, `column`, `rule`, `severity`, `message`, `hint`.
+  - Hasil `json.Marshal(diag)` menghasilkan flat JSON object dengan kunci tepat: `file`, `line`, `column`, `rule`, `severity`, `message`, `hint` (dengan `hint` di-omit jika kosong).
   - Dua instance `Diagnostic` dengan seluruh nilai field identik **MUST** menghasilkan byte array JSON yang identik 100%.
+  - Serialisasi array `[]Diagnostic` menghasilkan JSON array flat yang deterministik.
 
-### Test Case 2: Determinisme Pengurutan Koleksi
-- **Tujuan:** Membuktikan stabilitas urutan temuan saat diserialisasikan ke array JSON.
-- **Asersi Pembuktian:** Koleksi diagnosis diurutkan secara stabil berdasarkan `(File, Line, Column, Rule)`.
+### Test Case 2: Determinisme Total Pengurutan Koleksi (`TestDiagnostic_CollectionOrdering`)
+- **Tujuan:** Membuktikan stabilitas total urutan temuan diagnosis menggunakan 7-tingkat `DiagnosticOrderKey` untuk mengatasi ambiguitas arrival order dari concurrent worker pool.
+- **Asersi Pembuktian:**
+  - **7-Level Strict Tie-Breaking:** Menguji pemecah seri (*tie-breaking*) secara bertingkat:
+    1. Berkas berbeda (`a.tsx` vs `b.tsx`) $\rightarrow$ terurut menurut nama berkas.
+    2. Berkas sama, baris berbeda (Line 5 vs Line 10) $\rightarrow$ terurut menurut nomor baris.
+    3. Baris sama, kolom berbeda (Col 2 vs Col 8) $\rightarrow$ terurut menurut nomor kolom.
+    4. Lokasi sama, rule berbeda (`a11y.foo` vs `theme.bar`) $\rightarrow$ terurut menurut Rule ID.
+    5. Rule sama, severity berbeda (`error` vs `warn`) $\rightarrow$ `error` mendahului `warn`.
+    6. Severity sama, message berbeda (`"A"` vs `"B"`) $\rightarrow$ terurut leksikal menurut `Message`.
+    7. Message sama, hint berbeda (`"Fix A"` vs `"Fix B"`) $\rightarrow$ terurut leksikal menurut `Hint`.
+  - **Permutation Invariance:** Slice diagnosis yang diacak urutannya (*shuffled order*) setelah diproses dengan `ir.SortDiagnostics(diags)` **MUST** menghasilkan urutan elemen dan byte JSON yang 100% identik.
+  - **Idempotent Deduplication:** Dua item diagnosis dengan seluruh 7 field yang identik otomatis dipangkas menjadi 1 elemen unik.
 
 ---
 

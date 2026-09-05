@@ -34,10 +34,13 @@ Pemeriksaan linter wajib lolos 100% pada kode `internal/ir`:
 | Indikator | Ambang Batas (*Threshold*) | Metode Evaluasi | Klasifikasi |
 | :--- | :--- | :--- | :--- |
 | **Ukuran Struct `ir.Node`** | $\le 136$ bytes pada target 64-bit | `unsafe.Sizeof(ir.Node{})` di unit test | Hard Gate |
+| **Determinisme Total Order** | 100% byte-identical under permutations | `TestDiagnostic_CollectionOrdering` | Hard Gate (`QUAL-01-INVAR-001`) |
 | **Alokasi Iterator `Walk()`** | Target: **0 B/op** & **0 allocs/op** | `go test -bench=BenchmarkNode_Walk -benchmem` | Performance Budget |
 | **Coverage Uji Paket `ir`** | $\ge 90\%$ line coverage | `go test -cover ./internal/ir/...` | Hard Gate |
 | **Sirkularitas Dependensi** | **0 cycles** | `go vet ./internal/...` | Hard Gate |
 
 > [!NOTE]
-> Alokasi iterator `Walk()` dikelola sebagai **Performance Budget**. Deviasi alokasi ($> 0$) pada compiler environment tertentu memicu audit regresi performa, tanpa membatalkan keabsahan kontrak fungsional `ir.Node`.
+> - **QUAL-01-INVAR-001 (Deterministic Total Ordering):** Seluruh diagnosis yang dikumpulkan dari berbagai goroutine wajib melewati `ir.SortDiagnostics()` dengan 7-kunci `DiagnosticOrderKey`. Permutasi urutan kedatangan tidak boleh mengubah hasil akhir byte output JSON.
+> - Alokasi iterator `Walk()` dikelola sebagai **Performance Budget**. Deviasi alokasi ($> 0$) pada compiler environment tertentu memicu audit regresi performa, tanpa membatalkan keabsahan kontrak fungsional `ir.Node`.
+
 

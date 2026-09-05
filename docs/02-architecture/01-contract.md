@@ -114,3 +114,72 @@ Untuk mempercepat kerja rule evaluator, struct `Node` dilengkapi metode pembantu
 2. **`node.GetAttr(name string) (string, bool)`**: Mengambil nilai atribut dari map `Attributes`.
 3. **`node.IsElement(tags ...string) bool`**: Memeriksa kecocokan tag elemen secara variadic (misal: `node.IsElement("div", "section")`).
 
+---
+
+## 5. Mekanisme Pengurutan Total Diagnostik (Canonical Diagnostic Total Sorter)
+
+Untuk memenuhi kontrak `SPEC-01-CONTRACT` (Canonical Diagnostic Total Ordering), paket `internal/ir` menyediakan fungsi perbandingan murni (*pure comparator*) 7-tingkat dan fungsi penyortir in-place:
+
+```go
+package ir
+
+import (
+    "cmp"
+    "slices"
+    "strings"
+)
+
+// severityRank memetakan tingkat keparahan ke bobot integer untuk perbandingan deterministik.
+func severityRank(s Severity) int {
+    switch s {
+    case SeverityError:
+        return 0
+    case SeverityWarn:
+        return 1
+    case SeverityInfo:
+        return 2
+    default:
+        return 3
+    }
+}
+
+// CompareDiagnostics membandingkan dua Diagnostic menggunakan 7-level total ordering.
+// Mengembalikan -1 jika a < b, 1 jika a > b, dan 0 jika a == b (identik mutlak).
+func CompareDiagnostics(a, b Diagnostic) int {
+    if c := strings.Compare(a.File, b.File); c != 0 {
+        return c
+    }
+    if c := cmp.Compare(a.Line, b.Line); c != 0 {
+        return c
+    }
+    if c := cmp.Compare(a.Column, b.Column); c != 0 {
+        return c
+    }
+    if c := strings.Compare(a.Rule, b.Rule); c != 0 {
+        return c
+    }
+    if c := cmp.Compare(severityRank(a.Severity), severityRank(b.Severity)); c != 0 {
+        return c
+    }
+    if c := strings.Compare(a.Message, b.Message); c != 0 {
+        return c
+    }
+    return strings.Compare(a.Hint, b.Hint)
+}
+
+// SortDiagnostics mengurutkan slice diagnosis secara in-place menggunakan 7-level total order
+// dan memangkas duplikat identik (idempotent deduplication).
+func SortDiagnostics(diags []Diagnostic) []Diagnostic {
+    slices.SortFunc(diags, CompareDiagnostics)
+    return slices.CompactFunc(diags, func(a, b Diagnostic) bool {
+        return CompareDiagnostics(a, b) == 0
+    })
+}
+```
+
+### Invarian Arsitektural Pengurutan:
+- **Pure Function & Zero Allocations:** `CompareDiagnostics` tidak mengalokasikan memori pada heap (`0 allocs/op`).
+- **Idempotent Deduplication:** Penggunaan `slices.CompactFunc` menjamin jika aturan yang dievaluasi paralel melaporkan pelanggaran yang persis sama, hanya 1 entri yang dipertahankan.
+- **Worker Pool Convergence:** Analyzer dan Reporter cukup memanggil `ir.SortDiagnostics(results)` sebelum pelaporan format apa pun untuk mengonvergensi hasil eksekusi multi-goroutine menjadi output yang 100% byte-identical.
+
+
