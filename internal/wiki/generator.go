@@ -265,3 +265,13 @@ func (g *Generator) renderRule(r rules.Rule, category, slug string) (string, err
 	}
 	return buf.String(), nil
 }
+
+// RenderRuleDoc me-render dokumentasi 8-Pillars lengkap untuk sebuah rule ke dalam format Markdown.
+func RenderRuleDoc(r rules.Rule) (string, error) {
+	if r == nil {
+		return "", fmt.Errorf("cannot render nil rule")
+	}
+	gen := NewGenerator(nil)
+	slug := strings.TrimPrefix(r.ID(), r.Category()+".")
+	return gen.renderRule(r, r.Category(), slug)
+}

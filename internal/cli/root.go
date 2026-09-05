@@ -15,6 +15,8 @@ func UsageString() string {
 Available Commands:
   scan        Pindai berkas frontend untuk audit kualitas dan token semantik (Default)
               Aliases: check, run
+  mcp         Mulai server Model Context Protocol (MCP) berbasis Stdio JSON-RPC 2.0
+  wiki        Generate ensiklopedia dokumentasi Markdown untuk seluruh rule terdaftar
   update      Periksa dan perbarui biner Charites ke versi terbaru
               Aliases: upgrade
   upgrade     Alias identik untuk 'update'
@@ -38,11 +40,16 @@ Flags:
 
 // Execute adalah titik masuk trampoline utama untuk CLI menggunakan stream standar sistem operasi.
 func Execute(args []string) int {
-	return ExecuteArgs(args, os.Stdout, os.Stderr)
+	return ExecuteWithStreams(args, os.Stdin, os.Stdout, os.Stderr)
 }
 
 // ExecuteArgs mengeksekusi CLI dengan injeksi writer stdout dan stderr terisolasi.
 func ExecuteArgs(args []string, stdout, stderr io.Writer) int {
+	return ExecuteWithStreams(args, os.Stdin, stdout, stderr)
+}
+
+// ExecuteWithStreams mengeksekusi CLI dengan injeksi stream stdin, stdout, dan stderr lengkap.
+func ExecuteWithStreams(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		return RunScan([]string{"."}, stdout, stderr)
 	}
@@ -52,6 +59,10 @@ func ExecuteArgs(args []string, stdout, stderr io.Writer) int {
 	switch first {
 	case "scan", "check", "run":
 		return RunScan(args[1:], stdout, stderr)
+	case "mcp":
+		return RunMCP(args[1:], stdin, stdout, stderr)
+	case "wiki":
+		return RunWiki(args[1:], stdout, stderr)
 	case "update", "upgrade":
 		return RunUpdate(args[1:], stdout, stderr)
 	case "uninstall":

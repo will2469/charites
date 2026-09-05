@@ -142,3 +142,48 @@ func TestExecuteArgs_PathResolution(t *testing.T) {
 		})
 	}
 }
+
+func TestExecuteArgs_WikiCommand(t *testing.T) {
+	tmpDir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+
+	code := cli.ExecuteArgs([]string{"wiki", tmpDir}, &stdout, &stderr)
+	if code != cli.ExitClean {
+		t.Fatalf("expected wiki command to return 0, got %d, stderr: %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "wiki documentation successfully generated") {
+		t.Errorf("expected success message on stdout, got: %s", stdout.String())
+	}
+}
+
+func TestExecuteWithStreams_MCPCommand(t *testing.T) {
+	tmpDir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	// empty stdin triggers EOF -> graceful exit 0
+	inR := strings.NewReader("")
+
+	code := cli.ExecuteWithStreams([]string{"mcp", "--workspace", tmpDir}, inR, &stdout, &stderr)
+	if code != cli.ExitClean {
+		t.Fatalf("expected mcp command to return 0 on EOF, got %d, stderr: %s", code, stderr.String())
+	}
+
+	// MCP help
+	var hStdout, hStderr bytes.Buffer
+	codeHelp := cli.ExecuteWithStreams([]string{"mcp", "--help"}, inR, &hStdout, &hStderr)
+	if codeHelp != cli.ExitClean {
+		t.Fatalf("expected mcp --help to return 0, got %d", codeHelp)
+	}
+	if !strings.Contains(hStdout.String(), "Usage: charites mcp") {
+		t.Errorf("expected mcp help string, got: %s", hStdout.String())
+	}
+}
+
+func TestUsageString_HasMCPAndWiki(t *testing.T) {
+	usage := cli.UsageString()
+	if !strings.Contains(usage, "mcp") {
+		t.Errorf("expected usage string to contain 'mcp'")
+	}
+	if !strings.Contains(usage, "wiki") {
+		t.Errorf("expected usage string to contain 'wiki'")
+	}
+}

@@ -1,6 +1,7 @@
 package wiki_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -104,5 +105,63 @@ func TestGenerator_RegenerateWiki(t *testing.T) {
 	wikiDir := filepath.Join(repoRoot, "wiki")
 	if genErr := gen.Generate(wikiDir); genErr != nil {
 		t.Fatalf("failed to generate wiki into %s: %v", wikiDir, genErr)
+	}
+}
+
+func TestWikiGenerator_DynamicCategoriesAndAtomic(t *testing.T) {
+	tmpTarget := t.TempDir()
+	reg := rules.DefaultRegistry()
+
+	gen := wiki.NewGenerator(reg)
+	err := gen.Generate(tmpTarget)
+	if err != nil {
+		t.Fatalf("failed to generate wiki: %v", err)
+	}
+
+	homeContent, err := os.ReadFile(filepath.Clean(filepath.Join(tmpTarget, "Home.md"))) //nolint:gosec // controlled test path
+	if err != nil || !strings.Contains(string(homeContent), "theme.hardcode-opacity-color") {
+		t.Errorf("Home.md missing rule entry: %v", err)
+	}
+
+	ruleDoc, err := os.ReadFile(filepath.Clean(filepath.Join(tmpTarget, "theme", "hardcode-opacity-color.md"))) //nolint:gosec // controlled test path
+	if err != nil || !strings.Contains(string(ruleDoc), "## 1. Overview & Core Invariant") {
+		t.Errorf("rule 8-pillars document missing or corrupted: %v", err)
+	}
+
+	// Determinism test: generating twice produces byte-for-byte identical output
+	secondTarget := t.TempDir()
+	if err := gen.Generate(secondTarget); err != nil {
+		t.Fatalf("second generation failed: %v", err)
+	}
+
+	firstBytes, _ := os.ReadFile(filepath.Clean(filepath.Join(tmpTarget, "theme", "hardcode-opacity-color.md")))     //nolint:gosec // controlled test path
+	secondBytes, _ := os.ReadFile(filepath.Clean(filepath.Join(secondTarget, "theme", "hardcode-opacity-color.md"))) //nolint:gosec // controlled test path
+	if !bytes.Equal(firstBytes, secondBytes) {
+		t.Errorf("Wiki output is not byte-for-byte identical across runs")
+	}
+}
+
+func TestRenderRuleDoc(t *testing.T) {
+	reg := rules.DefaultRegistry()
+	rule, ok := reg.Get("theme.hardcode-opacity-color")
+	if !ok {
+		t.Fatalf("expected rule theme.hardcode-opacity-color to exist")
+	}
+
+	doc, err := wiki.RenderRuleDoc(rule)
+	if err != nil {
+		t.Fatalf("RenderRuleDoc failed: %v", err)
+	}
+	if !strings.Contains(doc, "# theme.hardcode-opacity-color") {
+		t.Errorf("expected doc to contain header, got: %s", doc)
+	}
+	if !strings.Contains(doc, "## 1. Overview & Core Invariant") {
+		t.Errorf("expected doc to contain overview section, got: %s", doc)
+	}
+
+	// Nil rule handling
+	_, err = wiki.RenderRuleDoc(nil)
+	if err == nil {
+		t.Errorf("expected error when rendering nil rule, got nil")
 	}
 }

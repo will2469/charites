@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `SPEC-07-MCP`
 > **Tahapan:** Fase 7 - Ekosistem Lanjutan (MCP Server, Wiki Generator & Secure Installer)
 > **Peran Pilar:** SPEC = WHAT (Spesifikasi Protokol MCP, Generator Wiki & Keamanan Pasokan)
-> **Status:** Ready for Review
+> **Status:** Approved / Completed
 > **Standar Rujukan:** Model Context Protocol (MCP) JSON-RPC 2.0 Specification / POSIX Shell Standards
 
 Dokumen ini mendefinisikan spesifikasi kebutuhan fungsional untuk tiga sub-ekosistem Charites:

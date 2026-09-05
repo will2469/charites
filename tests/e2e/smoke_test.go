@@ -10,6 +10,8 @@ import (
 func TestBinarySmoke(t *testing.T) {
 	binPath := "../../bin/charites"
 
+	tmpWiki := t.TempDir()
+
 	tests := []struct {
 		name           string
 		args           []string
@@ -52,6 +54,18 @@ func TestBinarySmoke(t *testing.T) {
 			args:           []string{"help"},
 			expectedCode:   0,
 			containsStdout: "Usage: charites",
+		},
+		{
+			name:           "subcommand mcp --help",
+			args:           []string{"mcp", "--help"},
+			expectedCode:   0,
+			containsStdout: "Usage: charites mcp",
+		},
+		{
+			name:           "subcommand wiki into tempdir",
+			args:           []string{"wiki", tmpWiki},
+			expectedCode:   0,
+			containsStdout: "wiki documentation successfully generated",
 		},
 		{
 			name:           "empty args runs scan",

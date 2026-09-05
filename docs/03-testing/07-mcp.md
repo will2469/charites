@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `TEST-07-MCP`
 > **Tahapan:** Fase 7 - Ekosistem Lanjutan (MCP Server, Wiki Generator & Secure Installer)
 > **Peran Pilar:** TEST = PROOF (Harness Pengujian, Matriks Protokol MCP & Validasi Pemasang)
-> **Status:** Ready for Review
+> **Status:** Approved / Completed
 > **Standar Rujukan:** JSON-RPC 2.0 Conformance Testing & Shellcheck Automation
 
 Dokumen ini mendefinisikan strategi pengujian menyeluruh untuk server **Model Context Protocol (MCP)** berbasis Stdio, pengujian integritas ekspor **Wiki Generator**, serta validasi keamanan skrip instalasi shell.

@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ARCH-07-MCP`
 > **Tahapan:** Fase 7 - Ekosistem Lanjutan (MCP Server, Wiki Generator & Secure Installer)
 > **Peran Pilar:** ARCH = HOW (Rancangan Protokol Stdio, Router MCP, Generator Wiki & Keamanan Pemasang)
-> **Status:** Ready for Review
+> **Status:** Approved / Completed
 > **Standar Rujukan:** Model Context Protocol Architecture & JSON-RPC 2.0 Specification
 
 Dokumen ini mendefinisikan arsitektur internal server **Model Context Protocol (MCP)** berbasis Stdio (`internal/mcp/*`), router JSON-RPC dengan state machine, isolasi trust boundary pemindaian, arsitektur generator ensiklopedia wiki, serta alur keamanan pemasang biner.

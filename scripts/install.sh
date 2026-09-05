@@ -1,14 +1,14 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Charites Universal Installer for Linux and macOS
-# Usage: curl -fsSL https://raw.githubusercontent.com/will2469/charites/main/scripts/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/will2469/charites/main/scripts/install.sh | sh
 # Options:
 #   CHARITES_VERSION="v1.0.0"  Specify exact version to install
 #   CHARITES_INSTALL_DIR="..." Specify custom installation directory
 
-set -euo pipefail
+set -eu
 
 REPO="will2469/charites"
-GITHUB_URL="https://github.com/${REPO}"
+GITHUB_URL="${GITHUB_URL:-https://github.com/${REPO}}"
 
 # Colors for output
 BOLD="\033[1m"
@@ -120,10 +120,13 @@ if curl -fsSL "${CHECKSUMS_URL}" -o "${CHECKSUM_FILE}" 2>/dev/null || wget -q "$
 
         if [ -n "${ACTUAL_SHA}" ]; then
             if [ "${ACTUAL_SHA}" = "${EXPECTED_SHA}" ]; then
-                success "SHA256 checksum verified: ${ACTUAL_SHA:0:16}..."
+                SHORT_SHA=$(printf '%.16s' "${ACTUAL_SHA}")
+                success "SHA256 checksum verified: ${SHORT_SHA}..."
             else
                 error "Checksum mismatch! Expected ${EXPECTED_SHA}, got ${ACTUAL_SHA}."
             fi
+        else
+            error "Neither sha256sum nor shasum is installed to verify checksum."
         fi
     fi
 else
@@ -131,6 +134,11 @@ else
 fi
 
 # 8. Extract Binary
+info "Validating archive entries for security..."
+if tar -tzf "${TMP_DIR}/${ARCHIVE_NAME}" 2>/dev/null | grep -E '(^|/)\.\.(/|$)' >/dev/null 2>&1; then
+    error "Archive contains illegal relative path traversal entries (..)!"
+fi
+
 info "Extracting binary..."
 tar -xzf "${TMP_DIR}/${ARCHIVE_NAME}" -C "${TMP_DIR}"
 
