@@ -69,15 +69,7 @@ func (w *Walker) Walk(ctx context.Context, target string, jobs chan<- string) er
 
 	// 2. Penanganan Target Berkas Tunggal Secara Langsung (Single File Target)
 	if !fi.IsDir() {
-		ext := filepath.Ext(cleanTarget)
-		if w.extMap[ext] && fi.Size() <= MaxScanFileSize && !w.matcher.ShouldIgnoreFile(cleanTarget) {
-			select {
-			case jobs <- cleanTarget:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-		return nil
+		return w.handleSingleFile(ctx, cleanTarget, fi, jobs)
 	}
 
 	// 3. Traversal Direktori Rekursif
@@ -86,52 +78,67 @@ func (w *Walker) Walk(ctx context.Context, target string, jobs chan<- string) er
 			return nil // Lanjutkan traversal jika file individual tidak dapat dibaca
 		}
 
-		// Cek interupsi context
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		rel, _ := filepath.Rel(cleanTarget, path)
+		return w.walkDirEntry(ctx, cleanTarget, path, d, jobs)
+	})
+}
 
-		// Proteksi Symlink: Jangan ikuti direktori symlink dan lewati berkas symlink
-		if d.Type()&os.ModeSymlink != 0 {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		// Direktori: Evaluasi Early Pruning
-		if d.IsDir() {
-			if rel != "." && w.matcher.ShouldIgnoreDir(d.Name(), rel) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		// Batas Ekstensi Berkas
-		if !w.extMap[filepath.Ext(path)] {
-			return nil
-		}
-
-		// Batas Ukuran Berkas Maksimal 10 MB
-		info, err := d.Info()
-		if err != nil || info.Size() > MaxScanFileSize {
-			return nil
-		}
-
-		// Filter Ignore Berkas
-		if w.matcher.ShouldIgnoreFile(rel) {
-			return nil
-		}
-
+func (w *Walker) handleSingleFile(ctx context.Context, cleanTarget string, fi os.FileInfo, jobs chan<- string) error {
+	ext := filepath.Ext(cleanTarget)
+	if w.extMap[ext] && fi.Size() <= MaxScanFileSize && !w.matcher.ShouldIgnoreFile(cleanTarget) {
 		select {
-		case jobs <- path:
+		case jobs <- cleanTarget:
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+	return nil
+}
+
+func (w *Walker) walkDirEntry(ctx context.Context, cleanTarget, path string, d os.DirEntry, jobs chan<- string) error {
+	rel, _ := filepath.Rel(cleanTarget, path)
+
+	// Proteksi Symlink: Jangan ikuti direktori symlink dan lewati berkas symlink
+	if d.Type()&os.ModeSymlink != 0 {
+		if d.IsDir() {
+			return filepath.SkipDir
+		}
 		return nil
-	})
+	}
+
+	// Direktori: Evaluasi Early Pruning
+	if d.IsDir() {
+		if rel != "." && w.matcher.ShouldIgnoreDir(d.Name(), rel) {
+			return filepath.SkipDir
+		}
+		return nil
+	}
+
+	// Batas Ekstensi Berkas
+	if !w.extMap[filepath.Ext(path)] {
+		return nil
+	}
+
+	// Batas Ukuran Berkas Maksimal 10 MB
+	info, err := d.Info()
+	if err != nil || info.Size() > MaxScanFileSize {
+		return nil
+	}
+
+	// Filter Ignore Berkas
+	if w.matcher.ShouldIgnoreFile(rel) {
+		return nil
+	}
+
+	select {
+	case jobs <- path:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

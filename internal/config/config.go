@@ -77,45 +77,10 @@ func Parse(data []byte) (*Config, error) {
 		// Hitung indentasi spasi
 		indent := len(line) - len(strings.TrimLeft(line, " "))
 
-		// Deteksi bagian tingkat atas (indent == 0)
 		if indent == 0 {
-			if strings.HasSuffix(trimmed, ":") {
-				currentSection = strings.TrimSuffix(trimmed, ":")
-				continue
-			}
-
-			// Key-value tingkat atas
-			if k, v, found := strings.Cut(trimmed, ":"); found {
-				currentSection = ""
-				key := strings.TrimSpace(k)
-				val := cleanValue(v)
-				switch key {
-				case "format":
-					cfg.Format = val
-				case "scan_path":
-					cfg.ScanPath = val
-				}
-			}
-			continue
-		}
-
-		// Parsing konten berindentasi berdasarkan seksi aktif
-		switch currentSection {
-		case "rules":
-			if k, v, found := strings.Cut(trimmed, ":"); found {
-				ruleID := strings.TrimSpace(k)
-				val := cleanValue(v)
-				if ruleID != "" {
-					cfg.Rules[ruleID] = val
-				}
-			}
-		case "ignore":
-			if strings.HasPrefix(trimmed, "-") {
-				val := cleanValue(strings.TrimPrefix(trimmed, "-"))
-				if val != "" {
-					cfg.Ignore = append(cfg.Ignore, val)
-				}
-			}
+			parseTopLevel(trimmed, cfg, &currentSection)
+		} else {
+			parseIndentedSection(trimmed, currentSection, cfg)
 		}
 	}
 
@@ -124,6 +89,45 @@ func Parse(data []byte) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func parseTopLevel(trimmed string, cfg *Config, currentSection *string) {
+	if strings.HasSuffix(trimmed, ":") {
+		*currentSection = strings.TrimSuffix(trimmed, ":")
+		return
+	}
+
+	if k, v, found := strings.Cut(trimmed, ":"); found {
+		*currentSection = ""
+		key := strings.TrimSpace(k)
+		val := cleanValue(v)
+		switch key {
+		case "format":
+			cfg.Format = val
+		case "scan_path":
+			cfg.ScanPath = val
+		}
+	}
+}
+
+func parseIndentedSection(trimmed, currentSection string, cfg *Config) {
+	switch currentSection {
+	case "rules":
+		if k, v, found := strings.Cut(trimmed, ":"); found {
+			ruleID := strings.TrimSpace(k)
+			val := cleanValue(v)
+			if ruleID != "" {
+				cfg.Rules[ruleID] = val
+			}
+		}
+	case "ignore":
+		if strings.HasPrefix(trimmed, "-") {
+			val := cleanValue(strings.TrimPrefix(trimmed, "-"))
+			if val != "" {
+				cfg.Ignore = append(cfg.Ignore, val)
+			}
+		}
+	}
 }
 
 // cleanValue membersihkan tanda kutip (single/double) dan spasi dari nilai konfigurasi.
@@ -159,22 +163,9 @@ func (c *Config) ResolveActiveRules(reg *rules.Registry, categoryFilter, ruleFil
 		}
 
 		// 2. Config Policy Resolution
-		effectiveSev := rule.DefaultSeverity()
-		if c != nil && c.Rules != nil {
-			if override, exists := c.Rules[id]; exists {
-				val := strings.ToLower(strings.TrimSpace(override))
-				if val == "off" || val == "false" || val == "disable" || val == "disabled" {
-					continue // Policy menonaktifkan rule (Policy mengalahkan CLI filter)
-				}
-				switch val {
-				case "error":
-					effectiveSev = ir.SeverityError
-				case "warn", "warning":
-					effectiveSev = ir.SeverityWarn
-				case "info":
-					effectiveSev = ir.SeverityInfo
-				}
-			}
+		effectiveSev, enabled := c.resolveRuleSeverity(rule)
+		if !enabled {
+			continue // Policy menonaktifkan rule (Policy mengalahkan CLI filter)
 		}
 
 		active = append(active, ActiveRule{
@@ -184,4 +175,32 @@ func (c *Config) ResolveActiveRules(reg *rules.Registry, categoryFilter, ruleFil
 	}
 
 	return active
+}
+
+func (c *Config) resolveRuleSeverity(rule rules.Rule) (ir.Severity, bool) {
+	effectiveSev := rule.DefaultSeverity()
+	if c == nil || c.Rules == nil {
+		return effectiveSev, true
+	}
+
+	override, exists := c.Rules[rule.ID()]
+	if !exists {
+		return effectiveSev, true
+	}
+
+	val := strings.ToLower(strings.TrimSpace(override))
+	if val == "off" || val == "false" || val == "disable" || val == "disabled" {
+		return effectiveSev, false
+	}
+
+	switch val {
+	case "error":
+		effectiveSev = ir.SeverityError
+	case "warn", "warning":
+		effectiveSev = ir.SeverityWarn
+	case "info":
+		effectiveSev = ir.SeverityInfo
+	}
+
+	return effectiveSev, true
 }

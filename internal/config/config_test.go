@@ -58,9 +58,8 @@ func TestResolveActiveRules_DefaultYes(t *testing.T) {
 	}
 }
 
-func TestResolveActiveRules_OverridesAndPrecedence(t *testing.T) {
-	reg := setupRegistry()
-
+func parseTestConfig(t *testing.T) *config.Config {
+	t.Helper()
 	yamlContent := `
 format: inline
 scan_path: ./src
@@ -77,6 +76,12 @@ ignore:
 	if err != nil {
 		t.Fatalf("config.Parse failed: %v", err)
 	}
+	return cfg
+}
+
+func TestResolveActiveRules_OverridesAndPrecedence(t *testing.T) {
+	reg := setupRegistry()
+	cfg := parseTestConfig(t)
 
 	if cfg.Format != "inline" || cfg.ScanPath != "./src" {
 		t.Errorf("unexpected top-level values: format=%q, scan_path=%q", cfg.Format, cfg.ScanPath)
@@ -85,9 +90,7 @@ ignore:
 		t.Errorf("unexpected ignore list: %+v", cfg.Ignore)
 	}
 
-	// Skenario A: Resolusi tanpa filter CLI
 	active := cfg.ResolveActiveRules(reg, "", "")
-	// theme.color (off) dan a11y.alt (disabled) harus nonaktif -> tersisa 2 rules
 	if len(active) != 2 {
 		t.Fatalf("expected 2 active rules, got %d", len(active))
 	}
@@ -103,15 +106,22 @@ ignore:
 	if sev, ok := ruleMap["perf.bundle"]; !ok || sev != ir.SeverityError {
 		t.Errorf("perf.bundle expected error, got %v (ok=%v)", sev, ok)
 	}
+}
 
-	// Skenario B: Policy mengalahkan CLI Selection
-	// User mencoba memilih theme.color via CLI (--rule=theme.color), tapi config menetapkan "off"
+func TestResolveActiveRules_PolicyOverridesCLI(t *testing.T) {
+	reg := setupRegistry()
+	cfg := parseTestConfig(t)
+
 	activeForced := cfg.ResolveActiveRules(reg, "", "theme.color")
 	if len(activeForced) != 0 {
 		t.Errorf("expected theme.color to be disabled by policy despite CLI flag, got %d", len(activeForced))
 	}
+}
 
-	// Skenario C: CLI Category Filter (--category=theme)
+func TestResolveActiveRules_CategoryFilter(t *testing.T) {
+	reg := setupRegistry()
+	cfg := parseTestConfig(t)
+
 	activeCategory := cfg.ResolveActiveRules(reg, "theme", "")
 	if len(activeCategory) != 1 || activeCategory[0].Rule.ID() != "theme.opacity" {
 		t.Fatalf("expected only theme.opacity under category=theme, got %d", len(activeCategory))

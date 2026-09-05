@@ -58,27 +58,7 @@ func (p *Pool) Run(ctx context.Context, walker *Walker, target string, analyzer 
 	// 1. Luncurkan N Worker Goroutines
 	for i := 0; i < p.workers; i++ {
 		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case path, ok := <-jobs:
-					if !ok {
-						return
-					}
-					diags, err := analyzer.AnalyzeFile(path)
-					if err == nil && len(diags) > 0 {
-						select {
-						case results <- diags:
-						case <-ctx.Done():
-							return
-						}
-					}
-				}
-			}
-		}()
+		go p.startWorker(ctx, &wg, jobs, results, analyzer)
 	}
 
 	// 2. Luncurkan Walker Goroutine (Single Producer & Closer untuk channel jobs)
@@ -112,4 +92,26 @@ func (p *Pool) Run(ctx context.Context, walker *Walker, target string, analyzer 
 	}
 
 	return ir.SortDiagnostics(allDiags), nil
+}
+
+func (p *Pool) startWorker(ctx context.Context, wg *sync.WaitGroup, jobs <-chan string, results chan<- []ir.Diagnostic, analyzer FileAnalyzer) {
+	defer wg.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case path, ok := <-jobs:
+			if !ok {
+				return
+			}
+			diags, err := analyzer.AnalyzeFile(path)
+			if err == nil && len(diags) > 0 {
+				select {
+				case results <- diags:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}
 }
