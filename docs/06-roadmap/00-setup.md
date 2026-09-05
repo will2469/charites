@@ -26,29 +26,37 @@ Dokumen ini mendefinisikan gerbang evaluasi kelulusan (*phase gate*) untuk **Fas
 
 ## 2. Checklist Definition of Done (Phase Gate DoD) Fase 0
 
-- [ ] **SPEC (WHAT) Verification:**
-  - [ ] `./bin/charites --version`, `./bin/charites -v`, dan `./bin/charites version` mencetak `charites version 0.1.0-dev` dan exit `0`.
-  - [ ] `./bin/charites --help` dan `./bin/charites -h` mencetak usage manual dan exit `0`.
-  - [ ] `./bin/charites` (tanpa argumen) mencetak usage manual dan exit `0`.
-  - [ ] `./bin/charites unknown-command` mencetak error ke `stderr` dan exit `2`.
-  - [ ] `.charitesignore` ada di root dan mematuhi sintaks Gitignore-compatible.
-- [ ] **ARCH (HOW) Verification:**
-  - [ ] Binary dikompilasi dengan `CGO_ENABLED=0` secara native.
-  - [ ] `cmd/charites/main.go` murni bertindak sebagai trampoline ke `cli.Execute()`.
-  - [ ] Struktur paket mematuhi enkapsulasi `internal/` tanpa kebocoran logika fase masa depan.
-- [ ] **TEST (PROOF) Verification:**
-  - [ ] `make test` lolos 100% pada unit test CLI dan subprocess E2E smoke test (`go test -v -race ./...`).
-- [ ] **QUALITY (THRESHOLD) Verification:**
-  - [ ] `make lint` (`golangci-lint run ./...`) lolos dengan exit code `0` tanpa peringatan pada seluruh kode Fase 0.
+Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi gerbang berikut berstatus **PASS**:
+
+- [ ] **`ROAD-00-GATE-001` (SPEC-00 Compliance = PASS):**
+  - [ ] Flag `--version`, `-v`, dan subcommand `version` mencetak info ke `stdout` (bersih dari `stderr`) dan keluar dengan exit code `0`.
+  - [ ] Flag `--help`, `-h`, dan pemanggilan tanpa argumen mencetak panduan usage ke `stdout` (bersih dari `stderr`) dan keluar dengan exit code `0`.
+  - [ ] Subcommand/flag tidak dikenal (`unknown-command`, `--bogus`) mencetak pesan error ke `stderr` (bersih dari `stdout`) dan keluar dengan exit code `2`.
+  - [ ] Berkas `.charitesignore` tersedia di root dan memuat seluruh default pattern ignorasi Gitignore-compatible.
+  - [ ] Berkas `go.sum` **MUST NOT** be required pada Fase 0 saat dependensi eksternal bernilai nol.
+
+- [ ] **`ROAD-00-GATE-002` (ARCH-00 Compliance = PASS):**
+  - [ ] Rantai dependensi Makefile `all: build test lint` terbukti berhasil dieksekusi secara deterministik pada *fresh checkout*.
+  - [ ] Entrypoint `cmd/charites/main.go` murni bertindak sebagai trampoline ke `cli.Execute()`.
+  - [ ] Struktur direktori mematuhi enkapsulasi `internal/` dan pemisahan *skeleton directory reservations* tanpa kebocoran logika fase masa depan.
+  - [ ] Implementasi build secara native menggunakan `CGO_ENABLED=0` (`SPEC-00-BUILD-001`).
+
+- [ ] **`ROAD-00-GATE-003` (TEST-00 Compliance = PASS):**
+  - [ ] Unit test `internal/cli/root_test.go` lolos 100% (`go test -v -race ./...`).
+  - [ ] Subprocess E2E smoke test `tests/e2e/smoke_test.go` lolos dengan pembuktian pemisahan buffer `stdout` vs `stderr`.
+  - [ ] Prosedur verifikasi kompilasi silang `TEST-00-BUILD-002` lolos tanpa CGO untuk 4 platform resmi: `linux/amd64`, `linux/arm64`, `darwin/arm64`, dan `windows/amd64`.
+
+- [ ] **`ROAD-00-GATE-004` (QUAL-00 Compliance = PASS):**
+  - [ ] `golangci-lint run ./...` lolos dengan exit code `0` tanpa peringatan pada seluruh kode Fase 0.
   - [ ] `go.mod` bebas dependensi pihak ketiga (*zero third-party dependencies*).
-- [ ] **Cross-Platform Compilation Gate:**
-  - [ ] Verifikasi kompilasi silang (*cross-compile*) berhasil tanpa CGO untuk Linux (`amd64`, `arm64`), macOS Apple Silicon (`darwin/arm64`), dan Windows (`amd64`).
+  - [ ] Invarian Zero CGO terverifikasi (bebas dari berkas `.c`, `.h`, atau blok `import "C"`).
+  - [ ] Konfigurasi pipeline CI memin versi Go pada baseline reproduktifitas `go1.26.0`.
 
 ---
 
 ## 3. Gerbang Transisi ke Fase 1 (IR Contract)
 
-Begitu seluruh kriteria evaluasi gerbang di atas tercentang hijau:
+Begitu seluruh kriteria evaluasi gerbang `ROAD-00-GATE-001` s/d `ROAD-00-GATE-004` di atas tercentang hijau:
 1. Rekam checkpoint git commit: `feat(init): complete Phase 0 repository setup, CLI entrypoint and toolchain baseline`.
 2. Buka dokumen [docs/01-spec/01-contract.md](file:///home/will/Monorepo/charites/docs/01-spec/01-contract.md) untuk memulai implementasi kontrak data Intermediate Representation (**Fase 1**).
 

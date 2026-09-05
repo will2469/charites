@@ -9,13 +9,22 @@ Dokumen ini mendefinisikan spesifikasi formal untuk penyiapan awal (_setup_) rep
 
 ---
 
-## 1. Spesifikasi Modul Go & Toolchain
+## 1. Spesifikasi Modul Go, Toolchain & Standar Kompilasi
 
 - **Module Path:** `github.com/will2469/charites`
-- **Go Version:** `1.26` (dideklarasikan di `go.mod` sebagai `go 1.26`)
-- **Go Toolchain:** `go1.26.x`
+- **Go Version & Compatibility:**
+  - **Language / Module Compatibility:** `Go 1.26` (dideklarasikan di `go.mod` sebagai `go 1.26`).
+  - **Supported Local Toolchain:** `go1.26.x` (mendukung minor patch toolchain Go 1.26 lokal pengembang).
+  - **CI / Reproducibility Baseline:** `go1.26.0` (dipin secara deterministik pada pipeline CI GitHub Actions dan release workflow).
 - **Vendor Policy:** Dilarang mengimpor library pihak ketiga (_third-party dependencies_) pada Fase 0. Seluruh scaffolding entrypoint murni menggunakan **Go Standard Library**.
-- **CGO Policy:** Wajib mendukung kompilasi `CGO_ENABLED=0` secara native tanpa memerlukan library C sistem.
+- **SPEC-00-BUILD-001 (Zero CGO Invariant):**
+  - Binary Charites **MUST** dapat dikompilasi secara penuh dengan CGO dinonaktifkan (`CGO_ENABLED=0`) tanpa ketergantungan library C sistem. Penggunaan kode CGO atau pustaka pihak ketiga yang membutuhkan CGO dilarang keras di seluruh repositori.
+- **SPEC-00-BUILD-002 (Cross-Platform Compilation Targets):**
+  - Binary Charites **MUST** mendukung kompilasi silang (*cross-compilation*) native dengan `CGO_ENABLED=0` untuk 4 target platform rilis resmi:
+    1. **Linux x86_64:** `GOOS=linux GOARCH=amd64`
+    2. **Linux ARM64:** `GOOS=linux GOARCH=arm64`
+    3. **macOS Apple Silicon:** `GOOS=darwin GOARCH=arm64`
+    4. **Windows x86_64:** `GOOS=windows GOARCH=amd64`
 - **Dependency File Policy:** Berkas `go.sum` **MUST NOT** be required pada Fase 0 saat dependensi eksternal bernilai nol (*zero external dependencies*).
 
 ---
@@ -124,15 +133,16 @@ Thumbs.db
 ## 4. Spesifikasi Kontrak Entrypoint Binary (`cmd/charites/main.go` & `internal/cli`)
 
 - **Nama Binary Output:** `charites`
-- **Kontrak CLI Fase 0 (Input, Output, Exit Codes):**
+- **Kontrak CLI Fase 0 (Input, Output, Stream Routing, Exit Codes):**
   1. **Flag Versi (`--version` dan `-v`) serta Subcommand `version`:**
-     - Mencetak informasi versi ke `stdout`:
+     - Mencetak informasi versi secara eksklusif ke `stdout`:
        ```text
        charites version 0.1.0-dev (go1.26.x)
        ```
+     - Saluran `stderr` **MUST** tetap bersih (kosong).
      - Keluar dengan exit code `0`.
   2. **Flag Bantuan (`--help` dan `-h`):**
-     - Mencetak panduan penggunaan dasar ke `stdout`:
+     - Mencetak panduan penggunaan dasar secara eksklusif ke `stdout`:
        ```text
        Usage: charites <command> [options] [path]
 
@@ -148,24 +158,29 @@ Thumbs.db
          --rule string            Filter by single rule ID: theme.hardcode-opacity-color
          --ignore string          Additional custom ignore pattern
        ```
+     - Saluran `stderr` **MUST** tetap bersih (kosong).
      - Keluar dengan exit code `0`.
   3. **Pemanggilan Tanpa Argumen (`[]string{}`):**
      - Mencetak panduan penggunaan dasar (Usage) ke `stdout`.
+     - Saluran `stderr` **MUST** tetap bersih (kosong).
      - Keluar dengan exit code `0`.
   4. **Subcommand / Flag Tidak Dikenal (*Unknown Command / Invalid Flag*):**
      - Jika pengguna memberikan argumen atau subcommand yang tidak dikenali (contoh: `charites unknown-command` atau `charites --bogus`), CLI **MUST** mencetak pesan kesalahan deskriptif ke `stderr`.
+     - Saluran `stdout` dilarang mencemari pesan kesalahan.
      - Keluar dengan exit code `2` (CLI argument syntax error).
 
 ---
 
 ## 5. Acceptance Criteria (Kriteria Fungsional Lolos Fase 0)
 
-1. Perintah `go build -o bin/charites ./cmd/charites` berhasil tanpa error dan tanpa warning dengan `CGO_ENABLED=0`.
-2. Binary `./bin/charites --version` dan `./bin/charites -v` serta `./bin/charites version` mencetak string versi dan keluar dengan exit code `0`.
-3. Binary `./bin/charites --help` dan `./bin/charites -h` mencetak panduan penggunaan dan keluar dengan exit code `0`.
-4. Binary `./bin/charites` (tanpa argumen) mencetak panduan penggunaan dan keluar dengan exit code `0`.
-5. Binary `./bin/charites unknown-command` mencetak pesan kesalahan ke `stderr` dan keluar dengan exit code `2`.
-6. Berkas `.charitesignore` tersedia di root dan memuat seluruh default pattern ignorasi Gitignore-compatible.
-7. Berkas `go.sum` **MUST NOT** be required pada Fase 0 karena ketiadaan dependensi pihak ketiga (*zero external dependencies*).
-8. Seluruh skeleton folder di `internal/` dan `tests/` telah dibuat sebagai *directory reservations*.
+1. Perintah `go build -o bin/charites ./cmd/charites` berhasil tanpa error dan tanpa warning dengan `CGO_ENABLED=0` (`SPEC-00-BUILD-001`).
+2. Kompilasi silang (*cross-compilation*) native berhasil untuk 4 target resmi: `linux/amd64`, `linux/arm64`, `darwin/arm64`, dan `windows/amd64` (`SPEC-00-BUILD-002`).
+3. Binary `./bin/charites --version`, `./bin/charites -v`, serta `./bin/charites version` mencetak string versi ke `stdout` (bersih dari `stderr`) dan keluar dengan exit code `0`.
+4. Binary `./bin/charites --help` dan `./bin/charites -h` mencetak panduan penggunaan ke `stdout` dan keluar dengan exit code `0`.
+5. Binary `./bin/charites` (tanpa argumen) mencetak panduan penggunaan ke `stdout` dan keluar dengan exit code `0`.
+6. Binary `./bin/charites unknown-command` dan `./bin/charites --bogus` mencetak pesan kesalahan secara presisi ke `stderr` dan keluar dengan exit code `2`.
+7. Berkas `.charitesignore` tersedia di root dan memuat seluruh default pattern ignorasi Gitignore-compatible.
+8. Berkas `go.sum` **MUST NOT** be required pada Fase 0 karena ketiadaan dependensi pihak ketiga (*zero external dependencies*).
+9. Rantai dependensi Makefile `all: build test lint` terbukti berhasil dieksekusi secara berurutan pada checkout repositori baru (*fresh checkout*).
+10. Seluruh skeleton folder di `internal/` dan `tests/` telah dibuat sebagai *directory reservations*.
 

@@ -1,7 +1,7 @@
 # Charites Architecture & Documentation Portal
 
 > **Engine:** Go 1.26 Standalone Native Binary
-> **Status:** Architecture Design Complete & Locked (Phases 0-8)
+> **Status:** Architecture Documentation Baseline (Phases 0-8 Design Baseline, Implementation In-Progress)
 > **Prinsip Utama:** *Single-Pass Zero-CGO Compiler Pipeline, Default-YES Configuration, Argus Tri-Corpus Verification*
 
 Selamat datang di portal dokumentasi teknis resmi **Charites**. Direktori `docs/` ini dirancang dengan standar arsitektur kelas enterprise yang memisahkan tanggung jawab (*Separation of Concerns*) ke dalam **6 Pilar Dokumentasi**, didukung oleh matriks tahapan implementasi modular terpadu dari **Fase 0 hingga Fase 8**.
@@ -212,7 +212,7 @@ Sebelum melangkah ke penulisan kode nyata di **Fase 0**, seluruh sistem wajib me
 2. **Sub-100ms Monorepo Latency:**
    Pemindaian 1.000 berkas frontend di SSD selesai dalam waktu $< 100\text{ milidetik}$.
 3. **Model Argus Tri-Corpus Semantic Verification:**
-   Setiap rule wajib memenuhi metrik kelulusan: `RuleCorrectnessMetric == Pass` (`PositiveViolations > 0`, `NegativeViolations == 0`, `AdversarialViolations == 0`).
+   Setiap rule wajib memenuhi matriks ekspektasi kasus Tri-Corpus (`matrix.json`) dengan pembuktian kecocokan semantik mutlak ($\text{Actual} \equiv \text{Expected}$).
 4. **Prinsip Konfigurasi Default: YES:**
    Tanpa berkas `charites.yaml`, 100% rule aktif otomatis. File konfigurasi murni digunakan untuk penyesuaian (*overrides*).
 5. **Invarian Anti-Sycophancy (Zero Secret Bypass):**

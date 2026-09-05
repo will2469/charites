@@ -41,12 +41,13 @@ Paket `internal/cli` wajib memiliki unit test deterministik yang menguji seluruh
 
 ## 2. Skenario Subprocess End-to-End Smoke Test (`tests/e2e/smoke_test.go`)
 
-Pengujian end-to-end membuktikan bahwa binary terkompilasi (`bin/charites`) dapat dieksekusi dari subprocess OS dengan perilaku kontrak yang presisi:
+Pengujian end-to-end membuktikan bahwa binary terkompilasi (`bin/charites`) dapat dieksekusi dari subprocess OS dengan perilaku kontrak yang presisi, termasuk **pemisahan saluran stream routing** (`stdout` vs `stderr`):
 
 ```go
 package e2e_test
 
 import (
+    "bytes"
     "os/exec"
     "strings"
     "testing"
@@ -56,64 +57,95 @@ func TestBinarySmoke(t *testing.T) {
     binPath := "../../bin/charites"
 
     tests := []struct {
-        name         string
-        args         []string
-        expectedCode int
-        containsOut  string
+        name           string
+        args           []string
+        expectedCode   int
+        containsStdout string
+        containsStderr string
     }{
         {
-            name:         "flag --version",
-            args:         []string{"--version"},
-            expectedCode: 0,
-            containsOut:  "charites version",
+            name:           "flag --version",
+            args:           []string{"--version"},
+            expectedCode:   0,
+            containsStdout: "charites version",
         },
         {
-            name:         "flag -v",
-            args:         []string{"-v"},
-            expectedCode: 0,
-            containsOut:  "charites version",
+            name:           "flag -v",
+            args:           []string{"-v"},
+            expectedCode:   0,
+            containsStdout: "charites version",
         },
         {
-            name:         "flag --help",
-            args:         []string{"--help"},
-            expectedCode: 0,
-            containsOut:  "Usage: charites",
+            name:           "subcommand version",
+            args:           []string{"version"},
+            expectedCode:   0,
+            containsStdout: "charites version",
         },
         {
-            name:         "flag -h",
-            args:         []string{"-h"},
-            expectedCode: 0,
-            containsOut:  "Usage: charites",
+            name:           "flag --help",
+            args:           []string{"--help"},
+            expectedCode:   0,
+            containsStdout: "Usage: charites",
         },
         {
-            name:         "unknown command exits 2",
-            args:         []string{"unknown-command"},
-            expectedCode: 2,
-            containsOut:  "unknown command",
+            name:           "flag -h",
+            args:           []string{"-h"},
+            expectedCode:   0,
+            containsStdout: "Usage: charites",
+        },
+        {
+            name:           "empty args usage",
+            args:           []string{},
+            expectedCode:   0,
+            containsStdout: "Usage: charites",
+        },
+        {
+            name:           "unknown command exits 2 to stderr",
+            args:           []string{"unknown-command"},
+            expectedCode:   2,
+            containsStderr: "unknown command",
+        },
+        {
+            name:           "unknown flag exits 2 to stderr",
+            args:           []string{"--bogus-flag"},
+            expectedCode:   2,
+            containsStderr: "unknown",
         },
     }
 
     for _, tc := range tests {
         t.Run(tc.name, func(t *testing.T) {
             cmd := exec.Command(binPath, tc.args...)
-            out, err := cmd.CombinedOutput()
-            outStr := string(out)
+            var stdout, stderr bytes.Buffer
+            cmd.Stdout = &stdout
+            cmd.Stderr = &stderr
 
-            if tc.expectedCode == 0 && err != nil {
-                t.Fatalf("ekspektasi exit 0, didapat error: %v, output: %s", err, outStr)
-            }
-            if tc.expectedCode != 0 {
+            err := cmd.Run()
+            stdoutStr := stdout.String()
+            stderrStr := stderr.String()
+
+            if tc.expectedCode == 0 {
+                if err != nil {
+                    t.Fatalf("ekspektasi exit 0, didapat error: %v, stderr: %s", err, stderrStr)
+                }
+                if stderrStr != "" {
+                    t.Errorf("ekspektasi stderr bersih pada exit 0, didapat: %s", stderrStr)
+                }
+            } else {
                 if exitErr, ok := err.(*exec.ExitError); ok {
                     if exitErr.ExitCode() != tc.expectedCode {
-                        t.Fatalf("ekspektasi exit %d, didapat %d", tc.expectedCode, exitErr.ExitCode())
+                        t.Fatalf("ekspektasi exit %d, didapat %d (stderr: %s)", tc.expectedCode, exitErr.ExitCode(), stderrStr)
                     }
                 } else {
-                    t.Fatalf("ekspektasi exit code non-zero, didapat err: %v", err)
+                    t.Fatalf("ekspektasi exit code %d, didapat err: %v", tc.expectedCode, err)
                 }
             }
 
-            if tc.containsOut != "" && !strings.Contains(outStr, tc.containsOut) {
-                t.Errorf("output tidak memuat substring yang diharapkan '%s': %s", tc.containsOut, outStr)
+            if tc.containsStdout != "" && !strings.Contains(stdoutStr, tc.containsStdout) {
+                t.Errorf("stdout tidak memuat substring yang diharapkan '%s': %s", tc.containsStdout, stdoutStr)
+            }
+            if tc.containsStderr != "" && !strings.Contains(stderrStr, tc.containsStderr) {
+                t.Errorf("stderr tidak memuat substring yang diharapkan '%s': %s", tc.containsStderr, stderrStr)
             }
         })
     }
@@ -122,7 +154,29 @@ func TestBinarySmoke(t *testing.T) {
 
 ---
 
-## 3. Scaffolding Reservasi Struktur Tri-Corpus Correctness (`tests/correctness/`)
+## 3. Prosedur Verifikasi Kompilasi Silang (`TEST-00-BUILD-002`)
+
+Untuk membuktikan pemenuhan kontrak `SPEC-00-BUILD-002` (Cross-Platform Targets), pengujian otomatis memverifikasi bahwa kompilasi silang berhasil untuk 4 platform resmi tanpa ketergantungan CGO:
+
+```bash
+# Target 1: Linux x86_64
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+
+# Target 2: Linux ARM64
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+
+# Target 3: macOS Apple Silicon
+GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+
+# Target 4: Windows x86_64
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+```
+
+Setiap perintah di atas **MUST** menghasilkan exit code `0` tanpa peringatan linker.
+
+---
+
+## 4. Scaffolding Reservasi Struktur Tri-Corpus Correctness (`tests/correctness/`)
 
 Mengadopsi pola pengujian semantik **Argus**, struktur direktori pengujian rule dipersiapkan sebagai *directory reservation*:
 - Direktori `tests/correctness/` dan `tests/golden/` dibentuk sebagai fondasi scaffolding.
@@ -131,24 +185,25 @@ Mengadopsi pola pengujian semantik **Argus**, struktur direktori pengujian rule 
 
 ---
 
-## 4. Checklist Verifikasi Manual Fase 0
+## 5. Checklist Verifikasi Manual Fase 0
 
 Jalankan rangkaian perintah pembuktian (*proof execution*) di terminal:
 ```bash
-# 1. Pastikan build binary berhasil dengan zero CGO
-make build
+# 1. Pastikan rantai Makefile all berjalan mulus dari awal (build -> test -> lint)
+make all
 
-# 2. Pastikan binary merespons flag versi dan help
+# 2. Pastikan binary merespons flag versi dan help dengan stream routing presisi
 ./bin/charites --version
 ./bin/charites -v
 ./bin/charites --help
 ./bin/charites -h
 
-# 3. Pastikan argumen tidak dikenal menghasilkan exit code 2
-./bin/charites unknown-command || [ $? -eq 2 ]
+# 3. Pastikan argumen tidak dikenal menghasilkan error murni ke stderr dengan exit code 2
+./bin/charites unknown-command 2> err.log || [ $? -eq 2 ]
+grep -q "unknown command" err.log && rm err.log
 
-# 4. Pastikan unit test dan subprocess smoke test lolos
-make test
+# 4. Pastikan verifikasi 4 target kompilasi silang lolos
+make cross-compile
 ```
 Seluruh perintah di atas **wajib** membuktikan pemenuhan kontrak SPEC-00.
 

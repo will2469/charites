@@ -11,8 +11,10 @@ Dokumen ini menjelaskan rancangan arsitektur penataan modul Go, batasan visibili
 
 ## 1. Spesifikasi Toolchain & Standar Kompilasi
 
-- **Go Version:** `1.26` (dideklarasikan di `go.mod` sebagai `go 1.26`)
-- **Go Toolchain:** `go1.26.x`
+- **Go Version & Compatibility:**
+  - **Language / Module Compatibility:** `Go 1.26` (dideklarasikan di `go.mod` sebagai `go 1.26`).
+  - **Supported Local Toolchain:** `go1.26.x` (mendukung minor patch toolchain Go 1.26 lokal).
+  - **CI / Reproducibility Baseline:** `go1.26.0` (dipin secara deterministik pada GitHub Actions CI runner).
 - **Dependency Invariant:** Fase 0 murni memanfaatkan **Go Standard Library**. Berkas `go.sum` **MUST NOT** be required saat ketiadaan dependensi pihak ketiga.
 
 ---
@@ -81,44 +83,56 @@ Fungsi `main()` murni bertindak sebagai *trampoline*: meneruskan argumen CLI ke 
 
 ---
 
-## 4. Invarian Kompilasi Statis (Zero CGO)
+## 4. Implementasi Kompilasi Statis (Zero CGO) & Cross-Platform
 
-Untuk menjamin portabilitas multi-platform tanpa masalah library C di Linux/macOS/Windows:
-- Setiap perintah build **MUST** menyertakan variabel environment `CGO_ENABLED=0`.
-- Flag build yang direkomendasikan untuk produksi:
+Mengimplementasikan kontrak `SPEC-00-BUILD-001` dan `SPEC-00-BUILD-002`:
+- **Zero CGO:** Perintah kompilasi menyertakan `CGO_ENABLED=0` secara eksplisit untuk menjamin pembuatan static binary tanpa ketergantungan library C sistem.
+- **Flag Produksi:**
   ```bash
   CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/charites ./cmd/charites
   ```
   *(Flag `-s -w` memangkas tabel simbol debug sehingga ukuran binary berkurang ~40% tanpa mengorbankan performa).*
+- **Cross-Platform Compilation:** Karena mengandalkan murni Go standard library tanpa CGO, kompilasi ke target lintas platform dapat dieksekusi secara instan:
+  - Linux: `GOOS=linux GOARCH=amd64` dan `GOOS=linux GOARCH=arm64`
+  - macOS: `GOOS=darwin GOARCH=arm64`
+  - Windows: `GOOS=windows GOARCH=amd64`
 
 ---
 
 ## 5. Standar Makefile Developer Automation
 
-Makefile di akar proyek menyediakan target seragam untuk pengembang lokal dan pipeline CI:
+Makefile di akar proyek menyediakan target seragam dengan **urutan dependensi deterministik** (*build before test*):
 
 ```makefile
-.PHONY: all build test lint clean
+.PHONY: all build test lint cross-compile clean
 
 BINARY_NAME=charites
 BIN_DIR=bin
 
-all: lint test build
+all: build test lint
 
 build:
 	@mkdir -p $(BIN_DIR)
 	CGO_ENABLED=0 go build -o $(BIN_DIR)/$(BINARY_NAME) ./cmd/charites
 
-test:
+test: build
 	go test -v -race ./...
 
 lint:
 	golangci-lint run ./...
 
+cross-compile:
+	@echo "Verifying cross-compilation targets (SPEC-00-BUILD-002)..."
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+
 clean:
 	rm -rf $(BIN_DIR)
 ```
 
-> [!NOTE]
-> Target `lint` (`golangci-lint run ./...`) mengevaluasi seluruh kode sumber yang ada pada fase berjalan (*current phase code*), memastikan nol pelanggaran sejak Fase 0 tanpa membebankan aturan paket masa depan.
+> [!IMPORTANT]
+> **Dependency Ordering Rationale (`all: build test lint`):**
+> Target `all` dan `test` mewajibkan `build` mendahului `test`. Pada *fresh checkout*, langkah ini menjamin artefak binary `bin/charites` telah tersedia sebelum pengujian subprocess end-to-end (`tests/e2e/smoke_test.go`) dieksekusi, mencegah kegagalan *missing binary* saat pipeline CI atau developer baru menjalankan `make all`.
 
