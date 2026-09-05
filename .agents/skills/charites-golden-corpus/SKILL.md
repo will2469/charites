@@ -100,29 +100,21 @@ Semua fixture pengujian berpusat secara eksklusif di direktori `tests/`:
 tests/
 ├── corpus_status_test.go                # Automated Adoption Matrix Checker (100% ADOPTED Gate)
 └── correctness/                         # Rule Test Suites
-    ├── theme.hardcode-color/
-    │   ├── positive/
-    │   │   ├── direct.astro             # P1: Obvious inline hex/rgb violation
-    │   │   ├── indirect.tsx             # P2: Template string concatenation
-    │   │   ├── helper.astro             # P3: Violation inside helper function
-    │   │   ├── nested.tsx               # P4: Deeply nested component violation
-    │   │   └── alias.tsx                # P5: Aliased token constant violation
-    │   ├── negative/
-    │   │   ├── tokens.astro             # N1: Standard design tokens
-    │   │   ├── ignore.tsx               # N2: charites:ignore directive
-    │   │   ├── vendor.tsx               # N3: External uninspected package
-    │   │   ├── static.html              # N4: Semantic static HTML
-    │   │   └── config.css               # N5: Excluded CSS property
-    │   ├── adversarial/
-    │   │   ├── template_interp.astro    # A1: Template string interpolation
-    │   │   ├── ternary.tsx              # A2: Conditional ternary styling
-    │   │   ├── spread.tsx               # A3: Spread props style override
-    │   │   ├── dynamic_class.astro      # A4: Dynamic object/class syntax
-    │   │   ├── shadowed_var.tsx         # A5: Variable shadowing
-    │   │   ├── hoc_closure.tsx          # A6: Higher-order closure component
-    │   │   └── obfuscated.astro         # A7: Obfuscated CSS class syntax
-    │   └── rule_test.go                 # Automated runner for this rule
-    └── ... (other rules)
+    ├── theme/
+    │   └── hardcode-opacity-color/
+    │       ├── positive/
+    │       │   ├── direct.astro         # P1: Obvious inline violation
+    │       │   └── indirect.tsx         # P2: Template string / variant concatenation
+    │       ├── negative/
+    │       │   ├── tokens.astro         # N1: Standard design tokens
+    │       │   └── clean.tsx            # N2: Clean standard classes
+    │       ├── adversarial/
+    │       │   ├── slash_layout.astro   # A1: Dimension / layout fractions
+    │       │   ├── line_height.tsx      # A2: Typography line-height modifiers
+    │       │   ├── arbitrary_color.tsx  # A3: Arbitrary hex colors
+    │       │   └── unmapped_opacity.astro # A4: Unmapped opacities & raw palettes
+    │       └── rule_test.go             # Automated runner for this rule
+    └── ... (other categories and rules)
 ```
 
 ---

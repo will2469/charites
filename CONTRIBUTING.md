@@ -50,31 +50,38 @@ Adding a new rule to Charites is automated through the rule scaffolding harness:
    ./.agents/skills/charites-rule-scaffold/scripts/scaffold_rule.sh theme hardcode-opacity-color HIGH "Detects hardcoded opacity color slash modifiers"
    ```
    This automatically creates:
-   - Rule implementation: `internal/rules/<category>_<snake_slug>.go`
-   - 1-SSOT Tri-Corpus test fixtures: `tests/correctness/<category>.<slug>/`
-   - 8-Pillars wiki documentation: `wiki/<category>.<slug>.md`
+   - Rule implementation: `internal/rules/<category>/<snake_slug>.go`
+   - 1-SSOT Tri-Corpus test fixtures: `tests/correctness/<category>/<slug>/`
 
 2. **Register the Rule:**
-   Register the new rule constructor in `internal/rules/registry.go`:
+   Register the new rule constructor in `internal/rules/builtin.go`:
    ```go
-   func RegisterBuiltinRules(r *Registry) {
+   func init() {
        // ...
-       r.Register(NewThemeHardcodeOpacityColorRule())
+       MustRegister(theme.NewHardcodeOpacityColorRule())
    }
    ```
 
-3. **Implement the AST Inspection:**
-   Implement node inspection logic using Leaf IR traversal (`ir.Walk(file.Root)`).
+3. **Implement the AST Inspection & Documentation:**
+   - Implement node inspection logic in `Evaluate(node *ir.Node) []ir.Diagnostic`.
+   - Provide complete 8-Pillars documentation in `Doc() ir.RuleDocumentation`.
 
 4. **Populate Tri-Corpus Fixtures:**
-   - `positive/`: Non-compliant test files annotated with `want "<category>.<slug>"`.
+   - `positive/`: Non-compliant test files with true violations.
    - `negative/`: Compliant test files, valid tokens, and ignored lines (`charites:ignore <category>.<slug>`).
-   - `adversarial/`: Stress testing edge cases (template string interpolation, ternaries, computed classes, shadowed variables).
+   - `adversarial/`: Stress testing edge cases (fractions, line heights, arbitrary values).
 
 5. **Verify Tests:**
    ```bash
-   go test -v ./tests/correctness/<category>.<slug>/...
+   go test -v ./tests/correctness/<category>/<slug>/...
    ```
+
+6. **Compile Wiki Documentation (SSOT):**
+   **Never edit markdown files manually.** Run the automated wiki generator:
+   ```bash
+   make wiki
+   ```
+   This deterministically compiles `wiki/Home.md`, `wiki/<category>.md`, and `wiki/<category>/<slug>.md` directly from your Go rule definition.
 
 ---
 

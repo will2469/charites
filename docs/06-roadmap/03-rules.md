@@ -26,6 +26,8 @@ Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi
    - `negative/`: Berkas contoh bersih dengan token semantik resmi `bg-primary-light`, `text-muted`.
    - `adversarial/`: Berkas jebakan `w-1/2`, `aspect-16/9`, `text-sm/6`, `bg-primary/30`, `bg-[#123456]/10`.
 7. **`tests/correctness_gate_test.go`**: Runner evaluasi otomatis yang menghitung dan memvalidasi `RuleCorrectnessMetric`.
+8. **`internal/ir/doc.go` & `internal/rules/doc.go`**: Kontrak data SSOT dokumentasi 8-Pillars (`ir.RuleDocumentation`, `rules.DocumentedRule`).
+9. **`internal/wiki/`**: Generator ensiklopedia dinamis atomik (`generator.go`, `generator_test.go`, `templates/` embedded FS) dan target Makefile `make wiki`.
 
 ---
 

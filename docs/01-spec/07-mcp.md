@@ -93,22 +93,27 @@ $$\text{NEW} \xrightarrow{\text{initialize}} \text{INITIALIZING} \xrightarrow{\t
 ## BAGIAN B: Generator Ensiklopedia Dokumentasi (`charites wiki`)
 
 ### 1. Single Source of Truth (SSOT) Rule Metadata
-Dokumentasi wiki dan respon tool `charites_explain_rule` bersumber dari metadata rule tunggal:
-- Identitas: `ID`, `Category`, `DefaultSeverity`.
-- Konten Edukasi: `Description`, `Explanation` (alasan arsitektural), `BadExample`, `GoodExample`, dan `Remediation` (token pengganti).
+Dokumentasi wiki dan respon tool `charites_explain_rule` bersumber dari metadata rule tunggal di kode Go (`rules.DocumentedRule`):
+- **Identitas Rule (`rules.Rule`):** `ID()`, `Category()`, `DefaultSeverity()`, `Description()`.
+- **Spesifikasi 8-Pillars (`ir.RuleDocumentation`):** `TargetStandards`, `CoreInvariant`, `Grounding`, `BadExamples`, `GoodExamples`, `Risks`.
+- **Invarian Mutlak:** Pengembang **DILARANG KERAS** mengedit berkas `.md` secara manual. Seluruh dokumentasi wiki di-generate secara deterministik melalui `internal/wiki/generator.go` (`make wiki` atau `charites wiki`).
 
-### 2. Penemuan Kategori Dinamis & Pengurutan Determinis
-- Subcommand `charites wiki [output_dir]` (default: `./wiki/`) secara dinamis mengekstrak seluruh kategori unik dari `rules.Registry`.
-- **Determinis Pengurutan (Total Ordering):**
-  - Berkas kategori diurutkan alfabetis: `category ASC` $\rightarrow$ `wiki/<category>.md`.
-  - Di dalam setiap berkas, entri rule diurutkan alfabetis berdasarkan `Rule.ID() ASC`.
-  - Berkas indeks utama `wiki/Home.md` memuat tabel master seluruh rule terdaftar yang terurut rapi.
-- **Invarian Nol Pergeseran Git (Zero Churn):** Generator dilarang menyertakan timestamp pembuatan yang berubah-ubah di dalam output markdown.
+### 2. Arsitektur Hierarkis Dokumen (Tiered Documentation Model)
+Subcommand `charites wiki [output_dir]` (default: `./wiki/`) me-render tiga lapis dokumentasi menggunakan embedded Go templates (`//go:embed templates/*.tmpl`):
+1. **Master Catalog (`wiki/Home.md`):** Memuat tabel agregasi kategori (jumlah rule) dan master list seluruh rule terdaftar yang terurut leksikografis (`home.md.tmpl`).
+2. **Domain Overview (`wiki/<category>.md`):** Memuat ringkasan domain kategori dan tabel indeks seluruh rule dalam domain tersebut beserta status enabled (`category.md.tmpl`).
+3. **Spesifikasi Lengkap 8-Pillars (`wiki/<category>/<slug>.md`):** Memuat spesifikasi mendalam per rule (`rule.md.tmpl`) mencakup Overview, Core Invariant, Technical Grounding, Risk Taxonomy, Bad/Good Examples, Ignore Directives, dan Konfigurasi `charites.yaml`.
 
-### 3. Generasi Berkas Bersifat Atomik (Atomic Directory Generation)
-- Generator merender seluruh berkas ke dalam direktori staging sementara (`.wiki.tmp.<pid>`).
-- Jika terjadi kegagalan rendering pada salah satu berkas, proses dibatalkan dan direktori sementara dihapus tanpa mengubah direktori `wiki/` yang sudah ada sebelumnya.
-- Jika seluruh berkas berhasil dirender 100%, direktori staging dipindahkan secara atomik ke direktori sasaran.
+### 3. Penemuan Kategori Dinamis & Pengurutan Determinis (Total Ordering)
+- Kategori diekstrak secara dinamis dari `rules.Registry`.
+- Kategori diurutkan alfabetis: `category ASC` $\rightarrow$ `wiki/<category>.md`.
+- Di dalam setiap kategori, rule diurutkan leksikografis berdasarkan `Rule.ID() ASC` $\rightarrow$ `wiki/<category>/<slug>.md`.
+- **Invarian Nol Pergeseran Git (Zero Churn):** Generator dilarang menyertakan timestamp pembuatan yang berubah-ubah di dalam output markdown. Pengeksekusian berulang pada binary yang sama menjamin output biner identik.
+
+### 4. Generasi Berkas Bersifat Atomik (Atomic Directory Generation)
+- Generator merender seluruh berkas ke dalam direktori staging sementara (`os.MkdirTemp("", "charites-wiki-staging-*")`).
+- Jika terjadi kegagalan rendering pada salah satu template atau berkas, proses dibatalkan dan direktori sementara dibersihkan tanpa memodifikasi direktori `wiki/` yang ada.
+- Jika seluruh berkas berhasil dirender 100%, staging disinkronkan secara atomik ke direktori sasaran.
 
 ---
 

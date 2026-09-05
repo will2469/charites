@@ -83,9 +83,9 @@ Untuk men-generate kerangka aturan baru secara otomatis:
 ```
 
 Skrip ini akan secara otomatis membuat:
-1. File implementasi rule di `internal/rules/<category>_<snake_slug>.go` (misal: `internal/rules/theme_hardcode_opacity_color.go`).
-2. 1-SSOT Tri-Corpus di `tests/correctness/<category>.<slug>/` (`positive/`, `negative/`, `adversarial/`, dan `rule_test.go`).
-3. Berkas dokumentasi 8-Pillars resmi di `wiki/<category>.<slug>.md`.
+1. File implementasi rule di `internal/rules/<category>/<snake_slug>.go` (misal: `internal/rules/theme/hardcode_opacity_color.go`).
+2. 1-SSOT Tri-Corpus di `tests/correctness/<category>/<slug>/` (`positive/`, `negative/`, `adversarial/`, dan `rule_test.go`).
+3. Berkas dokumentasi 8-Pillars resmi di `wiki/<category>/<slug>.md`.
 
 ---
 
@@ -95,7 +95,7 @@ Skrip ini akan secara otomatis membuat:
 .agents/skills/charites-rule-scaffold/
 ├── SKILL.md                          # Panduan inti & checklist verifikasi (berkas ini)
 ├── assets/                           # Templat kode standar
-│   ├── rule.go.tmpl                  # Kerangka rule analyzer Charites
+│   ├── rule.go.tmpl                  # Kerangka rule analyzer Charites (Evaluate & Doc)
 │   ├── rule_test.go.tmpl             # Test runner suite 1-SSOT Tri-Corpus
 │   └── wiki_rule.md.tmpl             # Templat dokumentasi 8-Pillars Matrix
 ├── references/                       # Dokumentasi pendukung
@@ -111,8 +111,8 @@ Skrip ini akan secara otomatis membuat:
 Setiap pembuatan rule baru di Charites wajib menuntaskan 6 langkah berurutan:
 
 - [ ] **Langkah 1: Scaffolding Otomatis:** Jalankan `./.agents/skills/charites-rule-scaffold/scripts/scaffold_rule.sh <category> <slug> [severity] [description]`.
-- [ ] **Langkah 2: Registrasi ke Registry Sentral:** Daftarkan rule di `internal/rules/registry.go` dalam fungsi `RegisterBuiltinRules()`.
-- [ ] **Langkah 3: Implementasi Logika AST Visitor:** Lengkapi fungsi inspeksi AST pada `internal/rules/<category>_<snake_slug>.go` dengan traversal `ir.Walk(root)`.
+- [ ] **Langkah 2: Registrasi ke Registry Sentral:** Daftarkan rule di `internal/rules/builtin.go` dalam fungsi `RegisterBuiltinRules()`.
+- [ ] **Langkah 3: Implementasi Logika AST & Doc():** Lengkapi fungsi inspeksi AST pada `internal/rules/<category>/<snake_slug>.go` dan method `Doc() ir.RuleDocumentation`.
 - [ ] **Langkah 4: Kelengkapan Tri-Corpus:** Isi skenario P1-P5 (`positive/`), N1-N5 (`negative/` dengan `charites:ignore <category>.<slug>`), dan A1-A7 (`adversarial/`).
-- [ ] **Langkah 5: Verifikasi Pengujian:** Jalankan `go test -v ./tests/correctness/<category>.<slug>/...` hingga seluruh tes PASS.
-- [ ] **Langkah 6: Validasi Dokumentasi 8-Pillars:** Pastikan `wiki/<category>.<slug>.md` memuat penjelasan grounding, bad code, good code, dan panduan mitigasi.
+- [ ] **Langkah 5: Verifikasi Pengujian:** Jalankan `go test -v ./tests/correctness/<category>/<slug>/...` hingga seluruh tes PASS.
+- [ ] **Langkah 6: Regenerasi Wiki Otomatis (Zero Manual Editing):** Jalankan `make wiki` untuk me-render `wiki/Home.md`, `wiki/<category>.md`, dan `wiki/<category>/<slug>.md` secara otomatis tanpa mengedit markdown manual.

@@ -40,8 +40,9 @@ func TestWikiGenerator_DynamicCategoriesAndAtomic(t *testing.T) {
     reg := rules.NewRegistry()
     _ = reg.Register(theme.NewHardcodeOpacityColorRule())
 
-    // 1. Uji Penemuan Kategori Dinamis
-    err := wiki.Generate(reg, tmpTarget)
+    // 1. Uji Penemuan Kategori Dinamis & Generasi 3-Tier
+    gen := wiki.NewGenerator(reg)
+    err := gen.Generate(tmpTarget)
     if err != nil {
         t.Fatalf("failed to generate wiki: %v", err)
     }
@@ -51,12 +52,17 @@ func TestWikiGenerator_DynamicCategoriesAndAtomic(t *testing.T) {
         t.Errorf("Home.md missing rule entry")
     }
 
+    ruleDoc, err := os.ReadFile(filepath.Join(tmpTarget, "theme", "hardcode-opacity-color.md"))
+    if err != nil || !strings.Contains(string(ruleDoc), "## 1. Overview & Core Invariant") {
+        t.Errorf("rule 8-pillars document missing or corrupted: %v", err)
+    }
+
     // 2. Uji Determinisme Biner (Dua kali generasi menghasilkan byte identik)
     secondTarget := t.TempDir()
-    _ = wiki.Generate(reg, secondTarget)
+    _ = gen.Generate(secondTarget)
 
-    firstBytes, _ := os.ReadFile(filepath.Join(tmpTarget, "theme.md"))
-    secondBytes, _ := os.ReadFile(filepath.Join(secondTarget, "theme.md"))
+    firstBytes, _ := os.ReadFile(filepath.Join(tmpTarget, "theme", "hardcode-opacity-color.md"))
+    secondBytes, _ := os.ReadFile(filepath.Join(secondTarget, "theme", "hardcode-opacity-color.md"))
     if !bytes.Equal(firstBytes, secondBytes) {
         t.Errorf("Wiki output is not byte-for-byte identical across runs")
     }

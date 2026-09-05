@@ -118,19 +118,31 @@ type Server struct {
 ## 3. Arsitektur Wiki Generator Dinamis & Atomik (`internal/wiki/`)
 
 ```mermaid
-flowchart LR
-    Registry["rules.Registry"] --> Extract["Extract Categories & Sort ASC"]
-    Extract --> TempDir["Staging Directory (.wiki.tmp.<pid>)"]
-    TempDir --> RenderHome["Render Home.md (Master Table)"]
-    TempDir --> RenderDomains["Render <category>.md (Sorted Rules)"]
-    RenderDomains --> Validate["Validate 100% Success"]
-    Validate --> AtomicRename["Atomic Directory Move/Rename -> wiki/"]
+flowchart TD
+    Registry["rules.Registry (All & ByCategory)"] --> Extract["Extract Categories & Sort Lexicographically"]
+    Extract --> TempDir["Staging Directory: os.MkdirTemp(.charites-wiki-staging-*)"]
+
+    TempDir --> RenderHome["Render Home.md via templates/home.md.tmpl\n(Master Table & Category Counts)"]
+    TempDir --> RenderDomains["Render <category>.md via templates/category.md.tmpl\n(Category Domain Overview)"]
+    TempDir --> RenderRules["Render <category>/<slug>.md via templates/rule.md.tmpl\n(8-Pillars Complete Specification)"]
+
+    RenderHome --> Validate["Validate 100% Success Across All Templates"]
+    RenderDomains --> Validate
+    RenderRules --> Validate
+
+    Validate --> AtomicCopy["Atomic Copy Tree (copyTree) -> wiki/"]
+    Validate -- Failure --> Cleanup["os.RemoveAll(staging) & Abort"]
 ```
 
 ### Mekanisme Generasi Determinis & Atomik:
-1. **Dynamic Category Grouping:** Mengelompokkan rule dari `Registry` berdasarkan `rule.Category()`, diurutkan leksikografis menaik.
-2. **Deterministic Entry Ordering:** Di dalam setiap berkas domain, rule diurutkan berdasarkan `Rule.ID() ASC`.
-3. **Pentas Staging Atomik:** Seluruh berkas dirender ke direktori temporer terlebih dahulu. Target direktori `wiki/` hanya diperbarui setelah seluruh berkas terbukti valid, mencegah output setengah jadi (*partial corrupted state*).
+1. **Dynamic Category Grouping:** Mengelompokkan rule dari `Registry` berdasarkan `rule.Category()`, diurutkan leksikografis menaik (`slices.Sort(categories)`).
+2. **Deterministic Entry Ordering:** Di dalam setiap kategori, rule diurutkan leksikografis berdasarkan `Rule.ID() ASC`.
+3. **Hierarchical 3-Tier Markdown Rendering:**
+   - `wiki/Home.md`: Master catalog dan tabel ringkasan rule terdaftar.
+   - `wiki/<category>.md`: Ringkasan domain kategori dan tabel indeks rule dalam domain.
+   - `wiki/<category>/<slug>.md`: Spesifikasi lengkap 8-Pillars per rule.
+4. **Embedded Template Engine (`//go:embed templates/*.tmpl`):** Menjamin binary mandiri tanpa dependensi berkas eksternal saat eksekusi.
+5. **Pentas Staging Atomik:** Seluruh berkas dirender ke direktori temporer (`os.MkdirTemp`) terlebih dahulu. Target direktori `wiki/` hanya disinkronkan via `copyTree` setelah seluruh berkas terbukti valid, mencegah output setengah jadi (*partial corrupted state*).
 
 ---
 

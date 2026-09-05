@@ -28,12 +28,23 @@ type Rule interface {
     DefaultSeverity() ir.Severity           // ir.SeverityError | ir.SeverityWarn | ir.SeverityInfo
     Evaluate(node *ir.Node) []ir.Diagnostic // Fungsi evaluasi murni tanpa efek samping I/O disk
 }
+
+// DocumentedRule adalah interface opsional untuk rule yang menyediakan dokumentasi kaya 8-Pillars.
+type DocumentedRule interface {
+    Rule
+    Doc() ir.RuleDocumentation
+}
 ```
 
 ### Invarian Evaluasi Murni:
 - **No Side Effects:** Fungsi `Evaluate()` dilarang memodifikasi pointer pohon `*ir.Node` dan dilarang melakukan operasi disk atau jaringan.
 - **Idempotent:** Pemanggilan `Evaluate(node)` berulang kali pada node yang sama **MUST** menghasilkan slice `[]ir.Diagnostic` yang identik.
 - **Rule Independence from Comments:** Fungsi `Evaluate()` murni mendeteksi pelanggaran pada `node`. Penyaringan komentar direktif (`charites:ignore`) dilakukan oleh lapisan traversal analyzer di Fase 4 (*separation of concerns*).
+
+### Invarian Single Source of Truth (SSOT) Dokumentasi:
+- Setiap rule yang diimplementasikan wajib menyertakan method `Doc() ir.RuleDocumentation` (`internal/ir/doc.go`).
+- **Dilarang Menulis Wiki Manual:** Seluruh dokumentasi ensiklopedia di `wiki/` (`Home.md`, `<category>.md`, `<category>/<slug>.md`) dihasilkan secara otomatis via `make wiki` menggunakan paket `internal/wiki`.
+
 
 ---
 

@@ -151,12 +151,16 @@ func (r *Registry) ByCategory(category string) []Rule {
 ```text
 internal/rules/
 ├── rule.go                         # Definisi interface Rule & Severity mapper
+├── doc.go                          # Interface DocumentedRule untuk SSOT dokumentasi
+├── builtin.go                      # Registrasi rule bawaan & interface assertion
 ├── registry.go                     # Registry katalog in-memory deterministik
 ├── registry_test.go                # Unit test registry concurrency & sorting determinism
 └── theme/
-    ├── hardcode_opacity_color.go      # Logika evaluasi & lexical normalizer
+    ├── hardcode_opacity_color.go      # Logika evaluasi, Doc() SSOT & lexical normalizer
     └── hardcode_opacity_color_test.go # Unit test table-driven & benchmark
 ```
+
+Model dokumentasi SSOT dipisahkan pada paket `internal/ir/doc.go` (tipe `RuleDocumentation`, `CodeExample`, `RiskItem`) untuk mencegah dependensi siklis antara `internal/rules` dan domain subpaket (`internal/rules/theme`). Paket `internal/wiki` bertindak sebagai konsumen hilir yang mengompilasi metadata dari `rules.DefaultRegistry()` ke direktori `wiki/` via `make wiki`.
 
 ### 3.2. Normalisasi Varian Leksikal (*Variant Stripping*)
 Sebelum melakukan pencocokan utility dasar, rule memisahkan varian Tailwind (seperti `hover:`, `dark:`, `md:`, `focus:`) tanpa memerlukan parser CSS penuh:

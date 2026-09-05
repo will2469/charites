@@ -1,21 +1,17 @@
-package rules
+package {{CATEGORY}}
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/will2469/charites/internal/ir"
 )
 
 // {{STRUCT_NAME}} implements the "{{RULE_ID}}" static analysis rule.
-type {{STRUCT_NAME}} struct {
-	severity ir.Severity
-}
+type {{STRUCT_NAME}} struct{}
 
 // New{{STRUCT_NAME}} creates a new instance of the rule analyzer.
 func New{{STRUCT_NAME}}() *{{STRUCT_NAME}} {
-	return &{{STRUCT_NAME}}{
-		severity: ir.Severity{{SEVERITY_TITLE}},
-	}
+	return &{{STRUCT_NAME}}{}
 }
 
 // ID returns the canonical Semgrep-style rule identifier.
@@ -30,7 +26,7 @@ func (r *{{STRUCT_NAME}}) Category() string {
 
 // DefaultSeverity returns the base severity level.
 func (r *{{STRUCT_NAME}}) DefaultSeverity() ir.Severity {
-	return r.severity
+	return ir.Severity{{SEVERITY_TITLE}}
 }
 
 // Description returns a brief explanation of the rule's purpose.
@@ -38,31 +34,46 @@ func (r *{{STRUCT_NAME}}) Description() string {
 	return "{{DESCRIPTION}}"
 }
 
-// Analyze inspects the Leaf IR root node and returns diagnostics for violations.
-func (r *{{STRUCT_NAME}}) Analyze(file *ir.File) []ir.Diagnostic {
-	var diagnostics []ir.Diagnostic
-
-	for node := range ir.Walk(file.Root) {
-		// Rule inspection logic here
-		if r.isViolation(node) {
-			diagnostics = append(diagnostics, ir.Diagnostic{
-				RuleID:   r.ID(),
-				Severity: r.severity,
-				Message:  fmt.Sprintf("{{RULE_ID}}: violation detected at %s", node.Name),
-				File:     file.Path,
-				Line:     node.Span.StartLine,
-				Column:   node.Span.StartCol,
-				EndLine:  node.Span.EndLine,
-				EndCol:   node.Span.EndCol,
-			})
-		}
+// Doc provides the 8-Pillars specification for automated wiki generation.
+func (r *{{STRUCT_NAME}}) Doc() ir.RuleDocumentation {
+	return ir.RuleDocumentation{
+		TargetStandards: []string{
+			"W3C Standards",
+		},
+		CoreInvariant: "{{DESCRIPTION}}",
+		Grounding:     "Technical explanation of runtime behavior and architectural impact.",
+		BadExamples: []ir.CodeExample{
+			{
+				Language: "astro",
+				Comment:  "Non-compliant example",
+				Code:     `<div class="violating-pattern">Bad</div>`,
+			},
+		},
+		GoodExamples: []ir.CodeExample{
+			{
+				Language: "astro",
+				Comment:  "Compliant example",
+				Code:     `<div class="compliant-pattern">Good</div>`,
+			},
+		},
+		Risks: []ir.RiskItem{
+			{
+				Vector:   "Code Quality",
+				Severity: "{{SEVERITY}}",
+				Impact:   "Degrades maintainability and standard compliance.",
+			},
+		},
 	}
-
-	return diagnostics
 }
 
-func (r *{{STRUCT_NAME}}) isViolation(node *ir.Node) bool {
-	// TODO: implement specific node pattern matching
+// Evaluate inspects an individual IR node and returns diagnostics for violations.
+// Must be a pure function: 0 disk/network I/O, immutable AST, returns nil on clean nodes.
+func (r *{{STRUCT_NAME}}) Evaluate(node *ir.Node) []ir.Diagnostic {
+	if node == nil || len(node.Classes) == 0 {
+		return nil
+	}
+
+	// TODO: implement pattern inspection
 	_ = node
-	return false
+	return nil
 }

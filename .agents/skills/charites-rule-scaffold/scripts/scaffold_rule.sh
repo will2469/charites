@@ -22,7 +22,7 @@ DESCRIPTION="${4:-Detects violations of ${CATEGORY}.${SLUG}}"
 
 RULE_ID="${CATEGORY}.${SLUG}"
 SNAKE_SLUG="${SLUG//-/_}"
-RULE_FILE_NAME="${CATEGORY}_${SNAKE_SLUG}.go"
+RULE_FILE_NAME="${SNAKE_SLUG}.go"
 
 # Convert to PascalCase for Go struct name
 to_pascal() {
@@ -36,19 +36,17 @@ SEVERITY_TITLE=$(tr '[:lower:]' '[:upper:]' <<< "${SEVERITY:0:1}")$(tr '[:upper:
 # shellcheck disable=SC2001
 TITLE_CASE_NAME=$(echo "${SLUG//-/ }" | sed -e 's/\b\(.\)/\u\1/g')
 
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-RULES_DIR="${REPO_ROOT}/internal/rules"
+RULES_DIR="${REPO_ROOT}/internal/rules/${CATEGORY}"
 CORPUS_DIR="${REPO_ROOT}/tests/correctness/${CATEGORY}/${SLUG}"
-WIKI_FILE="${REPO_ROOT}/wiki/${RULE_ID}.md"
+WIKI_FILE="${REPO_ROOT}/wiki/${CATEGORY}/${SLUG}.md"
 
 echo "=== Scaffolding Charites Rule: ${RULE_ID} ==="
 echo "Implementation: ${RULES_DIR}/${RULE_FILE_NAME}"
 echo "Tri-Corpus:     ${CORPUS_DIR}/"
 echo "Wiki Doc:       ${WIKI_FILE}"
 
-mkdir -p "${RULES_DIR}"
+mkdir -p "${RULES_DIR}" "${REPO_ROOT}/wiki/${CATEGORY}"
 mkdir -p "${CORPUS_DIR}/positive" "${CORPUS_DIR}/negative" "${CORPUS_DIR}/adversarial"
-mkdir -p "${REPO_ROOT}/wiki"
 
 # 1. Generate internal/rules/<category>_<slug>.go
 sed \
@@ -126,8 +124,11 @@ fi
 echo "=== Scaffolding Complete! ==="
 echo ""
 echo "Next Steps Checklist:"
-echo "1. Register in internal/rules/registry.go:"
-echo "     registry.Register(New${STRUCT_NAME}())"
-echo "2. Implement pattern inspection in internal/rules/${RULE_FILE_NAME}"
+echo "1. Register in internal/rules/builtin.go:"
+echo "     reg.Register(${CATEGORY}.New${STRUCT_NAME}())"
+echo "2. Implement pattern inspection in internal/rules/${CATEGORY}/${RULE_FILE_NAME}"
 echo "3. Run golden corpus test:"
 echo "     go test -v ./tests/correctness/${CATEGORY}/${SLUG}/..."
+echo "4. Regenerate wiki docs automatically:"
+echo "     make wiki"
+

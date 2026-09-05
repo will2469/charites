@@ -141,6 +141,7 @@ charites/
 │   ├── ir/                        # Intermediate Representation (Leaf SSOT Data Contract)
 │   │   ├── node.go                # Unified AST node & zero-alloc iter.Seq Walk
 │   │   ├── diagnostic.go          # Struct Diagnostic & Severity
+│   │   ├── doc.go                 # Struct RuleDocumentation, CodeExample, RiskItem (SSOT Doc)
 │   │   └── builder.go             # Perakit pohon AST ke representasi terpadu
 │   ├── parser/                    # Layer parsing kode sumber mentah
 │   │   ├── tailwind/              # Ekstraktor token @theme di global.css
@@ -149,6 +150,8 @@ charites/
 │   ├── rules/                     # Kernel evaluasi audit & registry katalog
 │   │   ├── registry.go            # In-memory registry thread-safe (sync.RWMutex)
 │   │   ├── rule.go                # Interface baku Rule (pure function Evaluate)
+│   │   ├── doc.go                 # Interface DocumentedRule untuk SSOT dokumentasi
+│   │   ├── builtin.go             # Registrasi rule bawaan & interface assertions
 │   │   └── theme/                 # Paket domain theme
 │   │       └── hardcode_opacity_color.go # Rule #1 proving ground
 │   ├── analyzer/                  # Mesin traversal AST terisolasi
@@ -166,21 +169,31 @@ charites/
 │   │   ├── dispatcher.go          # Protocol routing (initialize, tools/list, tools/call)
 │   │   └── handlers.go            # Tools: charites_scan, charites_explain_rule, charites_list_rules
 │   └── wiki/                      # Generator ensiklopedia rule otomatis
-│       ├── generator.go           # Ekspor metadata rule ke direktori wiki/
-│       └── templates/             # Template markdown
-├── wiki/                          # Katalog dokumentasi ringkas per bidang
-│   ├── Home.md                    # Indeks utama & tabel navigasi rule
-│   ├── theme.md                   # Rules bidang Theme & Design Tokens
-│   ├── a11y.md                    # Rules bidang Aksesibilitas
-│   ├── perf.md                    # Rules bidang Web Vitals & Performa
-│   ├── layout.md                  # Rules bidang Layout & Responsive Design
-│   └── seo.md                     # Rules bidang SEO & Metadata
+│       ├── generator.go           # Kompilasi metadata rule ke direktori wiki/
+│       ├── generator_test.go      # Pengujian determinisme biner & integritas wiki
+│       └── templates/             # Embedded Go templates (//go:embed templates/*.tmpl)
+│           ├── home.md.tmpl       # Template master catalog wiki/Home.md
+│           ├── category.md.tmpl   # Template domain overview wiki/<category>.md
+│           └── rule.md.tmpl       # Template 8-Pillars spec wiki/<category>/<slug>.md
+├── wiki/                          # Katalog dokumentasi SSOT dinamis (dihasilkan make wiki)
+│   ├── Home.md                    # Indeks utama & tabel navigasi master rule
+│   ├── theme.md                   # Ringkasan domain Theme & Design Tokens
+│   ├── theme/
+│   │   └── hardcode-opacity-color.md # Spesifikasi lengkap 8-Pillars per rule
+│   ├── a11y.md                    # Ringkasan domain Aksesibilitas
+│   ├── a11y/                      # Sub-direktori rule spesifik per domain
+│   ├── responsive.md              # Ringkasan domain Responsive Design
+│   ├── responsive/                # Sub-direktori rule spesifik per domain
+│   ├── perf.md                    # Ringkasan domain Web Vitals & Performa
+│   ├── perf/                      # Sub-direktori rule spesifik per domain
+│   └── seo.md                     # Ringkasan domain SEO & Metadata
 ├── tests/
 │   ├── correctness/               # Model Evaluasi Semantik Argus (Tri-Corpus)
-│   │   └── theme.hardcode-opacity-color/
-│   │       ├── positive/          # True violations (Wajib terdeteksi > 0)
-│   │       ├── negative/          # Clean valid code (Zero Noise Invariant == 0)
-│   │       └── adversarial/       # False positive bait & inline ignore
+│   │   └── theme/
+│   │       └── hardcode-opacity-color/
+│   │           ├── positive/      # True violations (Wajib terdeteksi > 0)
+│   │           ├── negative/      # Clean valid code (Zero Noise Invariant == 0)
+│   │           └── adversarial/   # False positive bait & inline ignore
 │   ├── golden/                    # Snapshot regresi kebenaran mutlak (.json & .txt)
 │   ├── fixtures/                  # Sampel berkas uji (.astro, .tsx, global.css)
 │   ├── fuzz/                      # Go 1.26 native fuzzing suite (zero panic)
