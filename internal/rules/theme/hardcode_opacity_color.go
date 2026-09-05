@@ -2,48 +2,64 @@ package theme
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/will2469/charites/internal/ir"
+	themeengine "github.com/will2469/charites/internal/theme"
 )
 
-// opacityTokenMap memetakan utility warna dengan modifier slash opacity ke token semantik resmi pengganti.
-// Bersifat unexported dan immutable-by-convention untuk menjamin purity, thread-safety, dan determinisme total.
-// Sesuai SPEC-03-RULES Section 3.2.A.
-var opacityTokenMap = map[string]string{
-	"primary/10":     "primary-light",
-	"primary/20":     "primary-light",
-	"primary/5":      "primary-subtle",
-	"secondary/10":   "muted-light",
-	"secondary/5":    "muted-subtle",
-	"destructive/10": "destructive-light",
-	"destructive/20": "destructive-light",
-	"destructive/5":  "destructive-subtle",
-	"accent/10":      "accent-light",
-	"accent/20":      "accent-light",
-	"accent/5":       "accent-subtle",
-	"warning/10":     "warning-light",
-	"warning/5":      "warning-subtle",
-	"muted/10":       "muted-light",
-	"muted/5":        "muted-subtle",
-	"amber/10":       "amber-light",
-	"amber/5":        "amber-subtle",
-	"emerald/10":     "emerald-light",
-	"emerald/5":      "emerald-subtle",
+var (
+	discoveredTheme     *themeengine.Context
+	discoveredThemeOnce sync.Once
+)
+
+func getDiscoveredTheme() *themeengine.Context {
+	discoveredThemeOnce.Do(func() {
+		ctx, err := themeengine.DiscoverAndLoad("", "")
+		if err == nil && ctx != nil {
+			discoveredTheme = ctx
+		} else {
+			discoveredTheme = themeengine.NewContext()
+		}
+	})
+	return discoveredTheme
 }
 
-// ReplacementFor mengembalikan token semantik pengganti untuk pasangan warna/opacity tertentu secara read-only.
-// Mengembalikan replacement token dan true jika token terdaftar, atau string kosong dan false jika tidak terdaftar.
+// ReplacementFor mengembalikan token semantik pengganti untuk pasangan warna/opacity tertentu secara read-only
+// dari Context yang terdeteksi dari CSS SSOT.
 func ReplacementFor(token string) (string, bool) {
-	rep, ok := opacityTokenMap[token]
-	return rep, ok
+	return getDiscoveredTheme().ReplacementForSlash(token)
 }
 
 // HardcodeOpacityColorRule mengimplementasikan aturan static analysis "theme.hardcode-opacity-color".
-type HardcodeOpacityColorRule struct{}
+type HardcodeOpacityColorRule struct {
+	themeCtx *themeengine.Context
+}
 
-// NewHardcodeOpacityColorRule membuat instance baru HardcodeOpacityColorRule.
+// NewHardcodeOpacityColorRule membuat instance baru HardcodeOpacityColorRule dengan Context yang ditemukan otomatis.
 func NewHardcodeOpacityColorRule() *HardcodeOpacityColorRule {
-	return &HardcodeOpacityColorRule{}
+	return &HardcodeOpacityColorRule{
+		themeCtx: getDiscoveredTheme(),
+	}
+}
+
+// NewHardcodeOpacityColorRuleWithTheme membuat instance baru HardcodeOpacityColorRule dengan dynamic Context.
+func NewHardcodeOpacityColorRuleWithTheme(themeCtx *themeengine.Context) *HardcodeOpacityColorRule {
+	if themeCtx == nil {
+		themeCtx = getDiscoveredTheme()
+	}
+	return &HardcodeOpacityColorRule{
+		themeCtx: themeCtx,
+	}
+}
+
+// WithTheme menetapkan context tema dinamis ke rule.
+func (r *HardcodeOpacityColorRule) WithTheme(themeCtx *themeengine.Context) *HardcodeOpacityColorRule {
+	if themeCtx == nil {
+		themeCtx = getDiscoveredTheme()
+	}
+	r.themeCtx = themeCtx
+	return r
 }
 
 // ID mengembalikan Charites Rule ID kanonikal berformat <category>.<slug>.
@@ -186,7 +202,12 @@ func (r *HardcodeOpacityColorRule) Evaluate(node *ir.Node) []ir.Diagnostic {
 			continue
 		}
 
-		replacement, ok := opacityTokenMap[colorSlash]
+		tCtx := r.themeCtx
+		if tCtx == nil {
+			tCtx = getDiscoveredTheme()
+		}
+
+		replacement, ok := tCtx.ReplacementForSlash(colorSlash)
 		if !ok {
 			continue
 		}

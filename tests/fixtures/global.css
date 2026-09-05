@@ -1,29 +1,213 @@
 @import "tailwindcss";
 
-/* Design token registry for Tailwind CSS v4 */
+/*
+  Charites Golden Design Token SSOT Fixture
+  Standar Rujukan: W3C DTCG (v2025.10), W3C CSS Color 4 (OKLCH), Tailwind CSS v4
+  Mencakup OKLCH sebagai warga kelas satu, dengan ketahanan multi-format (hex, rgba, hsl).
+*/
+
+@layer theme {
+  :root {
+    color-scheme: light;
+
+    /* --- Tier 2: Core Semantic Colors (OKLCH First-Class Citizen) --- */
+    --color-background: oklch(1 0 0);
+    --color-foreground: oklch(0.14 0.03 260);
+
+    --color-primary: oklch(0.55 0.22 260);
+    --color-primary-hover: oklch(0.48 0.24 260);
+    --color-primary-light: oklch(0.55 0.22 260 / 10%);
+    --color-primary-subtle: oklch(0.55 0.22 260 / 5%);
+
+    --color-secondary: oklch(0.96 0.01 260);
+    --color-secondary-hover: oklch(0.92 0.02 260);
+
+    --color-muted: oklch(0.96 0.01 260);
+    --color-muted-foreground: oklch(0.55 0.03 260);
+    --color-muted-light: oklch(0.96 0.01 260 / 10%);
+    --color-muted-subtle: oklch(0.96 0.01 260 / 5%);
+
+    --color-accent: oklch(0.62 0.21 260);
+    --color-accent-hover: oklch(0.55 0.24 260);
+    --color-accent-light: oklch(0.62 0.21 260 / 10%);
+    --color-accent-subtle: oklch(0.62 0.21 260 / 5%);
+
+    /* Multi-Format Resilience: Hex & RGBA representation */
+    --color-destructive: #ef4444;
+    --color-destructive-hover: #dc2626;
+    --color-destructive-light: rgba(239, 68, 68, 0.1);
+    --color-destructive-subtle: rgba(239, 68, 68, 0.05);
+
+    --color-warning: #f59e0b;
+    --color-warning-light: rgba(245, 158, 11, 0.1);
+    --color-warning-subtle: rgba(245, 158, 11, 0.05);
+
+    --color-amber: oklch(0.75 0.15 85);
+    --color-amber-light: oklch(0.75 0.15 85 / 10%);
+    --color-amber-subtle: oklch(0.75 0.15 85 / 5%);
+
+    --color-emerald: oklch(0.65 0.15 145);
+    --color-emerald-light: oklch(0.65 0.15 145 / 10%);
+    --color-emerald-subtle: oklch(0.65 0.15 145 / 5%);
+
+    /* --- Surfaces & Borders --- */
+    --color-card: oklch(1 0 0);
+    --color-card-foreground: oklch(0.14 0.03 260);
+    --color-popover: oklch(1 0 0);
+    --color-popover-foreground: oklch(0.14 0.03 260);
+
+    --color-border: oklch(0.92 0.01 260);
+    --color-input: oklch(0.92 0.01 260);
+    --color-ring: oklch(0.55 0.22 260);
+
+    /* --- Data Visualization Tokens --- */
+    --color-chart-1: oklch(0.64 0.22 260);
+    --color-chart-2: oklch(0.60 0.12 180);
+    --color-chart-3: oklch(0.40 0.08 230);
+    --color-chart-4: oklch(0.82 0.19 85);
+    --color-chart-5: oklch(0.77 0.18 70);
+
+    /* --- Shape & Border Radius Tokens --- */
+    --radius-sm: 0.25rem;    /* 4px */
+    --radius-md: 0.5rem;     /* 8px */
+    --radius-lg: 0.75rem;    /* 12px */
+    --radius-xl: 1rem;       /* 16px */
+    --radius-full: 9999px;
+
+    /* --- Semantic Z-Index Scale --- */
+    --z-dropdown: 1000;
+    --z-sticky: 1100;
+    --z-modal: 1300;
+    --z-popover: 1400;
+    --z-tooltip: 1500;
+    --z-toast: 1700;
+
+    /* --- Elevation Drop Shadows --- */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+    /* --- Backdrop Blur Scale --- */
+    --blur-sm: 4px;
+    --blur-md: 8px;
+    --blur-lg: 16px;
+
+    /* --- Typography & Modular Spacing --- */
+    --font-sans: "Inter Variable", system-ui, -apple-system, sans-serif;
+    --font-mono: "JetBrains Mono Variable", monospace;
+
+    --spacing-1: 0.25rem;
+    --spacing-2: 0.5rem;
+    --spacing-3: 0.75rem;
+    --spacing-4: 1rem;
+    --spacing-6: 1.5rem;
+    --spacing-8: 2rem;
+    --spacing-container: 1280px;
+  }
+
+  /* --- Dark Mode Semantic Overrides (Inversion Parity) --- */
+  .dark, [data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-background: oklch(0.14 0.03 260);
+    --color-foreground: oklch(0.98 0.01 260);
+
+    --color-card: oklch(0.19 0.03 260);
+    --color-card-foreground: oklch(0.98 0.01 260);
+    --color-popover: oklch(0.24 0.03 260);
+    --color-popover-foreground: oklch(0.98 0.01 260);
+
+    --color-primary: oklch(0.65 0.20 260);
+    --color-primary-hover: oklch(0.70 0.18 260);
+    --color-primary-light: oklch(0.65 0.20 260 / 15%);
+    --color-primary-subtle: oklch(0.65 0.20 260 / 8%);
+
+    --color-secondary: oklch(0.24 0.03 260);
+    --color-secondary-hover: oklch(0.28 0.03 260);
+
+    --color-muted: oklch(0.24 0.03 260);
+    --color-muted-foreground: oklch(0.70 0.03 260);
+    --color-muted-light: oklch(0.24 0.03 260 / 15%);
+    --color-muted-subtle: oklch(0.24 0.03 260 / 8%);
+
+    --color-accent: oklch(0.70 0.19 260);
+    --color-accent-hover: oklch(0.75 0.17 260);
+    --color-accent-light: oklch(0.70 0.19 260 / 15%);
+    --color-accent-subtle: oklch(0.70 0.19 260 / 8%);
+
+    --color-destructive: #f87171;
+    --color-destructive-hover: #ef4444;
+    --color-destructive-light: rgba(248, 113, 113, 0.15);
+    --color-destructive-subtle: rgba(248, 113, 113, 0.08);
+
+    --color-warning: #fbbf24;
+    --color-warning-light: rgba(251, 191, 36, 0.15);
+    --color-warning-subtle: rgba(251, 191, 36, 0.08);
+
+    --color-border: oklch(0.26 0.03 260);
+    --color-input: oklch(0.26 0.03 260);
+    --color-ring: oklch(0.65 0.20 260);
+  }
+}
+
+/* --- Tailwind CSS v4 @theme Block Mapping --- */
 @theme {
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-light: rgba(37, 99, 235, 0.1);
-  --color-primary-subtle: rgba(37, 99, 235, 0.05);
+  --color-*: initial;
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-light: var(--color-primary-light);
+  --color-primary-subtle: var(--color-primary-subtle);
 
-  --color-secondary: #64748b;
-  --color-secondary-hover: #475569;
-  --color-secondary-light: rgba(100, 116, 139, 0.1);
+  --color-secondary: var(--color-secondary);
+  --color-secondary-hover: var(--color-secondary-hover);
 
-  --color-danger: #ef4444;
-  --color-danger-light: rgba(239, 68, 68, 0.1);
+  --color-destructive: var(--color-destructive);
+  --color-destructive-hover: var(--color-destructive-hover);
+  --color-destructive-light: var(--color-destructive-light);
+  --color-destructive-subtle: var(--color-destructive-subtle);
 
-  --color-accent: oklch(0.623 0.214 259.815);
-  --color-accent-hover: oklch(0.546 0.245 262.881);
-  --color-accent-light: oklch(0.623 0.214 259.815 / 10%);
-  --color-accent-subtle: oklch(0.623 0.214 259.815 / 5%);
+  --color-warning: var(--color-warning);
+  --color-warning-light: var(--color-warning-light);
+  --color-warning-subtle: var(--color-warning-subtle);
 
-  --color-surface: #ffffff;
-  --color-surface-dark: #0f172a;
+  --color-muted: var(--color-muted);
+  --color-muted-foreground: var(--color-muted-foreground);
+  --color-muted-light: var(--color-muted-light);
+  --color-muted-subtle: var(--color-muted-subtle);
 
-  --font-sans: Inter, system-ui, -apple-system, sans-serif;
-  --font-mono: JetBrains Mono, monospace;
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-light: var(--color-accent-light);
+  --color-accent-subtle: var(--color-accent-subtle);
 
-  --spacing-container: 1280px;
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-foreground);
+  --color-card: var(--color-card);
+  --color-card-foreground: var(--color-card-foreground);
+  --color-popover: var(--color-popover);
+  --color-popover-foreground: var(--color-popover-foreground);
+  --color-border: var(--color-border);
+  --color-input: var(--color-input);
+  --color-ring: var(--color-ring);
+
+  --color-amber: var(--color-amber);
+  --color-amber-light: var(--color-amber-light);
+  --color-amber-subtle: var(--color-amber-subtle);
+
+  --color-emerald: var(--color-emerald);
+  --color-emerald-light: var(--color-emerald-light);
+  --color-emerald-subtle: var(--color-emerald-subtle);
+
+  --color-chart-1: var(--color-chart-1);
+  --color-chart-2: var(--color-chart-2);
+  --color-chart-3: var(--color-chart-3);
+  --color-chart-4: var(--color-chart-4);
+  --color-chart-5: var(--color-chart-5);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-full: var(--radius-full);
 }

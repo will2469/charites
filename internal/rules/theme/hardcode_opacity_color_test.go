@@ -1,10 +1,13 @@
 package theme_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/will2469/charites/internal/ir"
 	"github.com/will2469/charites/internal/rules/theme"
+	themeengine "github.com/will2469/charites/internal/theme"
 )
 
 func TestHardcodeOpacityColorRule_Metadata(t *testing.T) {
@@ -457,6 +460,78 @@ func BenchmarkEvaluateHardcodeOpacityColor_Clean(b *testing.B) {
 
 func BenchmarkEvaluateHardcodeOpacityColor_Violation(b *testing.B) {
 	rule := theme.NewHardcodeOpacityColorRule()
+	node := &ir.Node{
+		Span:    ir.Span{Line: 1, Column: 1},
+		Tag:     "div",
+		Classes: []string{"p-4", "flex", "bg-primary/10", "rounded-lg"},
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = rule.Evaluate(node)
+	}
+}
+
+func TestHardcodeOpacityColorRule_DynamicThemeContext(t *testing.T) {
+	fixturePath := filepath.Join("..", "..", "..", "tests", "fixtures", "global.css")
+	data, err := os.ReadFile(filepath.Clean(fixturePath)) //nolint:gosec // test fixture path is controlled
+	if err != nil {
+		t.Fatalf("failed to read global.css: %v", err)
+	}
+
+	themeCtx, err := themeengine.ParseCSS(data)
+	if err != nil {
+		t.Fatalf("failed to parse global.css: %v", err)
+	}
+
+	rule := theme.NewHardcodeOpacityColorRuleWithTheme(themeCtx)
+
+	// Test case 1: OKLCH /10 and /5 from global.css
+	node1 := &ir.Node{
+		Span:    ir.Span{Line: 10, Column: 5},
+		Tag:     "div",
+		Classes: []string{"bg-primary/10", "border-destructive/20", "text-warning/5"},
+	}
+
+	diags := rule.Evaluate(node1)
+	if len(diags) != 3 {
+		t.Fatalf("expected 3 diagnostics, got %d", len(diags))
+	}
+
+	if diags[0].Hint != "Use semantic token \"primary-light\"." {
+		t.Errorf("diag 0 hint = %q, want 'primary-light'", diags[0].Hint)
+	}
+	if diags[1].Hint != "Use semantic token \"destructive-light\"." {
+		t.Errorf("diag 1 hint = %q, want 'destructive-light'", diags[1].Hint)
+	}
+	if diags[2].Hint != "Use semantic token \"warning-subtle\"." {
+		t.Errorf("diag 2 hint = %q, want 'warning-subtle'", diags[2].Hint)
+	}
+
+	// Test case 2: Clean node remains 0 diags and zero alloc
+	cleanNode := &ir.Node{
+		Span:    ir.Span{Line: 20, Column: 1},
+		Tag:     "div",
+		Classes: []string{"bg-primary-light", "border-destructive-light", "text-muted-foreground"},
+	}
+	if cleanDiags := rule.Evaluate(cleanNode); len(cleanDiags) != 0 {
+		t.Errorf("expected 0 diags on clean node, got %d", len(cleanDiags))
+	}
+}
+
+func BenchmarkEvaluateHardcodeOpacityColor_DynamicThemeContext(b *testing.B) {
+	fixturePath := filepath.Join("..", "..", "..", "tests", "fixtures", "global.css")
+	data, err := os.ReadFile(filepath.Clean(fixturePath)) //nolint:gosec // test fixture path is controlled
+	if err != nil {
+		b.Fatalf("failed to read global.css: %v", err)
+	}
+	themeCtx, err := themeengine.ParseCSS(data)
+	if err != nil {
+		b.Fatalf("failed to parse global.css: %v", err)
+	}
+
+	rule := theme.NewHardcodeOpacityColorRuleWithTheme(themeCtx)
 	node := &ir.Node{
 		Span:    ir.Span{Line: 1, Column: 1},
 		Tag:     "div",
