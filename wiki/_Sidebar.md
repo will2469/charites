@@ -6,7 +6,7 @@
 
 ### Rule Categories
 
-* [**Theme**](theme.md)
+* [**Theme**](theme.md) (9 rules)
   * [`theme.gradient-hardcode`](theme/gradient-hardcode.md)
   * [`theme.hardcode-border-color`](theme/hardcode-border-color.md)
   * [`theme.hardcode-color`](theme/hardcode-color.md)

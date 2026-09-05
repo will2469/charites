@@ -6,6 +6,6 @@
 
 ### Rule Categories
 {{range .Categories}}
-* [**{{.Title}}**]({{.Name}}.md)
+* [**{{.Title}}**]({{.Name}}.md) ({{.Count}} rules)
 {{range .Rules}}  * [`{{.ID}}`]({{.Category}}/{{.Slug}}.md)
 {{end}}{{end}}

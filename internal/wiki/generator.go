@@ -77,6 +77,7 @@ type categoryTemplateData struct {
 type sidebarCategoryEntry struct {
 	Name  string
 	Title string
+	Count int
 	Rules []homeRuleEntry
 }
 
@@ -287,6 +288,7 @@ func (g *Generator) renderSidebar(categories []string, catMap map[string][]rules
 		entry := sidebarCategoryEntry{
 			Name:  cat,
 			Title: titleCat,
+			Count: len(cRules),
 			Rules: make([]homeRuleEntry, 0, len(cRules)),
 		}
 		for _, r := range cRules {
