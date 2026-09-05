@@ -12,8 +12,8 @@ Dokumen ini menetapkan *checklist* baku pengerjaan rule baru (*Standard Rule Aut
 
 Setiap pengembang atau kontributor yang menambahkan rule baru ke repositori Charites wajib menyelesaikan 7 langkah verifikasi berikut:
 
-- [ ] **Langkah 1 (Spesifikasi & Semgrep ID):**
-  Tentukan Semgrep ID baku (`<category>.<slug>`), default severity (`error`/`warn`/`info`), pola pelanggaran, dan rekomendasi perbaikan (*hint*).
+- [ ] **Langkah 1 (Spesifikasi & Charites Rule ID):**
+  Tentukan Charites Rule ID baku (`<category>.<slug>`), default severity (`error`/`warn`/`info`), pola pelanggaran, dan rekomendasi perbaikan (*hint*).
 - [ ] **Langkah 2 (Implementasi Rule):**
   Tulis implementasi murni pada `internal/rules/<domain>/<rule_slug>.go` yang mematuhi kontrak `rules.Rule` dengan fast-path string check.
 - [ ] **Langkah 3 (Pendaftaran di Registry):**

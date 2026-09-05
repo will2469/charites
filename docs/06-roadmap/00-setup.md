@@ -31,7 +31,7 @@ Dokumen ini mendefinisikan gerbang evaluasi kelulusan (*phase gate*) untuk **Fas
   - [ ] `./bin/charites --help` dan `./bin/charites -h` mencetak usage manual dan exit `0`.
   - [ ] `./bin/charites` (tanpa argumen) mencetak usage manual dan exit `0`.
   - [ ] `./bin/charites unknown-command` mencetak error ke `stderr` dan exit `2`.
-  - [ ] `.charitesignore` ada di root dan mematuhi sintaks Semgrep-compatible.
+  - [ ] `.charitesignore` ada di root dan mematuhi sintaks Gitignore-compatible.
 - [ ] **ARCH (HOW) Verification:**
   - [ ] Binary dikompilasi dengan `CGO_ENABLED=0` secara native.
   - [ ] `cmd/charites/main.go` murni bertindak sebagai trampoline ke `cli.Execute()`.

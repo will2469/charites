@@ -38,7 +38,7 @@ timeline
   - Setup fondasi Go 1.26 (`cmd/charites/main.go`).
   - Parser token Tailwind CSS v4 (`@theme`), parser Astro frontmatter, dan parser TSX.
   - Normalisasi ke kontrak data `ir.Node`.
-  - Implementasi Rule #1: `hardcode_opacity_color.go` (Semgrep ID: `theme.hardcode-opacity-color`).
+  - Implementasi Rule #1: `hardcode_opacity_color.go` (Charites Rule ID: `theme.hardcode-opacity-color`).
   - Traversal engine dengan iterator Go 1.26 dan konkurensi worker pool.
   - Reporter terminal ANSI dan JSON.
   - Verifikasi golden snapshot test pass 100%.

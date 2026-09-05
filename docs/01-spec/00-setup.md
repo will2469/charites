@@ -34,7 +34,7 @@ Fase 0 **MUST** menginisialisasi dan menyediakan berkas-berkas berikut:
 6. Berkas konfigurasi root:
    - `go.mod` (Go 1.26, zero external dependencies)
    - `Makefile` (target `all`, `build`, `test`, `lint`, `clean`)
-   - `.charitesignore` (pola ignore default Semgrep-compatible)
+   - `.charitesignore` (pola ignore default Gitignore-compatible)
    - `.golangci.yml` (konfigurasi baseline linter)
    - `charites.example.yaml` (template konfigurasi rule & severity)
 
@@ -61,9 +61,9 @@ Pemisahan ini menjamin isolasi fase (*phase isolation*) yang bersih tanpa keboco
 
 ## 3. Spesifikasi Default Ignore Pattern (`.charitesignore`)
 
-Sistem pemindai **MUST** mendukung berkas `.charitesignore` dengan standar sintaks **Semgrep / Gitignore**:
+Sistem pemindai **MUST** mendukung berkas `.charitesignore` dengan standar sintaks **Gitignore**:
 
-1. **Aturan Sintaksis Semgrep-Compatible:**
+1. **Aturan Sintaksis Gitignore-Compatible:**
    - Komentar diawali dengan tanda pagar `#`.
    - Pola direktori diakhiri dengan garis miring `/` (hanya mencocokkan folder).
    - Pola yang diawali garis miring `/` terikat ke akar repositori (_root-anchored_), sedangkan tanpa garis miring mencocokkan secara rekursif.
@@ -74,7 +74,7 @@ Sistem pemindai **MUST** mendukung berkas `.charitesignore` dengan standar sinta
 ```text
 # ==============================================================================
 # CHARITES DEFAULT IGNORE PATTERNS (.charitesignore)
-# Semgrep-compatible ignore specification for frontend static analysis
+# Gitignore-compatible ignore specification for frontend static analysis
 # ==============================================================================
 
 # 1. Package Manager & Third-Party Dependencies
@@ -165,7 +165,7 @@ Thumbs.db
 3. Binary `./bin/charites --help` dan `./bin/charites -h` mencetak panduan penggunaan dan keluar dengan exit code `0`.
 4. Binary `./bin/charites` (tanpa argumen) mencetak panduan penggunaan dan keluar dengan exit code `0`.
 5. Binary `./bin/charites unknown-command` mencetak pesan kesalahan ke `stderr` dan keluar dengan exit code `2`.
-6. Berkas `.charitesignore` tersedia di root dan memuat seluruh default pattern ignorasi Semgrep-compatible.
+6. Berkas `.charitesignore` tersedia di root dan memuat seluruh default pattern ignorasi Gitignore-compatible.
 7. Berkas `go.sum` **MUST NOT** be required pada Fase 0 karena ketiadaan dependensi pihak ketiga (*zero external dependencies*).
 8. Seluruh skeleton folder di `internal/` dan `tests/` telah dibuat sebagai *directory reservations*.
 

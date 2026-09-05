@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `SPEC-08-EXPANSION`
 > **Tahapan:** Fase 8 - Repetitive Pattern Flow Guide & Rule Authoring Template (Core Assessment)
 > **Status:** Ready for Review
-> **Standar Rujukan:** Semgrep Rule Specification / Standardized Extensibility Pattern
+> **Standar Rujukan:** Standardized Static Analysis Rule Specification / Standardized Extensibility Pattern
 
 Dokumen ini mendefinisikan panduan spesifikasi baku (*standardized specification template*) untuk menambahkan rule audit baru ke dalam Charites setelah fondasi compiler selesai, dengan studi kasus konkret implementasi **Rule #2 (`theme.hardcode-color`)**.
 
@@ -11,7 +11,7 @@ Dokumen ini mendefinisikan panduan spesifikasi baku (*standardized specification
 
 ## 1. Standar Penamaan & Identitas Rule Baru
 
-Setiap rule baru yang akan dikembangkan wajib mematuhi aturan penamaan Semgrep tunggal:
+Setiap rule baru yang akan dikembangkan wajib mematuhi aturan penamaan Charites Rule ID tunggal:
 
 1. **Format Identifier Tunggal:**
    ```text
@@ -21,7 +21,7 @@ Setiap rule baru yang akan dikembangkan wajib mematuhi aturan penamaan Semgrep t
    - `<rule-slug>`: Kata deskriptif ringkas menggunakan huruf kecil dan tanda hubung minus (`kebab-case`).
    - Contoh: `theme.hardcode-color`, `a11y.html-missing-lang`, `perf.lcp-priority`.
 2. **Larangan Kode Ganda:**
-   Dilarang menggunakan kode numerik acak seperti `T01` atau `A02`. Semua referensi konfigurasi, CLI filter, dan inline ignore wajib menggunakan Semgrep ID tunggal.
+   Dilarang menggunakan kode numerik acak seperti `T01` atau `A02`. Semua referensi konfigurasi, CLI filter, dan inline ignore wajib menggunakan Charites Rule ID tunggal.
 
 ---
 
@@ -55,7 +55,7 @@ Pengembang dapat mengecualikan baris tertentu menggunakan:
 
 ---
 
-## 3. Spesifikasi Kebutuhan Tri-Corpus Argus
+## 3. Spesifikasi Kebutuhan Charites 1-SSOT Tri-Corpus
 
 Setiap rule baru wajib merinci 3 sub-korpus uji coba yang akan ditempatkan di `tests/correctness/<rule_id>/`:
 

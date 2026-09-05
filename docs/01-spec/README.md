@@ -52,7 +52,7 @@ Charites memproses berkas sumber frontend pada direktori proyek lokal:
   }
   ```
 - Evaluasi rule **MUST** bersifat fungsi murni (*pure function*): menerima `*ir.Node`, mengembalikan irisan (*slice*) `[]ir.Diagnostic` tanpa efek samping I/O disk.
-- Sistem penamaan rule **MUST** menggunakan format Semgrep namespace `<category>.<rule-slug>` (contoh: `theme.hardcode-opacity-color`).
+- Sistem penamaan rule **MUST** menggunakan format Charites Rule ID `<category>.<rule-slug>` (contoh: `theme.hardcode-opacity-color`).
 
 ### FR-04: Reference Proving Rule (`theme.hardcode-opacity-color`)
 Sebagai pembuktian stabilitas pipa (*proving ground*), sistem **MUST** mengimplementasikan Rule #1:

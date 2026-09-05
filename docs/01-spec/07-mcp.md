@@ -49,7 +49,7 @@ Charites menyediakan antarmuka terstandarisasi untuk berinteraksi langsung denga
     "properties": {
       "path": { "type": "string", "description": "Path relatif atau absolut direktori/berkas yang dipindai" },
       "category": { "type": "string", "description": "Filter kategori rule (misal: theme, a11y)" },
-      "rule": { "type": "string", "description": "Filter Semgrep ID rule spesifik" },
+      "rule": { "type": "string", "description": "Filter Charites Rule ID spesifik" },
       "ext": { "type": "string", "description": "Filter ekstensi berkas (misal: astro, tsx)" }
     },
     "required": ["path"]
@@ -64,7 +64,7 @@ Charites menyediakan antarmuka terstandarisasi untuk berinteraksi langsung denga
   {
     "type": "object",
     "properties": {
-      "rule_id": { "type": "string", "description": "Semgrep ID rule (contoh: theme.hardcode-opacity-color)" }
+      "rule_id": { "type": "string", "description": "Charites Rule ID (contoh: theme.hardcode-opacity-color)" }
     },
     "required": ["rule_id"]
   }
@@ -108,7 +108,7 @@ wiki/
 
 ### 2.3. Format Konten Per-Rule di dalam Berkas Bidang
 Setiap rule di dalam berkas bidang memuat format standar:
-1. **Header:** `### <rule-slug> (Semgrep ID: <category>.<rule-slug>)`
+1. **Header:** `### <rule-slug> (Rule ID: <category>.<rule-slug>)`
 2. **Badge Metadata:** Severity bawaan (`ERROR` / `WARN` / `INFO`).
 3. **Deskripsi Teknis:** Mengapa pola ini dilarang dan dampaknya terhadap UX/performa.
 4. **Contoh Pelanggaran (*Bad Practice*):** Snippet kode yang melanggar.
