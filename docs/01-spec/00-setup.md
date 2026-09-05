@@ -17,8 +17,9 @@ Dokumen ini mendefinisikan spesifikasi formal untuk penyiapan awal (_setup_) rep
   - **Supported Local Toolchain:** `go1.26.x` (mendukung minor patch toolchain Go 1.26 lokal pengembang).
   - **CI / Reproducibility Baseline:** `go1.26.0` (dipin secara deterministik pada pipeline CI GitHub Actions dan release workflow).
 - **Vendor Policy:** Dilarang mengimpor library pihak ketiga (_third-party dependencies_) pada Fase 0. Seluruh scaffolding entrypoint murni menggunakan **Go Standard Library**.
-- **SPEC-00-BUILD-001 (Zero CGO Invariant):**
-  - Binary Charites **MUST** dapat dikompilasi secara penuh dengan CGO dinonaktifkan (`CGO_ENABLED=0`) tanpa ketergantungan library C sistem. Penggunaan kode CGO atau pustaka pihak ketiga yang membutuhkan CGO dilarang keras di seluruh repositori.
+- **SPEC-00-BUILD-001 (Zero CGO Production & Verification Boundary Invariant):**
+  - **Production & Release Artifacts Boundary:** Biner Charites (`bin/charites`) dan seluruh target kompilasi silang **MUST** dikompilasi secara penuh dengan CGO dinonaktifkan (`CGO_ENABLED=0`) menghasilkan biner statis murni tanpa ketergantungan pustaka C sistem (glibc/musl). Kode sumber repositori dilarang keras memuat berkas CGO (`.c`, `.h`) atau direktif `import "C"`.
+  - **Verification & Dynamic Analysis Boundary:** Pengujian konkurensi dengan Go Race Detector (`-race`) dan cakupan kode berbasis atomic (`-covermode=atomic`) diizinkan dan beroperasi pada *verification environment* menggunakan `CGO_ENABLED=1` semata-mata untuk mengaktifkan instrumentasi Go ThreadSanitizer runtime, tanpa mengubah status zero-CGO kode sumber maupun artefak biner produksi.
 - **SPEC-00-BUILD-002 (Cross-Platform Compilation Targets):**
   - Binary Charites **MUST** mendukung kompilasi silang (*cross-compilation*) native dengan `CGO_ENABLED=0` untuk 4 target platform rilis resmi:
     1. **Linux x86_64:** `GOOS=linux GOARCH=amd64`

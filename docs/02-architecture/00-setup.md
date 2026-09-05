@@ -104,7 +104,7 @@ Mengimplementasikan kontrak `SPEC-00-BUILD-001` dan `SPEC-00-BUILD-002`:
 Makefile di akar proyek menyediakan target seragam dengan **urutan dependensi deterministik** (*build before test*):
 
 ```makefile
-.PHONY: all build test lint cross-compile clean
+.PHONY: all build test test-unit lint cross-compile clean
 
 BINARY_NAME=charites
 BIN_DIR=bin
@@ -116,7 +116,10 @@ build:
 	CGO_ENABLED=0 go build -o $(BIN_DIR)/$(BINARY_NAME) ./cmd/charites
 
 test: build
-	go test -v -race ./...
+	CGO_ENABLED=1 go test -v -race ./...
+
+test-unit: build
+	go test -v ./...
 
 lint:
 	golangci-lint run ./...
@@ -131,6 +134,12 @@ cross-compile:
 clean:
 	rm -rf $(BIN_DIR)
 ```
+
+> [!IMPORTANT]
+> **CGO Execution Environment Boundary Rationale (`SPEC-00-BUILD-001`):**
+> - **Production & Artifact Boundary (`CGO_ENABLED=0`):** Target `build` dan `cross-compile` mengisolasi `CGO_ENABLED=0` secara mutlak, menjamin biner yang dihasilkan 100% statis murni tanpa ketergantungan pada glibc/musl host.
+> - **Verification & Dynamic Analysis Boundary (`CGO_ENABLED=1`):** Target `test` menyematkan `CGO_ENABLED=1` semata-mata untuk mengaktifkan Go ThreadSanitizer (`-race`) pada harness verifikasi, tanpa mengubah sifat zero-CGO kode sumber.
+> - **Pure Unit Testing (`test-unit`):** Pengembang pada lingkungan tanpa C compiler (misal minimal container atau Windows tanpa MinGW) dapat menjalankan `make test-unit` yang berjalan murni dengan `CGO_ENABLED=0`.
 
 > [!IMPORTANT]
 > **Dependency Ordering Rationale (`all: build test lint`):**

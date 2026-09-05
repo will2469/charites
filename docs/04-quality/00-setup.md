@@ -66,7 +66,7 @@ issues:
   - Berkas `go.sum` **MUST NOT** be required pada Fase 0 saat dependensi eksternal bernilai nol.
 
 - **QUAL-00-INVAR-001 (Zero CGO Surface Invariant):**
-  - *Distinction of Authority:* Bila `SPEC-00-BUILD-001` mewajibkan binary dapat dikompilasi dengan `CGO_ENABLED=0` dan `TEST-00-BUILD-001` membuktikannya via compiler, maka `QUAL-00-INVAR-001` bertindak sebagai *defense-in-depth hygiene barrier* yang memverifikasi bahwa struktur kode sumber repositori **murni 100% Go** tanpa berkas `.c`, `.h`, atau blok `import "C"`.
+  - *Distinction of Authority:* Bila `SPEC-00-BUILD-001` mewajibkan biner produksi dan artefak rilis dikompilasi murni dengan `CGO_ENABLED=0`, maka `QUAL-00-INVAR-001` bertindak sebagai *defense-in-depth hygiene barrier* yang memverifikasi bahwa struktur kode sumber repositori **murni 100% Go** tanpa berkas `.c`, `.h`, atau blok `import "C"`. Keberadaan CGO hanya diizinkan secara terbatas pada runtime *dynamic verification harness* (`go test -race` via ThreadSanitizer) tanpa mencemari kode sumber produksi.
   - Prosedur verifikasi:
     ```bash
     test -z "$(go list -f '{{range .CgoFiles}}{{.}} {{end}}' ./...)"

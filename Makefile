@@ -1,6 +1,6 @@
 export GOWORK ?= off
 
-.PHONY: all test test-full test-race test-coverage lint build clean cross-compile setup-hooks format vulncheck
+.PHONY: all test test-unit test-full test-race test-coverage lint build clean cross-compile setup-hooks format vulncheck
 
 # Deterministic build-before-test ordering (ARCH-00-BUILD-ORDER / TEST-00-BUILD-ORDER)
 all: build test lint
@@ -20,10 +20,18 @@ build:
 	@mkdir -p bin
 	CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -o bin/charites ./cmd/charites
 
-# Fast test: depends on build so subprocess E2E smoke tests always find bin/charites
+# Concurrency verification test: runs Go Race Detector via ThreadSanitizer harness
 test: build
 	@if [ -f "go.mod" ]; then \
 		CGO_ENABLED=1 go test -v -race ./...; \
+	else \
+		echo "Notice: go.mod not initialized yet. Run Phase 0 setup first."; \
+	fi
+
+# Pure Go Unit Test: runs in any environment with CGO_ENABLED=0 (zero C compiler requirement)
+test-unit: build
+	@if [ -f "go.mod" ]; then \
+		go test -v ./...; \
 	else \
 		echo "Notice: go.mod not initialized yet. Run Phase 0 setup first."; \
 	fi
