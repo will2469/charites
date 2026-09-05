@@ -53,22 +53,16 @@ func TestExecuteArgs(t *testing.T) {
 			containsStdout: "Usage: charites",
 		},
 		{
-			name:           "empty args usage",
-			args:           []string{},
-			expectedCode:   0,
-			containsStdout: "Usage: charites",
-		},
-		{
 			name:           "unknown command exits 2 to stderr",
 			args:           []string{"unknown-command"},
 			expectedCode:   2,
-			containsStderr: "unknown command or flag",
+			containsStderr: `unknown command "unknown-command"`,
 		},
 		{
 			name:           "unknown flag exits 2 to stderr",
 			args:           []string{"--bogus-flag"},
 			expectedCode:   2,
-			containsStderr: "unknown command or flag",
+			containsStderr: "flag provided but not defined",
 		},
 	}
 
@@ -78,7 +72,7 @@ func TestExecuteArgs(t *testing.T) {
 			code := cli.ExecuteArgs(tc.args, &stdout, &stderr)
 
 			if code != tc.expectedCode {
-				t.Fatalf("expected exit code %d, got %d", tc.expectedCode, code)
+				t.Fatalf("expected exit code %d, got %d (stderr: %s)", tc.expectedCode, code, stderr.String())
 			}
 
 			stdoutStr := stdout.String()
@@ -101,5 +95,13 @@ func TestExecuteArgs(t *testing.T) {
 				t.Errorf("stderr %q does not contain %q", stderrStr, tc.containsStderr)
 			}
 		})
+	}
+}
+
+func TestExecute_Entrypoint(t *testing.T) {
+	// Memverifikasi bahwa trampoline Execute() dapat dipanggil dengan flag help tanpa panik
+	code := cli.Execute([]string{"--help"})
+	if code != cli.ExitClean {
+		t.Errorf("expected Execute(--help) to return 0, got %d", code)
 	}
 }

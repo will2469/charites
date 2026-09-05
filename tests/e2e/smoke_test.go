@@ -54,22 +54,22 @@ func TestBinarySmoke(t *testing.T) {
 			containsStdout: "Usage: charites",
 		},
 		{
-			name:           "empty args usage",
+			name:           "empty args runs scan",
 			args:           []string{},
 			expectedCode:   0,
-			containsStdout: "Usage: charites",
+			containsStdout: "problems found",
 		},
 		{
 			name:           "unknown command exits 2 to stderr",
 			args:           []string{"unknown-command"},
 			expectedCode:   2,
-			containsStderr: "unknown command or flag",
+			containsStderr: `unknown command "unknown-command"`,
 		},
 		{
 			name:           "unknown flag exits 2 to stderr",
 			args:           []string{"--bogus-flag"},
 			expectedCode:   2,
-			containsStderr: "unknown command or flag",
+			containsStderr: "flag provided but not defined",
 		},
 	}
 

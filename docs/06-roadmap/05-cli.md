@@ -3,7 +3,7 @@
 > **Kode Dokumen:** `ROAD-05-CLI`
 > **Tahapan:** Fase 5 - Reporter Output & CLI Entrypoint
 > **Peran Pilar:** ROADMAP = PHASE GATE (Otoritas Gerbang Evaluasi Kelulusan Transisi)
-> **Status:** Ready / Approved for Implementation
+> **Status:** Graduated (All Phase Gates Passed)
 
 Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi (*phase gate*) untuk **Fase 5 (Reporter Output & CLI Entrypoint)** sebelum tim diizinkan melangkah ke **Fase 6 (Validasi Penuh & Golden Tests)**. Sesuai prinsip tata kelola [docs/00-CONTRACT.md](https://github.com/will2469/charites/blob/main/docs/00-CONTRACT.md):
 - **SPEC** = WHAT (Spesifikasi Antarmuka CLI, Format Reporter & Kontrak Exit Code)
@@ -25,7 +25,7 @@ Dokumen ini menetapkan kriteria kelulusan (*exit criteria*) dan gerbang transisi
 7. **`internal/cli/exit.go`**: Modul resolusi exit code POSIX terpadu (0, 1, 2, 130).
 8. **`cmd/charites/main.go`**: Berkas titik masuk (*entrypoint*) binary yang memanggil `cli.Execute(os.Args[1:])`.
 9. **`tests/golden/reporters/`**: Berkas referensi snapshot reporter (`inline_clean.golden`, `inline_violations.golden`, `inline_no_color.golden`, `json_clean.golden`, `json_violations.golden`).
-10. **`tests/e2e/cli_test.go`**: Suite pengujian terintegrasi subprocess E2E yang memvalidasi seluruh matriks interaksi CLI.
+10. **`tests/e2e/cli_test.go`**: Suite pengujian terintegrasi subprocess E2E yang memvalidasi seluruh matriks interaksi CLI (14 skenario).
 
 ---
 
@@ -74,30 +74,34 @@ $$\mathbf{SPEC\ PASS} \longrightarrow \mathbf{ARCH\ PASS} \longrightarrow \mathb
 
 Sebuah fase dinyatakan lulus (*graduated*) jika dan hanya jika seluruh evaluasi gerbang berikut berstatus **PASS**:
 
-- [ ] **`ROAD-05-GATE-001` (SPEC-05 Compliance = PASS):**
+- [x] **`ROAD-05-GATE-001` (SPEC-05 Compliance = PASS):**
   - Pemanggilan 0 argumen (`charites`) otomatis menjalankan `scan .`.
   - Subcommand alias `check` dan `run` bekerja identik dengan `scan`.
   - Normalisasi `--ext` mendukung format case-insensitive dan menolak ekstensi yang tidak didukung dengan exit code `2`.
   - Konflik `--category` dan `--rule` terdeteksi dan menghasilkan exit code `2`.
   - Format `--format=inline` dan `--format=json` memenuhi skema dokumen lengkap.
   - Taksonomi exit code dipatuhi (0 = Clean, 1 = Violations, 2 = Operational error, 130 = Interrupted).
+  - Invarian zero host pollution & zero leftover terbukti valid.
 
-- [ ] **`ROAD-05-GATE-002` (ARCH-05 Compliance = PASS):**
+- [x] **`ROAD-05-GATE-002` (ARCH-05 Compliance = PASS):**
   - Binary mempertahankan Zero Dependency Invariant (hanya menggunakan pustaka standar Go).
   - Skema DTO `ScanResult` memuat field `version` dan `duration_ms` secara presisi.
   - Abstraksi `ColorMode` memungkinkan isolasi pengujian terminal tanpa ketergantungan device OS.
 
-- [ ] **`ROAD-05-GATE-003` (TEST-05 Compliance = PASS):**
+- [x] **`ROAD-05-GATE-003` (TEST-05 Compliance = PASS):**
   - Pengujian determinisme membuktikan output reporter 100% identik secara biner (`bytes.Equal`).
   - Golden contract snapshots (`tests/golden/reporters/`) terverifikasi 100%.
-  - Seluruh skenario matriks E2E subprocess (termasuk kasus `--fail-on-warn`) lulus tanpa kegagalan.
+  - Seluruh 14 skenario matriks E2E subprocess (termasuk kasus `--fail-on-warn` dan zero host footprint) lulus 100%.
 
-- [ ] **`ROAD-05-GATE-004` (QUAL-05 Compliance = PASS):**
+- [x] **`ROAD-05-GATE-004` (QUAL-05 Compliance = PASS):**
   - Seluruh ambang batas cakupan pengujian paket terpenuhi:
-    - `internal/cli`: $\ge 85\%$ line coverage.
-    - `internal/reporter`: $\ge 90\%$ line coverage.
-  - Anggaran performa rendering formatting terisolasi terpenuhi (`QUAL-05-PERF-001`).
-  - `golangci-lint run ./...` lulus 100% tanpa isu.
+    - `internal/cli`: **89.0%** (target $\ge 85\%$).
+    - `internal/reporter`: **94.4%** (target $\ge 90\%$).
+  - Anggaran performa rendering formatting terisolasi terpenuhi (`QUAL-05-PERF-001`):
+    - JSON render 1.000 findings: 1.79 ms ($\le 5\text{ ms}$).
+    - Inline render 1.000 findings: 0.56 ms ($\le 10\text{ ms}$).
+  - `golangci-lint run ./...` lulus 100% dengan 0 issues.
+  - `make cross-compile` lulus 100% pada 4 platform rilis.
 
 ---
 

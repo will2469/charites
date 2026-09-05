@@ -4,50 +4,72 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
-// UsageString returns the canonical CLI help message conforming to SPEC-00.
+// UsageString mengembalikan pesan bantuan penggunaan CLI kanonikal sesuai SPEC-05-CLI.
 func UsageString() string {
-	return `Usage: charites <command> [options] [path]
+	return `Usage: charites [command] [flags] [path]
 
-Commands:
-  scan       Scan frontend files for design system, a11y, and performance issues
-             Aliases: check, run
-  version    Print binary version
-
-Options for 'scan':
-  -f, --format string      Output format: inline (default ANSI) or json
-  --ext string             Filter by extension: astro, tsx, jsx
-  --category string        Filter by category: theme, a11y, perf, layout, seo
-  --rule string            Filter by single rule ID: theme.hardcode-opacity-color
-  --ignore string          Additional custom ignore pattern
+Available Commands:
+  scan        Pindai berkas frontend untuk audit kualitas dan token semantik (Default)
+  check       Alias identik untuk 'scan'
+  run         Alias identik untuk 'scan'
+  version     Cetak versi kompilasi binary, commit git, dan Go runtime
+  help        Bantuan penggunaan perintah
 `
 }
 
-// Execute is the main entrypoint trampoline for the CLI using standard os streams.
+// Execute adalah titik masuk trampoline utama untuk CLI menggunakan stream standar sistem operasi.
 func Execute(args []string) int {
 	return ExecuteArgs(args, os.Stdout, os.Stderr)
 }
 
-// ExecuteArgs executes the CLI with injected stdout and stderr writers,
-// enforcing strict stream routing isolation and exit codes (SPEC-00).
+// ExecuteArgs mengeksekusi CLI dengan injeksi writer stdout dan stderr terisolasi.
 func ExecuteArgs(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprint(stdout, UsageString())
-		return 0
+		return RunScan([]string{"."}, stdout, stderr)
 	}
 
 	first := args[0]
 
 	switch first {
-	case "-v", "--version", "version":
+	case "scan", "check", "run":
+		return RunScan(args[1:], stdout, stderr)
+	case "version", "-v", "--version":
 		_, _ = fmt.Fprint(stdout, VersionString())
-		return 0
-	case "-h", "--help", "help":
+		return ExitClean
+	case "help", "-h", "--help":
 		_, _ = fmt.Fprint(stdout, UsageString())
-		return 0
+		return ExitClean
 	default:
-		_, _ = fmt.Fprintf(stderr, "charites: unknown command or flag \"%s\"\nRun 'charites --help' for usage.\n", first)
-		return 2
+		// Jika argumen diawali '-' (flag langsung) atau berupa path langsung
+		if strings.HasPrefix(first, "-") || isPath(first) {
+			return RunScan(args, stdout, stderr)
+		}
+		_, _ = fmt.Fprintf(stderr, "charites: error: unknown command \"%s\". Run 'charites --help' for usage.\n", first)
+		return ExitOperational
 	}
+}
+
+func isPath(arg string) bool {
+	if arg == "." || arg == ".." {
+		return true
+	}
+	if strings.HasPrefix(arg, "./") || strings.HasPrefix(arg, "../") || strings.HasPrefix(arg, "/") {
+		return true
+	}
+	if strings.Contains(arg, "/") || strings.Contains(arg, "\\") {
+		return true
+	}
+	if _, err := os.Stat(arg); err == nil {
+		return true
+	}
+	ext := strings.ToLower(filepath.Ext(arg))
+	switch ext {
+	case ".astro", ".tsx", ".jsx", ".ts", ".js", ".json", ".yaml", ".yml":
+		return true
+	}
+	return false
 }

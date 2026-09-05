@@ -1,0 +1,10 @@
+[ERROR] src/pages/index.astro:14:8 [theme.hardcode-opacity-color]
+  Hardcode opacity color: "bg-primary/10"
+  Hint: Use semantic token "primary-light".
+
+[WARN] src/components/Card.tsx:42:12 [theme.hardcode-color]
+  Hardcode hex color: "#2563eb"
+  Hint: Use semantic token "bg-primary".
+
+ 2 problems found (1 error, 1 warning)
+  Scanned 28 files in 18ms.
