@@ -154,10 +154,17 @@ func TestBinarySmoke(t *testing.T) {
 
 ---
 
-## 3. Prosedur Verifikasi Kompilasi Silang (`TEST-00-BUILD-002`)
+## 3. Prosedur Verifikasi Kompilasi & Build (`TEST-00-BUILD`)
 
-Untuk membuktikan pemenuhan kontrak `SPEC-00-BUILD-002` (Cross-Platform Targets), pengujian otomatis memverifikasi bahwa kompilasi silang berhasil untuk 4 platform resmi tanpa ketergantungan CGO:
+### A. Verifikasi Kompilasi Zero-CGO (`TEST-00-BUILD-001`)
+Membuktikan bahwa binary dapat dikompilasi secara penuh tanpa CGO:
+```bash
+CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/charites ./cmd/charites
+```
+Perintah ini **MUST** menghasilkan exit code `0` dan menghasilkan executable binary mandiri di `bin/charites`.
 
+### B. Verifikasi Kompilasi Silang 4 Target Resmi (`TEST-00-BUILD-002`)
+Membuktikan pemenuhan kontrak `SPEC-00-BUILD-002` (Cross-Platform Targets) tanpa ketergantungan CGO:
 ```bash
 # Target 1: Linux x86_64
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
@@ -171,8 +178,15 @@ GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
 # Target 4: Windows x86_64
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
 ```
-
 Setiap perintah di atas **MUST** menghasilkan exit code `0` tanpa peringatan linker.
+
+### C. Verifikasi Rantai Dependensi Fresh Checkout (`TEST-00-BUILD-ORDER`)
+Membuktikan bahwa pada repositori yang baru di-*clone* tanpa artefak terkompilasi, target `make all` secara deterministik membangun binary terlebih dahulu (`build`) sebelum menjalankan pengujian E2E (`test`):
+```bash
+make clean
+make all
+```
+Perintah ini **MUST** berhasil 100% tanpa error *file not found* pada binary `bin/charites`.
 
 ---
 

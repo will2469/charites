@@ -1,24 +1,35 @@
 export GOWORK ?= off
 
-.PHONY: all test test-full test-race test-coverage lint build clean setup-hooks format vulncheck
+.PHONY: all test test-full test-race test-coverage lint build clean cross-compile setup-hooks format vulncheck
 
-all: lint test build
+# Deterministic build-before-test ordering (ARCH-00-BUILD-ORDER / TEST-00-BUILD-ORDER)
+all: build test lint
 
 setup-hooks:
 	git config core.hooksPath .githooks
 	chmod +x .githooks/*
 	@echo "Charites git hooks installed to .githooks"
 
-# Fast test: lightweight iteration
-test:
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.1.0-dev")
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -s -w -X github.com/will2469/charites/internal/cli.Version=$(VERSION) -X github.com/will2469/charites/internal/cli.Commit=$(COMMIT) -X github.com/will2469/charites/internal/cli.BuildDate=$(BUILD_DATE)
+
+# Native Pure Go compilation with Zero CGO (SPEC-00-BUILD-001)
+build:
+	@mkdir -p bin
+	CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -o bin/charites ./cmd/charites
+
+# Fast test: depends on build so subprocess E2E smoke tests always find bin/charites
+test: build
 	@if [ -f "go.mod" ]; then \
-		go test -v ./...; \
+		go test -v -race ./...; \
 	else \
 		echo "Notice: go.mod not initialized yet. Run Phase 0 setup first."; \
 	fi
 
 # Full test with Go Race Detector
-test-full:
+test-full: build
 	@if [ -f "go.mod" ]; then \
 		go test -race -v ./...; \
 	else \
@@ -29,16 +40,24 @@ test-race: test-full
 
 # Test Coverage
 COVER_PKGS ?= github.com/will2469/charites/internal/...,github.com/will2469/charites/cmd/...
-test-coverage:
+test-coverage: build
 	go test -race -coverpkg=$(COVER_PKGS) -coverprofile=coverage.txt -covermode=atomic ./...
 	@go tool cover -func=coverage.txt | tail -n 1
 	go tool cover -html=coverage.txt -o coverage.html
 	@echo "Coverage report generated at coverage.html"
 
+# Cross-platform compilation verification for 4 official release targets (SPEC-00-BUILD-002 / TEST-00-BUILD-002)
+cross-compile:
+	@echo "Verifying cross-compilation targets (SPEC-00-BUILD-002)..."
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/charites
+
 lint:
 	@if [ -f "go.mod" ]; then \
-		echo "Running go vet..."; \
-		go vet ./...; \
+		echo "Running golangci-lint..."; \
+		golangci-lint run ./...; \
 	fi
 	@echo "Checking gofmt..."
 	@unformatted=$$(find . -name '*.go' -not -path './vendor/*' -exec gofmt -l {} + 2>/dev/null); \
@@ -50,14 +69,6 @@ lint:
 
 vulncheck:
 	govulncheck ./...
-
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
-BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(BUILD_DATE)
-
-build:
-	go build -ldflags="$(LDFLAGS)" -v -o bin/charites ./cmd/charites
 
 format:
 	@if [ -x .githooks/format-all.sh ]; then \

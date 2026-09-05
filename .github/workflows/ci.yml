@@ -15,24 +15,32 @@ jobs:
     name: Test & Build Charites
     runs-on: ubuntu-latest
 
+    env:
+      CGO_ENABLED: 0
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Set up Go
+      - name: Set up Go (QUAL-00-REPRO-001 Deterministic Pin)
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version-file: 'go.mod'
+          go-version: '1.26.0'
           cache: true
 
-      - name: Verify Module Dependencies
+      - name: Verify Module Dependencies (QUAL-00-DEPS-001)
         run: go mod verify
 
-      - name: Run Go Vet
-        run: go vet ./...
+      - name: Verify Zero CGO Surface (QUAL-00-INVAR-001)
+        run: |
+          cgo_files=$(go list -f '{{range .CgoFiles}}{{.}} {{end}}' ./...)
+          if [ -n "$cgo_files" ]; then
+            echo "Error: CGO files detected: $cgo_files"
+            exit 1
+          fi
 
-      - name: Run Unit Tests with Race Detector
-        run: go test -race -v -coverprofile=coverage.txt -covermode=atomic ./...
+      - name: Build, Test, and Lint (ARCH-00-BUILD-ORDER / TEST-00-BUILD-ORDER)
+        run: make all
 
-      - name: Compile Standalone Binary
-        run: go build -v -o bin/charites ./cmd/charites
+      - name: Verify Cross-Platform Compilation Targets (SPEC-00-BUILD-002 / TEST-00-BUILD-002)
+        run: make cross-compile

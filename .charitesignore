@@ -1,11 +1,45 @@
-# Default ignore patterns for Charites Static Analyzer
+# ==============================================================================
+# CHARITES DEFAULT IGNORE PATTERNS (.charitesignore)
+# Gitignore-compatible ignore specification for frontend static analysis
+# ==============================================================================
+
+# 1. Package Manager & Third-Party Dependencies
 node_modules/
+vendor/
+
+# 2. Build Outputs, Transpiled Bundles & Framework Caches
 dist/
 build/
+out/
 .astro/
 .next/
-.svelte-kit/
-.git/
-vendor/
+.nuxt/
+.output/
+.cache/
+coverage/
+
+# 3. Minified & Generated Production Bundles
 *.min.js
 *.min.css
+*.bundle.js
+*.map
+
+# 4. Dependency Lockfiles
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lockb
+
+# 5. Version Control Systems & OS Metadata
+.git/
+.svn/
+.hg/
+.DS_Store
+Thumbs.db
+
+# 6. Temporary Files & Crash Logs
+*.tmp
+*.temp
+*.log
+*.swp
+*.swo
