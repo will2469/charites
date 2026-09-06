@@ -47,7 +47,7 @@ func TestTouchTargetSizeRule(t *testing.T) {
 			node: &ir.Node{
 				Type:    ir.NodeElement,
 				Tag:     "button",
-				Classes: []string{"h-8", "w-8", "min-h-[44px]", "min-w-[44px]"},
+				Classes: []string{"h-8", "w-8", "min-h-11", "min-w-11"},
 			},
 			shouldFault: false,
 		},
@@ -290,7 +290,7 @@ func TestInputCrampedPaddingRule(t *testing.T) {
 			node: &ir.Node{
 				Type:    ir.NodeElement,
 				Tag:     "input",
-				Classes: []string{"h-8", "min-h-[44px]", "px-3"},
+				Classes: []string{"h-8", "min-h-11", "px-3"},
 			},
 			shouldFault: false,
 		},

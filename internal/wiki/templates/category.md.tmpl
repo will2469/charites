@@ -249,7 +249,7 @@ flowchart LR
 ```
 
 ### Pipeline Flow:
-1. **Touch Target Sizing:** Evaluates interactive controls against Fitts's Law, verifying minimum tap target dimensions of 44x44px (`min-h-[44px] min-w-[44px]`).
+1. **Touch Target Sizing:** Evaluates interactive controls against Fitts's Law, verifying minimum tap target dimensions of 44x44px (`min-h-11 min-w-11` / `size-11`).
 2. **Container Query Governance:** Enforces modular `@container` queries over fragile page-level viewport media queries (`sm:`, `md:`, `lg:`).
 3. **Viewport & Overflow Analysis:** Identifies fixed-width containers that cause mobile horizontal scrollbars or layout breakage.
 

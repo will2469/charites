@@ -18,7 +18,7 @@ func BenchmarkA11yRules_ZeroAllocClean(b *testing.B) {
 	cleanNode := &ir.Node{
 		Type:    ir.NodeElement,
 		Tag:     "button",
-		Classes: []string{"h-11", "w-11", "min-h-[44px]", "min-w-[44px]", "p-2.5", "focus-visible:ring-2", "text-base"},
+		Classes: []string{"h-11", "w-11", "min-h-11", "min-w-11", "p-2.5", "focus-visible:ring-2", "text-base"},
 		Span:    ir.Span{Line: 1, Column: 1},
 	}
 
