@@ -643,3 +643,320 @@ func TestFormInputMissingNameRule(t *testing.T) {
 		})
 	}
 }
+
+func TestFormLabelMissingControlRule(t *testing.T) {
+	rule := a11y.NewFormLabelMissingControlRule()
+
+	tests := []struct {
+		name        string
+		node        *ir.Node
+		shouldFault bool
+	}{
+		{
+			name: "non_form_item_safe",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "div",
+			},
+			shouldFault: false,
+		},
+		{
+			name: "form_item_without_label_safe",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "FormItem",
+				Children: []*ir.Node{
+					{Type: ir.NodeElement, Tag: "p"},
+				},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "form_item_with_label_and_form_control_safe",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "FormItem",
+				Children: []*ir.Node{
+					{Type: ir.NodeElement, Tag: "FormLabel"},
+					{
+						Type: ir.NodeElement,
+						Tag:  "FormControl",
+						Children: []*ir.Node{
+							{Type: ir.NodeElement, Tag: "Input"},
+						},
+					},
+				},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "form_item_with_label_and_direct_input_safe",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "FormItem",
+				Children: []*ir.Node{
+					{Type: ir.NodeElement, Tag: "FormLabel"},
+					{Type: ir.NodeElement, Tag: "input"},
+				},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "form_item_with_label_no_control_violation",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "FormItem",
+				Children: []*ir.Node{
+					{Type: ir.NodeElement, Tag: "FormLabel"},
+					{Type: ir.NodeElement, Tag: "p"},
+				},
+			},
+			shouldFault: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			diags := rule.Evaluate(tc.node)
+			if tc.shouldFault && len(diags) == 0 {
+				t.Errorf("expected violation for %s, got 0", tc.name)
+			}
+			if !tc.shouldFault && len(diags) > 0 {
+				t.Errorf("unexpected violation for %s: %+v", tc.name, diags)
+			}
+		})
+	}
+}
+
+func TestFormLabelCompositeControlRule(t *testing.T) {
+	rule := a11y.NewFormLabelCompositeControlRule()
+
+	tests := []struct {
+		name        string
+		node        *ir.Node
+		shouldFault bool
+	}{
+		{
+			name: "single_control_safe",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "FormItem",
+				Children: []*ir.Node{
+					{Type: ir.NodeElement, Tag: "FormLabel"},
+					{
+						Type: ir.NodeElement,
+						Tag:  "FormControl",
+						Children: []*ir.Node{
+							{Type: ir.NodeElement, Tag: "Input"},
+						},
+					},
+				},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "composite_date_range_picker_violation",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "FormItem",
+				Children: []*ir.Node{
+					{Type: ir.NodeElement, Tag: "FormLabel"},
+					{
+						Type: ir.NodeElement,
+						Tag:  "FormControl",
+						Children: []*ir.Node{
+							{Type: ir.NodeElement, Tag: "DateRangePicker"},
+						},
+					},
+				},
+			},
+			shouldFault: true,
+		},
+		{
+			name: "composite_address_fields_violation",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "FormItem",
+				Children: []*ir.Node{
+					{Type: ir.NodeElement, Tag: "FormLabel"},
+					{
+						Type: ir.NodeElement,
+						Tag:  "FormControl",
+						Children: []*ir.Node{
+							{Type: ir.NodeElement, Tag: "AddressFields"},
+						},
+					},
+				},
+			},
+			shouldFault: true,
+		},
+		{
+			name: "multiple_inputs_violation",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "FormItem",
+				Children: []*ir.Node{
+					{Type: ir.NodeElement, Tag: "FormLabel"},
+					{
+						Type: ir.NodeElement,
+						Tag:  "FormControl",
+						Children: []*ir.Node{
+							{Type: ir.NodeElement, Tag: "input"},
+							{Type: ir.NodeElement, Tag: "input"},
+						},
+					},
+				},
+			},
+			shouldFault: true,
+		},
+		{
+			name: "composite_wrapped_in_fieldset_safe",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "FormItem",
+				Children: []*ir.Node{
+					{Type: ir.NodeElement, Tag: "FormLabel"},
+					{
+						Type: ir.NodeElement,
+						Tag:  "FormControl",
+						Children: []*ir.Node{
+							{
+								Type: ir.NodeElement,
+								Tag:  "fieldset",
+								Children: []*ir.Node{
+									{Type: ir.NodeElement, Tag: "legend"},
+									{Type: ir.NodeElement, Tag: "DateRangePicker"},
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldFault: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			diags := rule.Evaluate(tc.node)
+			if tc.shouldFault && len(diags) == 0 {
+				t.Errorf("expected violation for %s, got 0", tc.name)
+			}
+			if !tc.shouldFault && len(diags) > 0 {
+				t.Errorf("unexpected violation for %s: %+v", tc.name, diags)
+			}
+		})
+	}
+}
+
+func TestImgMissingAltRule(t *testing.T) {
+	rule := a11y.NewImgMissingAltRule()
+
+	tests := []struct {
+		name        string
+		node        *ir.Node
+		shouldFault bool
+	}{
+		{
+			name: "native_img_missing_alt_violation",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "img",
+				Attributes: map[string]string{"src": "/hero.png"},
+			},
+			shouldFault: true,
+		},
+		{
+			name: "astro_image_missing_alt_violation",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "Image",
+				Attributes: map[string]string{"src": "/hero.png", "width": "800", "height": "400"},
+			},
+			shouldFault: true,
+		},
+		{
+			name: "astro_picture_missing_alt_violation",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "Picture",
+				Attributes: map[string]string{"src": "/hero.png"},
+			},
+			shouldFault: true,
+		},
+		{
+			name: "native_img_with_alt_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "img",
+				Attributes: map[string]string{"src": "/hero.png", "alt": "Descriptive banner"},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "native_img_decorative_empty_alt_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "img",
+				Attributes: map[string]string{"src": "/decor.svg", "alt": ""},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "astro_image_with_alt_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "Image",
+				Attributes: map[string]string{"src": "/hero.png", "alt": "Astro Hero"},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "img_with_aria_label_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "img",
+				Attributes: map[string]string{"src": "/icon.png", "aria-label": "Home icon"},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "img_with_role_presentation_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "img",
+				Attributes: map[string]string{"src": "/decor.png", "role": "presentation"},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "img_with_aria_hidden_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "img",
+				Attributes: map[string]string{"src": "/decor.png", "aria-hidden": "true"},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "non_image_element_safe",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "button",
+			},
+			shouldFault: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			diags := rule.Evaluate(tc.node)
+			if tc.shouldFault && len(diags) == 0 {
+				t.Errorf("expected violation for %s, got 0", tc.name)
+			}
+			if !tc.shouldFault && len(diags) > 0 {
+				t.Errorf("unexpected violation for %s: %+v", tc.name, diags)
+			}
+		})
+	}
+}

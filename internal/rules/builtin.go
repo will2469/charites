@@ -93,6 +93,11 @@ func builtinRules() []Rule {
 		a11y.NewPlaceholderAsLabelRule(),
 		a11y.NewLabelMissingControlRule(),
 		a11y.NewFormInputMissingNameRule(),
+
+		// a11y Wave 3 (Shadcn UI Hierarchy & Astro Image)
+		a11y.NewFormLabelMissingControlRule(),
+		a11y.NewFormLabelCompositeControlRule(),
+		a11y.NewImgMissingAltRule(),
 	}
 }
 

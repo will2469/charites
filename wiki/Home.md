@@ -8,7 +8,7 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 | Category | Rules Count | Documentation |
 | :--- | :---: | :--- |
-| `a11y` | 9 | [`a11y`](a11y) |
+| `a11y` | 12 | [`a11y`](a11y) |
 | `theme` | 32 | [`theme`](theme) |
 
 ---
@@ -19,6 +19,9 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 | :--- | :---: | :---: | :--- | :--- |
 | `a11y.error-not-announced` | `a11y` | `ERROR` | Ensures form controls with aria-invalid are programmatically linked to error messages via aria-describedby (WCAG 3.3.1) | [`a11y.error-not-announced`](a11y.error-not-announced) |
 | `a11y.form-input-missing-name` | `a11y` | `WARN` | Ensures form input controls declare an identifying name or id attribute for form submission and autofill (WCAG 4.1.2) | [`a11y.form-input-missing-name`](a11y.form-input-missing-name) |
+| `a11y.form-label-composite-control` | `a11y` | `WARN` | Warns when <FormLabel> is directly bound to a composite multi-field control causing screen reader ambiguity | [`a11y.form-label-composite-control`](a11y.form-label-composite-control) |
+| `a11y.form-label-missing-control` | `a11y` | `ERROR` | Enforces that Shadcn UI <FormItem> containing <FormLabel> also contains an associated <FormControl> or input element | [`a11y.form-label-missing-control`](a11y.form-label-missing-control) |
+| `a11y.img-missing-alt` | `a11y` | `ERROR` | Enforces required 'alt' attribute on Astro <Image>, <Picture>, and native <img> elements (WCAG 1.1.1) | [`a11y.img-missing-alt`](a11y.img-missing-alt) |
 | `a11y.input-cramped-padding` | `a11y` | `WARN` | Flags input controls with cramped vertical padding or height under 42px that clip text and impede touch targeting | [`a11y.input-cramped-padding`](a11y.input-cramped-padding) |
 | `a11y.input-ios-zoom-hazard` | `a11y` | `WARN` | Prevents forced Safari iOS viewport auto-zoom by requiring at least 16px font size on inputs on mobile viewports | [`a11y.input-ios-zoom-hazard`](a11y.input-ios-zoom-hazard) |
 | `a11y.label-missing-control` | `a11y` | `ERROR` | Ensures label htmlFor attributes match an existing input control ID in the same document (WCAG 1.3.1) | [`a11y.label-missing-control`](a11y.label-missing-control) |

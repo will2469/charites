@@ -7,11 +7,14 @@
 ### Rule Categories
 
 <details open>
-<summary><b>A11y</b> (9 rules)</summary>
+<summary><b>A11y</b> (12 rules)</summary>
 
 * [**A11y Overview**](a11y)
 * [`a11y.error-not-announced`](a11y.error-not-announced)
 * [`a11y.form-input-missing-name`](a11y.form-input-missing-name)
+* [`a11y.form-label-composite-control`](a11y.form-label-composite-control)
+* [`a11y.form-label-missing-control`](a11y.form-label-missing-control)
+* [`a11y.img-missing-alt`](a11y.img-missing-alt)
 * [`a11y.input-cramped-padding`](a11y.input-cramped-padding)
 * [`a11y.input-ios-zoom-hazard`](a11y.input-ios-zoom-hazard)
 * [`a11y.label-missing-control`](a11y.label-missing-control)
