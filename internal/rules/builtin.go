@@ -133,6 +133,12 @@ var (
 	_ Rule = (*cls.UnsizedEmbedFrameRule)(nil)
 	_ Rule = (*cls.UnreservedAdContainerRule)(nil)
 	_ Rule = (*cls.UnconstrainedCarouselRule)(nil)
+
+	// cls Wave 2 (Font Loading & Metric Stability)
+	_ Rule = (*cls.FontDisplayMissingRule)(nil)
+	_ Rule = (*cls.UnadjustedFontMetricRule)(nil)
+	_ Rule = (*cls.FontImportLateDiscoveryRule)(nil)
+	_ Rule = (*cls.TextIconLateReflowRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -297,6 +303,12 @@ func builtinRules() []Rule {
 		cls.NewUnsizedEmbedFrameRule(),
 		cls.NewUnreservedAdContainerRule(),
 		cls.NewUnconstrainedCarouselRule(),
+
+		// cls Wave 2 (Font Loading & Metric Stability)
+		cls.NewFontDisplayMissingRule(),
+		cls.NewUnadjustedFontMetricRule(),
+		cls.NewFontImportLateDiscoveryRule(),
+		cls.NewTextIconLateReflowRule(),
 	}
 }
 

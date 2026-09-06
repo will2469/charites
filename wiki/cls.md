@@ -8,6 +8,10 @@ The `cls` category contains static analysis rules for code quality, architectura
 
 | Rule ID | Severity | Summary | Full Specification | Status |
 | :--- | :---: | :--- | :--- | :---: |
+| `cls.font-display-missing` | `ERROR` | Requires font-display descriptor on custom @font-face declarations to prevent FOIT reflow | [`cls.font-display-missing`](cls.font-display-missing) | `enabled` |
+| `cls.font-import-late-discovery` | `WARN` | Warns when CSS @import is used for external font loading, delaying discovery and risking layout shift | [`cls.font-import-late-discovery`](cls.font-import-late-discovery) | `enabled` |
+| `cls.text-icon-late-reflow` | `INFO` | Requires locked bounding dimensions on text-ligature icon elements to prevent text reflow | [`cls.text-icon-late-reflow`](cls.text-icon-late-reflow) | `enabled` |
+| `cls.unadjusted-font-metric` | `INFO` | Recommends font metric overrides on fallback font declarations to reduce swap CLS | [`cls.unadjusted-font-metric`](cls.unadjusted-font-metric) | `enabled` |
 | `cls.unconstrained-carousel` | `WARN` | Warns when carousel or slider containers lack bounded height or slide aspect-ratio constraints | [`cls.unconstrained-carousel`](cls.unconstrained-carousel) | `enabled` |
 | `cls.unreserved-ad-container` | `WARN` | Warns when dynamic ad containers lack reserved vertical dimensions or initial skeleton placeholders | [`cls.unreserved-ad-container`](cls.unreserved-ad-container) | `enabled` |
 | `cls.unsized-embed-frame` | `WARN` | Warns when embedded media frames lack explicit dimensions or an aspect-ratio container wrapper | [`cls.unsized-embed-frame`](cls.unsized-embed-frame) | `enabled` |

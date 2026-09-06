@@ -289,3 +289,189 @@ func hasSkeletonOrFallback(node *ir.Node) bool {
 	}
 	return false
 }
+
+// getStyleNodeText mengekstrak seluruh teks CSS dari child node NodeText dalam <style>.
+func getStyleNodeText(node *ir.Node) string {
+	if node == nil {
+		return ""
+	}
+	if len(node.Children) == 0 {
+		return node.RawClasses
+	}
+	var sb strings.Builder
+	for _, child := range node.Children {
+		if child.Type == ir.NodeText {
+			sb.WriteString(child.RawClasses)
+		}
+	}
+	res := sb.String()
+	if res == "" {
+		return node.RawClasses
+	}
+	return res
+}
+
+// extractFontFaceBlocks mengekstrak blok deklarasi di dalam @font-face { ... }.
+func extractFontFaceBlocks(css string) []string {
+	if !strings.Contains(css, "@font-face") {
+		return nil
+	}
+	var blocks []string
+	idx := 0
+	for {
+		pos := strings.Index(css[idx:], "@font-face")
+		if pos == -1 {
+			break
+		}
+		start := idx + pos + len("@font-face")
+		braceOpen := strings.IndexByte(css[start:], '{')
+		if braceOpen == -1 {
+			break
+		}
+		blockStart := start + braceOpen + 1
+		braceClose := strings.IndexByte(css[blockStart:], '}')
+		if braceClose == -1 {
+			break
+		}
+		blockEnd := blockStart + braceClose
+		blocks = append(blocks, css[blockStart:blockEnd])
+		idx = blockEnd + 1
+	}
+	return blocks
+}
+
+// hasValidFontDisplay memeriksa apakah deklarasi @font-face memiliki descriptor font-display yang sah.
+func hasValidFontDisplay(block string) bool {
+	lower := strings.ToLower(block)
+	pos := strings.Index(lower, "font-display")
+	if pos == -1 {
+		return false
+	}
+	after := lower[pos+len("font-display"):]
+	colon := strings.IndexByte(after, ':')
+	if colon == -1 {
+		return false
+	}
+	val := after[colon+1:]
+	semi := strings.IndexByte(val, ';')
+	if semi != -1 {
+		val = val[:semi]
+	}
+	val = strings.TrimSpace(val)
+	switch val {
+	case "swap", "optional", "fallback":
+		return true
+	default:
+		return false
+	}
+}
+
+// hasLocalFontSource memeriksa apakah blok @font-face merujuk pada font sistem fallback via src: local(...).
+func hasLocalFontSource(block string) bool {
+	lower := strings.ToLower(block)
+	srcPos := strings.Index(lower, "src")
+	if srcPos == -1 {
+		return false
+	}
+	return strings.Contains(lower[srcPos:], "local(")
+}
+
+// hasFontMetricOverrides memeriksa apakah blok @font-face fallback menyertakan deskriptor penyesuaian metrik.
+func hasFontMetricOverrides(block string) bool {
+	lower := strings.ToLower(block)
+	return strings.Contains(lower, "size-adjust") ||
+		strings.Contains(lower, "ascent-override") ||
+		strings.Contains(lower, "descent-override")
+}
+
+// findExternalFontImports mengekstrak aturan @import CSS yang mengimpor font eksternal.
+func findExternalFontImports(css string) []string {
+	if !strings.Contains(css, "@import") {
+		return nil
+	}
+	var violations []string
+	lines := strings.Split(css, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "@import") {
+			continue
+		}
+		if isExternalFontImport(trimmed) {
+			violations = append(violations, trimmed)
+		}
+	}
+	return violations
+}
+
+// isExternalFontImport memeriksa apakah baris @import mengimpor font eksternal remote.
+func isExternalFontImport(line string) bool {
+	lower := strings.ToLower(line)
+
+	// Whitelist: Tailwind CSS dan berkas stylesheet lokal
+	if strings.Contains(lower, "tailwindcss") || strings.Contains(lower, "./") || strings.Contains(lower, "../") {
+		return false
+	}
+
+	// Wajib merupakan URL eksternal remote
+	if !strings.Contains(lower, "http://") && !strings.Contains(lower, "https://") && !strings.Contains(lower, "//") {
+		return false
+	}
+
+	return strings.Contains(lower, "fonts.googleapis.com") ||
+		strings.Contains(lower, "fonts.gstatic.com") ||
+		strings.Contains(lower, "fonts.bunny.net") ||
+		strings.Contains(lower, "use.typekit.net") ||
+		strings.Contains(lower, "font") ||
+		strings.Contains(lower, ".woff") ||
+		strings.Contains(lower, ".woff2") ||
+		strings.Contains(lower, ".ttf")
+}
+
+// isIconLigatureElement memeriksa apakah node merupakan elemen ligatur ikon teks.
+func isIconLigatureElement(node *ir.Node) bool {
+	if node == nil || node.Type != ir.NodeElement {
+		return false
+	}
+
+	for _, cls := range node.Classes {
+		clsLower := strings.ToLower(cls)
+		if clsLower == "material-icons" ||
+			clsLower == "material-icons-outlined" ||
+			clsLower == "material-symbols" ||
+			clsLower == "material-symbols-outlined" ||
+			clsLower == "font-icon" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// hasLockedLigatureBox memeriksa apakah kotak elemen ligatur ikon telah dikunci dimensinya.
+func hasLockedLigatureBox(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	hasDisplay := false
+	hasSize := false
+	hasOverflow := false
+
+	for _, cls := range node.Classes {
+		switch cls {
+		case "inline-block", "block", "inline-flex", "flex":
+			hasDisplay = true
+		case "overflow-hidden":
+			hasOverflow = true
+		}
+		if strings.HasPrefix(cls, "size-") && cls != "size-auto" {
+			hasSize = true
+		}
+	}
+
+	if !hasSize && hasTailwindDimensions(node) {
+		hasSize = true
+	}
+
+	return hasDisplay && hasSize && hasOverflow
+}

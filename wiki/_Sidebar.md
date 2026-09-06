@@ -49,9 +49,13 @@
 </details>
 
 <details open>
-<summary><b>Cls</b> (4 rules)</summary>
+<summary><b>Cls</b> (8 rules)</summary>
 
 * [**Cls Overview**](cls)
+* [`cls.font-display-missing`](cls.font-display-missing)
+* [`cls.font-import-late-discovery`](cls.font-import-late-discovery)
+* [`cls.text-icon-late-reflow`](cls.text-icon-late-reflow)
+* [`cls.unadjusted-font-metric`](cls.unadjusted-font-metric)
 * [`cls.unconstrained-carousel`](cls.unconstrained-carousel)
 * [`cls.unreserved-ad-container`](cls.unreserved-ad-container)
 * [`cls.unsized-embed-frame`](cls.unsized-embed-frame)
