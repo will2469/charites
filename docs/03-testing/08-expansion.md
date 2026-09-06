@@ -53,38 +53,43 @@ $$\text{Actual Findings} \equiv \text{Expected Findings}$$
 
 ---
 
-## 2. Alur Pengujian 4 Langkah untuk Rule Baru
+## 2. Alur Pengujian 3 Langkah untuk Rule Baru (1-SSOT Architecture)
+
+> [!CRITICAL]
+> **Larangan Keras Monolith `rules_test.go` & Duplikasi Mocks:**
+> Pengujian fungsionalitas rule **DILARANG** dilakukan melalui berkas unit test monolitik sintetis (`rules_test.go` atau `*_test.go` masif di dalam `internal/rules/<category>/`).
+> Praktik tersebut melahirkan ribuan baris boilerplate AST tiruan (`&ir.Node{...}`) yang terlepas dari parser nyata dan rentan terhadap *drift* semantik.
+>
+> Seluruh pengujian semantik rule berpusat secara tunggal pada **1-SSOT Tri-Corpus** di `tests/correctness/<category>/<slug>/` menggunakan berkas Astro dan TSX asli yang diproses parser resmi. Direktori `internal/rules/<category>/` hanya memiliki `contract_test.go` (verifikasi metadata & 8-Pillars) dan `benchmark_test.go` (verifikasi alokasi memori nol).
 
 ```mermaid
 flowchart LR
-    Step1["1. Table-Driven Unit Test\n(*_test.go)"] --> Step2["2. Tri-Corpus Fixtures\n(tests/correctness/<rule>/)"]
-    Step2 --> Step3["3. Semantic Matrix Verification\n(go test -run TestTriCorpus)"]
-    Step3 --> Step4["4. Per-Node Benchmark\n(QUAL-08-PERF-001)"]
+    Step1["1. 1-SSOT Tri-Corpus Fixtures\n(tests/correctness/<category>/<slug>/)"] --> Step2["2. Tri-Corpus Runner\n(tests/correctness/<category>/<slug>/rule_test.go)"]
+    Step2 --> Step3["3. Canonical Contract & Benchmark\n(contract_test.go & benchmark_test.go)"]
 ```
 
-### Langkah 1: Table-Driven Unit Testing (`internal/rules/<domain>/<rule>_test.go`)
-Menguji fungsi murni `rule.Evaluate(node)` pada node-node AST in-memory.
+### Langkah 1: Penyusunan Berkas 1-SSOT Tri-Corpus
+Membuat berkas `.astro` dan `.tsx` nyata di dalam `tests/correctness/<category>/<slug>/`:
+- `positive/`: Berkas dengan pelanggaran nyata sesuai target invarian.
+- `negative/`: Berkas kode bersih dan legal (*zero-noise invariant*).
+- `adversarial/`: Berkas jebakan sintaks, dynamic classes, and edge cases.
 
-### Langkah 2: Penyusunan Berkas Tri-Corpus
-Membuat berkas `.astro` dan `.tsx` nyata yang merepresentasikan skenario dunia nyata.
-
-### Langkah 3: Eksekusi Otomatis Runner Tri-Corpus
-Runner memvalidasi setiap kasus terhadap deklarasi `matrix.json`:
+### Langkah 2: Eksekusi Otomatis Runner Tri-Corpus
+Runner terisolasi per-rule di `tests/correctness/<category>/<slug>/rule_test.go` mengevaluasi berkas korpus:
 ```bash
-go test -v ./tests -run TestTriCorpus_AllRules
+go test -v ./tests/correctness/<category>/<slug>/...
+```
+Dan diverifikasi secara global di level repositori:
+```bash
+go test -v ./tests -run TestGoldenCorpus_AdoptionMatrix
+go test -v ./tests -run TestCorrectnessGate
 ```
 
-### Langkah 4: Pengukuran Benchmark Memori & Latensi (`QUAL-08-PERF-001`)
-Memastikan fungsi `Evaluate()` tidak memicu alokasi heap saat mengevaluasi node legal:
+### Langkah 3: Verifikasi Kontrak Kanonikal & Benchmark Nol Alokasi (`QUAL-03`)
+1. **Canonical Contract (`internal/rules/<category>/contract_test.go`):** Memastikan Semgrep Canonical ID (`<category>.<slug>`), non-empty description, severity, kelengkapan 8-Pillars Doc, serta fail-safe nil/empty node invariant.
+2. **Zero Allocation Benchmark (`internal/rules/<category>/benchmark_test.go`):** Memastikan `0 B/op` dan `0 allocs/op` pada fast-path node legal:
 ```go
-func BenchmarkEvaluate_CleanNode(b *testing.B) {
-    rule := NewHardcodeColorRule()
-    node := &ir.Node{Tag: "div", Classes: []string{"flex", "p-4", "bg-primary"}}
-    b.ResetTimer()
-    b.ReportAllocs()
-    for i := 0; i < b.N; i++ {
-        _ = rule.Evaluate(node)
-    }
-}
+func BenchmarkA11yRules_ZeroAllocClean(b *testing.B) { ... }
 ```
-Target desain: `0 B/op` dan `0 allocs/op` pada fast-path node legal.
+Target desain mutlak: `0 B/op` dan `0 allocs/op` pada fast-path node legal.
+
