@@ -8,8 +8,6 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 In Greek mythology, the **Charites** ($\text{Χάριτες}$ / *The Three Graces*: **Aglaea** / Splendor, **Euphrosyne** / Mirth, and **Thalia** / Bloom) are the goddesses of charm, grace, beauty, joy, and visual elegance. Companions of Aphrodite and craftswomen of Olympian splendor, the Charites bring harmony, proportion, and delightful aesthetic design to all human and divine creations.
 
-Originating as the core UI design system and headless primitive library in ASTRADES (`@astrades/charites`), Charites expanded into an ultra-fast, independent static analysis compiler to guard and guarantee this exact triad of digital excellence across every commit.
-
 In modern software engineering, Charites occupies a unique, highly respectful position:
 
 $$\mathbf{Linter} < \mathbf{Charites} < \mathbf{Developer\ Preference}$$
