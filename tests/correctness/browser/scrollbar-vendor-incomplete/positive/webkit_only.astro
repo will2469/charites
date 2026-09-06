@@ -1,0 +1,15 @@
+---
+// P1: WebKit-only custom scrollbar in style block without W3C scrollbar-width or scrollbar-color
+---
+<div class="scroll-box">
+  <p>Scrollable content</p>
+</div>
+
+<style>
+  .scroll-box::-webkit-scrollbar {
+    width: 8px;
+  }
+  .scroll-box::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+  }
+</style>

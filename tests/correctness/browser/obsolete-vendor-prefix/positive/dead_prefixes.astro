@@ -1,0 +1,15 @@
+---
+// P1: Dead vendor prefixes in CSS stylesheet and inline styles
+---
+<div class="legacy-card" style="-webkit-border-radius: 8px; -moz-box-shadow: 0 4px 6px black;">
+  <h3>Old Card</h3>
+</div>
+
+<style>
+  .legacy-card {
+    -webkit-transition: all 0.3s ease;
+    -moz-transition: all 0.3s ease;
+    -o-transform: rotate(5deg);
+    -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=50)";
+  }
+</style>

@@ -30,6 +30,17 @@
 </details>
 
 <details open>
+<summary><b>Browser</b> (4 rules)</summary>
+
+* [**Browser Overview**](browser)
+* [`browser.appearance-native-override`](browser.appearance-native-override)
+* [`browser.hover-only-interaction`](browser.hover-only-interaction)
+* [`browser.obsolete-vendor-prefix`](browser.obsolete-vendor-prefix)
+* [`browser.scrollbar-vendor-incomplete`](browser.scrollbar-vendor-incomplete)
+
+</details>
+
+<details open>
 <summary><b>Theme</b> (32 rules)</summary>
 
 * [**Theme Overview**](theme)

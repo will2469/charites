@@ -1,0 +1,22 @@
+---
+// N3: Live vendor prefixes still required by modern Safari / iOS / WebKit - MUST NOT BE FLAGGED
+---
+<div class="glass-panel">
+  <span class="gradient-text">Live WebKit Prefixes</span>
+</div>
+
+<style>
+  .glass-panel {
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  .gradient-text {
+    -webkit-text-fill-color: transparent;
+    -webkit-text-stroke: 1px rgba(255, 255, 255, 0.2);
+  }
+</style>

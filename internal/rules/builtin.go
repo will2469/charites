@@ -2,6 +2,7 @@ package rules
 
 import (
 	"github.com/will2469/charites/internal/rules/a11y"
+	"github.com/will2469/charites/internal/rules/browser"
 	"github.com/will2469/charites/internal/rules/theme"
 )
 
@@ -44,6 +45,12 @@ var (
 	_ Rule = (*a11y.PlaceholderAsLabelRule)(nil)
 	_ Rule = (*a11y.LabelMissingControlRule)(nil)
 	_ Rule = (*a11y.FormInputMissingNameRule)(nil)
+
+	// browser Wave 1 (Rendering & Styling Multi-Engine)
+	_ Rule = (*browser.AppearanceNativeOverrideRule)(nil)
+	_ Rule = (*browser.ScrollbarVendorIncompleteRule)(nil)
+	_ Rule = (*browser.ObsoleteVendorPrefixRule)(nil)
+	_ Rule = (*browser.HoverOnlyInteractionRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -104,6 +111,12 @@ func builtinRules() []Rule {
 		a11y.NewKeyboardTrapMissingEscapeRule(),
 		a11y.NewDialogMissingAriaRule(),
 		a11y.NewEmptyInteractiveRule(),
+
+		// browser Wave 1 (Rendering & Styling Multi-Engine)
+		browser.NewAppearanceNativeOverrideRule(),
+		browser.NewScrollbarVendorIncompleteRule(),
+		browser.NewObsoleteVendorPrefixRule(),
+		browser.NewHoverOnlyInteractionRule(),
 	}
 }
 

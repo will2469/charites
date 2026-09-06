@@ -1,0 +1,14 @@
+---
+// A1: Scroll snap and scroll margin properties are NOT scrollbar styling
+---
+<div class="carousel snap-x overflow-x-auto">
+  <div class="snap-start scroll-ml-6 w-64 h-32 bg-slate-100 p-4">Slide 1</div>
+  <div class="snap-start scroll-ml-6 w-64 h-32 bg-slate-200 p-4">Slide 2</div>
+</div>
+
+<style>
+  .carousel {
+    scroll-padding: 1rem;
+    overscroll-behavior-x: contain;
+  }
+</style>
