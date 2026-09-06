@@ -1,0 +1,16 @@
+---
+// Negative fixture for cls.layout-trigger-animation: GPU composited transforms
+---
+<style>
+@keyframes slideDown {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+</style>
+<div class="banner">Announcement</div>

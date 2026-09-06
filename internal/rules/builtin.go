@@ -139,6 +139,12 @@ var (
 	_ Rule = (*cls.UnadjustedFontMetricRule)(nil)
 	_ Rule = (*cls.FontImportLateDiscoveryRule)(nil)
 	_ Rule = (*cls.TextIconLateReflowRule)(nil)
+
+	// cls Wave 3 (CSS Animations, Transitions, Scrollbar Gutter, & Dynamic Table Layouts)
+	_ Rule = (*cls.LayoutTriggerAnimationRule)(nil)
+	_ Rule = (*cls.LayoutTriggerTransitionRule)(nil)
+	_ Rule = (*cls.UnstableScrollbarGutterRule)(nil)
+	_ Rule = (*cls.DynamicTableReflowRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -309,6 +315,12 @@ func builtinRules() []Rule {
 		cls.NewUnadjustedFontMetricRule(),
 		cls.NewFontImportLateDiscoveryRule(),
 		cls.NewTextIconLateReflowRule(),
+
+		// cls Wave 3 (CSS Animations, Transitions, Scrollbar Gutter, & Dynamic Table Layouts)
+		cls.NewLayoutTriggerAnimationRule(),
+		cls.NewLayoutTriggerTransitionRule(),
+		cls.NewUnstableScrollbarGutterRule(),
+		cls.NewDynamicTableReflowRule(),
 	}
 }
 

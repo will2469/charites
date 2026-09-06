@@ -49,17 +49,21 @@
 </details>
 
 <details open>
-<summary><b>Cls</b> (8 rules)</summary>
+<summary><b>Cls</b> (12 rules)</summary>
 
 * [**Cls Overview**](cls)
+* [`cls.dynamic-table-reflow`](cls.dynamic-table-reflow)
 * [`cls.font-display-missing`](cls.font-display-missing)
 * [`cls.font-import-late-discovery`](cls.font-import-late-discovery)
+* [`cls.layout-trigger-animation`](cls.layout-trigger-animation)
+* [`cls.layout-trigger-transition`](cls.layout-trigger-transition)
 * [`cls.text-icon-late-reflow`](cls.text-icon-late-reflow)
 * [`cls.unadjusted-font-metric`](cls.unadjusted-font-metric)
 * [`cls.unconstrained-carousel`](cls.unconstrained-carousel)
 * [`cls.unreserved-ad-container`](cls.unreserved-ad-container)
 * [`cls.unsized-embed-frame`](cls.unsized-embed-frame)
 * [`cls.unsized-image`](cls.unsized-image)
+* [`cls.unstable-scrollbar-gutter`](cls.unstable-scrollbar-gutter)
 
 </details>
 

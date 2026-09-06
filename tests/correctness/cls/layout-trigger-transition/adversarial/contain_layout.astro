@@ -1,0 +1,18 @@
+---
+// Adversarial fixture for cls.layout-trigger-transition: contain: layout isolation and opacity transitions
+---
+<style>
+.isolated-box {
+  contain: layout;
+  transition: width 300ms ease;
+}
+.fade-item {
+  transition: opacity 200ms ease, background-color 200ms ease;
+}
+</style>
+<div class="isolated-box contain-layout w-40 transition-all hover:w-60">
+  Isolated Box
+</div>
+<div class="fade-item transition-opacity hover:opacity-80">
+  Fading Element
+</div>
