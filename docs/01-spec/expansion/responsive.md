@@ -274,50 +274,128 @@ flowchart TD
 ---
 
 ### 2.7. `responsive.horizontal-overflow`
-- **Tujuan:** Mendeteksi layout yang secara CSS valid tetapi berpotensi memicu horizontal scrolling yang merusak gestur swipe mobile.
-- **Mengapa Lolos Linter Standar:** `overflow-x-scroll` sah secara CSS, namun sering dipasang tanpa pertimbangan bahwa seluruh halaman web ikut goyang ke kanan-kiri di mobile jika tidak dibungkus rapi.
-- **In-Scope:** Kontainer dengan `overflow-x-scroll` atau `overflow-x-auto` tanpa strategi responsive wrapping.
-- **Engine:** JSX/TSX AST + Style AST.
-- **Severity:** Warning.
+- **Design Rationale:** W3C CSS Overflow Module Level 3 & Mobile Gesture Chaining Preservation.
+- **Konteks Realitas Mobile:**
+  Penggunaan kelas utilitas `overflow-x-scroll` secara kaku langsung pada baseline mobile memaksa peramban (WebKit dan Blink) untuk merender rel scrollbar horizontal permanen dan memutus rantai gestur usap (*swipe gesture chaining*). Pada perangkat sentuh kecil, pengguna yang berniat menggulir halaman ke bawah sering kali tersangkut di dalam kontainer `overflow-x-scroll` jika kontainer tersebut tidak memiliki pembatas lebar (`w-full` atau kontainer batas) atau tidak menggunakan `overflow-x-auto`. Selain itu, kontainer gulir samping wajib dilengkapi dengan isolasi sentuh yang tepat agar tidak mengguncang dokumen utama (*horizontal page wobble*).
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen dengan kelas overflow horizontal:
+  $$C \in \text{Classes}(E) \land C = \text{"overflow-x-scroll"} \land \neg \text{hasBreakpointPrefix}(C) \land \neg \text{hasFluidWidthBoundary}(E) \implies \text{Violation (Warn)}$$
+  di mana elemen yang mendeklarasikan `overflow-x-scroll` tanpa pembatas fluida `w-full`/`max-w-full` atau tanpa breakpoint modifier diperingatkan untuk menggunakan `overflow-x-auto w-full`.
+- **Mengapa Lolos Linter Standar:**
+  `overflow-x-scroll` adalah nilai CSS valid. Linter sintaksis tidak membedakan konsekuensi ergonomis antara `scroll` (rel scrollbar kaku permanen) dan `auto` (bergulir dinamis saat dibutuhkan) pada layar sentuh.
+- **Suspicious (Memaksa Scroll Horizontal Tanpa Batas Fluida):**
+  ```tsx
+  {/* Memaksa rel scrollbar kaku di layar sentuh mobile */}
+  <div className="overflow-x-scroll">
+    <div className="flex gap-4">
+      <div className="p-4 bg-card">Kartu 1</div>
+      <div className="p-4 bg-card">Kartu 2</div>
+    </div>
+  </div>
+  ```
+- **Compliant (Menggunakan overflow-x-auto dengan Batas Fluida Penuh):**
+  ```tsx
+  {/* Bergulir halus saat konten meluap tanpa rel scrollbar kaku permanen */}
+  <div className="w-full overflow-x-auto">
+    <div className="flex gap-4 min-w-max">
+      <div className="p-4 bg-card">Kartu 1</div>
+      <div className="p-4 bg-card">Kartu 2</div>
+    </div>
+  </div>
+  ```
+- **Engine:** L1 Syntax + L2 Token Geometry AST (`internal/rules/responsive/horizontal_overflow.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 2.8. `responsive.flex-child-overflow`
-- **Tujuan:** Mencegah anak flex (`flex child`) menyebabkan kontainer melebar melebihi lebar viewport karena `min-width: auto` default pada CSS Flexbox.
-- **Mengapa Lolos Linter Standar:** Perilaku `min-width: auto` pada flex items adalah salah satu gotcha paling membingungkan di CSS yang sama sekali tidak dapat dideteksi oleh linter sintaksis.
-- **In-Scope:** Elemen flex child yang memuat dynamic string panjang tanpa kelas peredam `min-w-0` dan `break-words`.
-- **Bad:**
+- **Design Rationale:** W3C CSS Flexible Box Layout Module Level 1 (Section 4.5: Implied Minimum Size of Flex Items).
+- **Konteks Realitas Mobile:**
+  Spesifikasi CSS Flexbox menetapkan bahwa nilai bawaan `min-width` untuk flex item adalah `auto`, bukan `0`. Akibatnya, anak langsung kontainer flex (`flex child`) tidak akan pernah mengecil lebih sempit daripada konten intrinsiknya. Jika anak flex memuat teks dinamis yang panjang, blok kode (`<code>`), atau kontainer anak yang lebar, flex item tersebut akan mengembang melebihi 100vw dan merobek kontainer induk serta layar ponsel. Penawar wajib gotcha ini adalah menyertakan `min-w-0` pada flex child yang memuat konten teks/dinamis.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen anak langsung dari kontainer flex ($P = \text{Parent}(E) \land \text{isFlexContainer}(P)$):
+  $$\text{hasPotentiallyOverflowingContent}(E) \land \neg \text{hasFlexChildMinBoundary}(E) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasFlexChildMinBoundary}$ memeriksa kehadiran utilitas peredam `min-w-0`, `overflow-hidden`, `w-0`, atau lebar statis yang aman.
+- **Mengapa Lolos Linter Standar:**
+  Perilaku `min-width: auto` pada flex items adalah gotcha spesifikasi layout CSS, bukan kesalahan sintaksis. Linter sintaksis murni tidak memodelkan hierarki parent-child flexbox.
+- **Suspicious (Flex Child Tanpa min-w-0 Mengembangkan Kontainer):**
   ```tsx
-  <div className="flex">
+  {/* Flex child akan melebar keluar layar jika teks atau kode panjang */}
+  <div className="flex items-center gap-4">
     <div className="w-full">
-      <code>{longDynamicString}</code>
+      <p className="truncate">{userDescription}</p>
     </div>
   </div>
   ```
-- **Good:**
+- **Compliant (Flex Child Dilindungi min-w-0):**
   ```tsx
-  <div className="flex">
-    <div className="min-w-0 w-full break-words">
-      <code>{longDynamicString}</code>
+  {/* min-w-0 meredam batas minimum flex child sehingga truncate berfungsi */}
+  <div className="flex items-center gap-4">
+    <div className="min-w-0 w-full">
+      <p className="truncate">{userDescription}</p>
     </div>
   </div>
   ```
-- **Engine:** JSX/TSX AST.
-- **Severity:** Warning.
+- **Engine:** L1 Syntax + L2 Relational AST (`internal/rules/responsive/flex_child_overflow.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 2.9. `responsive.image-overflow`
-- **Tujuan:** Menjamin elemen media tidak menyebabkan kebocoran horizontal saat dibuka di ponsel berlayar kecil.
-- **Mengapa Lolos Linter Standar:** Atribut `width={1200} height={800}` pada tag `<img>` adalah best practice untuk Core Web Vitals (mencegah CLS), tetapi jika lupa dipasangi CSS `max-w-full h-auto`, gambar akan menabrak keluar layar.
-- **In-Scope:** Tag `<img>`, `<Image>`, `<video>` dengan atribut dimensi besar tanpa kelas `max-w-full`.
-- **Bad:** `<img src={src} width={1200} height={800} />`
-- **Good:** `<img className="max-w-full h-auto" src={src} width={1200} height={800} />`
-- **Engine:** JSX/TSX AST.
-- **Severity:** Warning.
+- **Design Rationale:** HTML Living Standard (Embedded Media Elements) & Web.dev Responsive Media Principles.
+- **Konteks Realitas Mobile:**
+  Pengembang web modern menyematkan atribut dimensi eksplisit `width={1200} height={800}` pada tag `<img>`, `<video>`, atau `<svg>` untuk mencegah Cumulative Layout Shift (CLS) demi skor Core Web Vitals. Namun, tanpa aturan gaya responsif `max-w-full h-auto`, peramban akan merender gambar pada lebar piksel absolut atribut tersebut, menyebabkan media keluar dari layar ponsel selebar 360px dan memicu horizontal overflow parah.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen media $M \in \{ \text{"img"}, \text{"video"}, \text{"svg"}, \text{"picture"}, \text{"canvas"} \}$:
+  $$\text{hasLargeIntrinsicWidth}(M) \land \neg \text{hasResponsiveMediaScaling}(M) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasLargeIntrinsicWidth}$ mendeteksi atribut `width > 320` atau kelas lebar statis $> 320$px, dan $\text{hasResponsiveMediaScaling}$ memeriksa keberadaan kelas `max-w-full`, `w-full`, atau container query yang membatasi media.
+- **Mengapa Lolos Linter Standar:**
+  Atribut `width` dan `height` numerik justru merupakan rekomendasi linter SEO dan performa. Linter konvensional tidak memeriksa apakah aturan CSS pelindung fluida `max-w-full` hadir bersamaan.
+- **Suspicious (Media dengan Dimensi Besar Tanpa max-w-full):**
+  ```tsx
+  {/* Merobek viewport mobile karena dirender pada lebar fisik 1200px */}
+  <img src="/hero-desa.jpg" width={1200} height={800} alt="Pemandangan Desa" />
+  ```
+- **Compliant (Media Dilengkapi max-w-full h-auto):**
+  ```tsx
+  {/* Mempertahankan aspect-ratio tanpa melebihi batas layar mobile */}
+  <img className="max-w-full h-auto" src="/hero-desa.jpg" width={1200} height={800} alt="Pemandangan Desa" />
+  ```
+- **Engine:** L1 Syntax + L2 HTML/JSX Media AST (`internal/rules/responsive/image_overflow.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 2.10. `responsive.mobile-text-overflow`
-- **Tujuan:** Mencegah string teks panjang tanpa spasi (seperti URL, UUID, token hash, atau email) merobek layout mobile.
-- **Mengapa Lolos Linter Standar:** `{user.email}` adalah ekspresi JSX yang valid. Linter biasa tidak tahu bahwa teks dinamis tersebut dapat melebihi lebar kontainer jika tidak ada aturan word breaking.
-- **In-Scope:** Kontainer teks dengan `whitespace-nowrap` atau lebar terbatas tanpa `break-words` atau `truncate`.
-- **Engine:** JSX/TSX AST.
-- **Severity:** Warning.
+- **Design Rationale:** W3C CSS Text Module Level 3 & WCAG 2.2 SC 1.4.10 (Reflow - Level AA).
+- **Konteks Realitas Mobile:**
+  Data dinamis seperti URL, token otentikasi, hash transaksi, nomor rekening/IBAN, atau alamat surel sering kali tidak memuat karakter spasi. Pada layar ponsel berlebar 360px, mendeklarasikan `whitespace-nowrap` pada kontainer teks tanpa memotong teks (`truncate` atau `overflow-hidden`), atau menyematkan blok kode (`<code>`) tanpa pemenggalan kata (`break-all`, `break-words`) atau scroll wrapper, akan memaksa peramban memperluas lebar kontainer melampaui layar.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen teks atau blok kode $T$:
+  $$((\text{hasNowrap}(T) \land \neg \text{hasTextOverflowProtection}(T)) \lor (\text{isCodeBlock}(T) \land \neg \text{hasCodeWrapOrScroll}(T))) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasNowrap}$ mendeteksi `whitespace-nowrap`, $\text{hasTextOverflowProtection}$ mendeteksi `truncate`, `overflow-hidden`, `overflow-x-auto`, dan $\text{hasCodeWrapOrScroll}$ memeriksa `break-all`, `break-words`, atau ancestor horizontal scroll.
+- **Mengapa Lolos Linter Standar:**
+  `whitespace-nowrap` adalah kelas CSS valid. Linter standar tidak mengetahui apakah teks di dalamnya bersifat dinamis dan panjang.
+- **Suspicious (whitespace-nowrap Tanpa Truncate atau Scroll):**
+  ```tsx
+  {/* String panjang tanpa spasi merobek layout mobile */}
+  <div className="whitespace-nowrap text-sm text-foreground">
+    <span>Token Transaksi: {transactionHash}</span>
+  </div>
+  ```
+- **Compliant (Dilengkapi Pemotongan Teks Truncate atau Break):**
+  ```tsx
+  {/* Aman di layar sempit dengan pemotongan elipsis */}
+  <div className="whitespace-nowrap truncate text-sm text-foreground">
+    <span>Token Transaksi: {transactionHash}</span>
+  </div>
+  ```
+- **Engine:** L1 Syntax + L2 Text Geometry AST (`internal/rules/responsive/mobile_text_overflow.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
 
 ### 2.11. `responsive.desktop-only-content`
 - **Tujuan:** Mendeteksi aksi penting atau navigasi utama yang hanya tersedia di breakpoint desktop (`hidden md:flex`) tanpa alternatif di layar mobile.

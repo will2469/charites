@@ -9,7 +9,11 @@ The `responsive` category contains static analysis rules for code quality, archi
 | Rule ID | Severity | Summary | Full Specification | Status |
 | :--- | :---: | :--- | :--- | :---: |
 | `responsive.fixed-width-overflow` | `ERROR` | Detects static fixed container widths exceeding 320px that cause horizontal overflow on mobile viewports | [`responsive.fixed-width-overflow`](responsive.fixed-width-overflow) | `enabled` |
+| `responsive.flex-child-overflow` | `WARN` | Warns when a flex child containing text or dynamic content lacks min-w-0, causing min-width: auto container blowout | [`responsive.flex-child-overflow`](responsive.flex-child-overflow) | `enabled` |
+| `responsive.horizontal-overflow` | `WARN` | Warns when unconstrained overflow-x-scroll is declared without fluid width boundary or dynamic auto-scrolling | [`responsive.horizontal-overflow`](responsive.horizontal-overflow) | `enabled` |
+| `responsive.image-overflow` | `WARN` | Warns when media elements with large fixed dimensions lack responsive max-w-full scaling | [`responsive.image-overflow`](responsive.image-overflow) | `enabled` |
 | `responsive.missing-breakpoint` | `WARN` | Warns when multi-column grids or giant font sizes are declared on mobile baseline without responsive breakpoint modifiers | [`responsive.missing-breakpoint`](responsive.missing-breakpoint) | `enabled` |
+| `responsive.mobile-text-overflow` | `WARN` | Warns when whitespace-nowrap text or code blocks lack truncation, word breaking, or horizontal scroll wrappers | [`responsive.mobile-text-overflow`](responsive.mobile-text-overflow) | `enabled` |
 | `responsive.safe-area-missing` | `WARN` | Warns when bottom-docked fixed or sticky elements lack safe-area-inset-bottom padding for modern mobile home indicators | [`responsive.safe-area-missing`](responsive.safe-area-missing) | `enabled` |
 | `responsive.unwrapped-table-overflow` | `WARN` | Warns when an HTML table element lacks a responsive horizontal scroll wrapper (overflow-x-auto) or responsive display transformation | [`responsive.unwrapped-table-overflow`](responsive.unwrapped-table-overflow) | `enabled` |
 | `responsive.viewport-meta-missing` | `WARN` | Warns when <meta name="viewport"> is missing width=device-width or viewport-fit=cover | [`responsive.viewport-meta-missing`](responsive.viewport-meta-missing) | `enabled` |

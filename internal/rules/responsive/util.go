@@ -165,3 +165,144 @@ func hasDeviceWidth(content string) bool {
 func hasViewportFitCover(content string) bool {
 	return strings.Contains(content, "viewport-fit=cover")
 }
+
+func isFlexContainer(node *ir.Node) bool {
+	if node == nil || node.Type != ir.NodeElement {
+		return false
+	}
+	for _, cls := range node.Classes {
+		if hasBreakpointPrefix(cls) {
+			continue
+		}
+		if cls == "flex" || cls == "inline-flex" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasFlexChildMinBoundary(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, cls := range node.Classes {
+		switch cls {
+		case "min-w-0", "min-w-full", "overflow-hidden", "overflow-auto", "overflow-x-auto", "w-0":
+			return true
+		}
+		if strings.HasPrefix(cls, "w-") && !hasBreakpointPrefix(cls) {
+			if cls != "w-full" && cls != "w-auto" && !strings.Contains(cls, "screen") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasPotentiallyOverflowingContent(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, cls := range node.Classes {
+		if cls == "w-full" || cls == "flex-1" || cls == "truncate" {
+			return true
+		}
+	}
+	switch node.Tag {
+	case "p", "span", "code", "pre", "h1", "h2", "h3", "h4", "h5", "h6":
+		return true
+	}
+	for _, child := range node.Children {
+		if child == nil {
+			continue
+		}
+		switch child.Tag {
+		case "p", "span", "code", "pre", "h1", "h2", "h3", "h4", "h5", "h6":
+			return true
+		}
+		for _, cls := range child.Classes {
+			if cls == "truncate" || cls == "whitespace-nowrap" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isMediaTag(tag string) bool {
+	switch tag {
+	case "img", "video", "svg", "picture", "canvas", "Image":
+		return true
+	default:
+		return false
+	}
+}
+
+func extractMediaWidth(node *ir.Node) (int, bool) {
+	if node == nil {
+		return 0, false
+	}
+	for _, cls := range node.Classes {
+		if w, ok := extractStaticPixelWidth(cls); ok && w > 320 {
+			return w, true
+		}
+	}
+	if node.Attributes != nil {
+		if wStr, ok := node.Attributes["width"]; ok {
+			wStr = cleanAttrValue(wStr)
+			wStr = strings.TrimSuffix(wStr, "px")
+			if w, err := strconv.Atoi(wStr); err == nil && w > 320 {
+				return w, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func hasResponsiveMediaScaling(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, cls := range node.Classes {
+		switch cls {
+		case "max-w-full", "max-w-[100%]", "w-full":
+			return true
+		}
+	}
+	return false
+}
+
+func hasNowrap(classes []string) bool {
+	for _, cls := range classes {
+		if hasBreakpointPrefix(cls) {
+			continue
+		}
+		if cls == "whitespace-nowrap" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasTextOverflowProtection(classes []string) bool {
+	for _, cls := range classes {
+		switch cls {
+		case "truncate", "overflow-hidden", "overflow-x-auto", "overflow-auto", "break-words", "break-all":
+			return true
+		}
+	}
+	return false
+}
+
+func hasCodeWrapOrScroll(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, cls := range node.Classes {
+		switch cls {
+		case "break-all", "break-words", "whitespace-normal", "whitespace-pre-wrap":
+			return true
+		}
+	}
+	return hasScrollContainerAncestor(node)
+}

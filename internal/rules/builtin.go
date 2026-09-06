@@ -84,6 +84,12 @@ var (
 	_ Rule = (*responsive.ViewportUnitLeakRule)(nil)
 	_ Rule = (*responsive.SafeAreaMissingRule)(nil)
 	_ Rule = (*responsive.ViewportMetaMissingRule)(nil)
+
+	// responsive Wave 2 (Overflow Integrity & Flex Geometry)
+	_ Rule = (*responsive.HorizontalOverflowRule)(nil)
+	_ Rule = (*responsive.FlexChildOverflowRule)(nil)
+	_ Rule = (*responsive.ImageOverflowRule)(nil)
+	_ Rule = (*responsive.MobileTextOverflowRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -201,6 +207,12 @@ func builtinRules() []Rule {
 		responsive.NewViewportUnitLeakRule(),
 		responsive.NewSafeAreaMissingRule(),
 		responsive.NewViewportMetaMissingRule(),
+
+		// responsive Wave 2 (Overflow Integrity & Flex Geometry)
+		responsive.NewHorizontalOverflowRule(),
+		responsive.NewFlexChildOverflowRule(),
+		responsive.NewImageOverflowRule(),
+		responsive.NewMobileTextOverflowRule(),
 	}
 }
 
