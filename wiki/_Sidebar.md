@@ -106,6 +106,17 @@
 </details>
 
 <details open>
+<summary><b>Lcp</b> (4 rules)</summary>
+
+* [**Lcp Overview**](lcp)
+* [`lcp.lazy-loaded-lcp-image`](lcp.lazy-loaded-lcp-image)
+* [`lcp.missing-lcp-image-preload`](lcp.missing-lcp-image-preload)
+* [`lcp.undiscoverable-lcp-image`](lcp.undiscoverable-lcp-image)
+* [`lcp.unhinted-lcp-image-priority`](lcp.unhinted-lcp-image-priority)
+
+</details>
+
+<details open>
 <summary><b>Mobile</b> (5 rules)</summary>
 
 * [**Mobile Overview**](mobile)

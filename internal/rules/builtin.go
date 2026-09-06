@@ -6,6 +6,7 @@ import (
 	"github.com/will2469/charites/internal/rules/cls"
 	"github.com/will2469/charites/internal/rules/ergonomy"
 	"github.com/will2469/charites/internal/rules/inp"
+	"github.com/will2469/charites/internal/rules/lcp"
 	"github.com/will2469/charites/internal/rules/mobile"
 	"github.com/will2469/charites/internal/rules/pwa"
 	"github.com/will2469/charites/internal/rules/responsive"
@@ -176,6 +177,12 @@ var (
 	_ Rule = (*inp.LargeInteractionLayoutScopeRule)(nil)
 	_ Rule = (*inp.MissingTouchActionRule)(nil)
 	_ Rule = (*inp.ExpensiveStyleMutationRule)(nil)
+
+	// lcp Wave 1 (Hero Media Discovery & Prioritization)
+	_ Rule = (*lcp.LazyLoadedLCPImageRule)(nil)
+	_ Rule = (*lcp.UnhintedLCPImagePriorityRule)(nil)
+	_ Rule = (*lcp.UndiscoverableLCPImageRule)(nil)
+	_ Rule = (*lcp.MissingLCPImagePreloadRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -382,6 +389,12 @@ func builtinRules() []Rule {
 		inp.NewLargeInteractionLayoutScopeRule(),
 		inp.NewMissingTouchActionRule(),
 		inp.NewExpensiveStyleMutationRule(),
+
+		// lcp Wave 1 (Hero Media Discovery & Prioritization)
+		lcp.NewLazyLoadedLCPImageRule(),
+		lcp.NewUnhintedLCPImagePriorityRule(),
+		lcp.NewUndiscoverableLCPImageRule(),
+		lcp.NewMissingLCPImagePreloadRule(),
 	}
 }
 
