@@ -468,3 +468,154 @@ func hasClassicalViewportHeight(classes []string) bool {
 	}
 	return false
 }
+
+func isFixedBottom(classes []string) bool {
+	hasFixed := false
+	hasBottom := false
+	for _, cls := range classes {
+		if hasBreakpointPrefix(cls) {
+			continue
+		}
+		switch cls {
+		case "fixed", "sticky":
+			hasFixed = true
+		case "bottom-0", "inset-x-0":
+			hasBottom = true
+		}
+	}
+	return hasFixed && hasBottom
+}
+
+func hasScrollableRegionAncestor(node *ir.Node) bool {
+	curr := node
+	for curr != nil {
+		for _, cls := range curr.Classes {
+			switch cls {
+			case "overflow-y-auto", "overflow-y-scroll", "overflow-auto", "overflow-scroll":
+				return true
+			}
+		}
+		curr = curr.Parent
+	}
+	return false
+}
+
+func hasFormInputDescendant(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for child := range node.Walk() {
+		if child != nil && child.Type == ir.NodeElement {
+			if child.Tag == "input" || child.Tag == "textarea" || child.Tag == "select" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasExcessiveMobilePadding(classes []string) bool {
+	hasNarrowMaxW := false
+	hasHugePadding := false
+	hasModeratePadding := false
+
+	for _, cls := range classes {
+		if hasBreakpointPrefix(cls) {
+			continue
+		}
+		if cls == "max-w-xs" || cls == "max-w-64" || cls == "max-w-72" {
+			hasNarrowMaxW = true
+		}
+		switch {
+		case isHugePaddingClass(cls):
+			hasHugePadding = true
+		case isModeratePaddingClass(cls):
+			hasModeratePadding = true
+		}
+	}
+	return hasHugePadding || (hasNarrowMaxW && hasModeratePadding)
+}
+
+func isHugePaddingClass(cls string) bool {
+	switch cls {
+	case "px-16", "px-20", "px-24", "px-28", "px-32",
+		"p-16", "p-20", "p-24", "p-28", "p-32":
+		return true
+	default:
+		return false
+	}
+}
+
+func isModeratePaddingClass(cls string) bool {
+	switch cls {
+	case "px-10", "px-12", "px-14", "p-10", "p-12", "p-14":
+		return true
+	default:
+		return false
+	}
+}
+
+func hasExcessiveGridMinColumn(classes []string) (string, bool) {
+	for _, cls := range classes {
+		if hasBreakpointPrefix(cls) {
+			continue
+		}
+		if !strings.HasPrefix(cls, "grid-cols-[") {
+			continue
+		}
+		if isOverlargeGridClass(cls) {
+			return cls, true
+		}
+	}
+	return "", false
+}
+
+func isOverlargeGridClass(cls string) bool {
+	lower := strings.ToLower(cls)
+	if !strings.Contains(lower, "minmax(") {
+		return false
+	}
+	overlargeSizes := [...]string{
+		"350px", "360px", "375px", "380px", "400px", "450px", "500px", "600px",
+		"22rem", "24rem", "25rem", "28rem", "30rem", "32rem",
+	}
+	for _, sz := range overlargeSizes {
+		if strings.Contains(lower, sz) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasConflictingAspectRatio(classes []string) bool {
+	hasAspect := false
+	hasRigidHeight := false
+	hasFluidWidth := false
+
+	for _, cls := range classes {
+		if hasBreakpointPrefix(cls) {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(cls, "aspect-"):
+			hasAspect = true
+		case isRigidHeightClass(cls):
+			hasRigidHeight = true
+		case cls == "w-full" || cls == "max-w-full":
+			hasFluidWidth = true
+		}
+	}
+	return hasAspect && hasRigidHeight && !hasFluidWidth
+}
+
+func isRigidHeightClass(cls string) bool {
+	if strings.HasPrefix(cls, "h-[") && strings.HasSuffix(cls, "px]") {
+		return true
+	}
+	switch cls {
+	case "h-64", "h-72", "h-80", "h-96":
+		return true
+	default:
+		return false
+	}
+}

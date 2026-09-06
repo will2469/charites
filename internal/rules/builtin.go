@@ -95,6 +95,12 @@ var (
 	_ Rule = (*responsive.DesktopOnlyContentRule)(nil)
 	_ Rule = (*responsive.MobileDensityOverloadRule)(nil)
 	_ Rule = (*responsive.DynamicViewportInconsistencyRule)(nil)
+
+	// responsive Wave 4 (Viewport Dynamics, Keyboard Obstruction & Grid Physics)
+	_ Rule = (*responsive.KeyboardObstructionRule)(nil)
+	_ Rule = (*responsive.ContainerOverconstraintRule)(nil)
+	_ Rule = (*responsive.GridMinColumnRule)(nil)
+	_ Rule = (*responsive.AspectRatioOverflowRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -223,6 +229,12 @@ func builtinRules() []Rule {
 		responsive.NewDesktopOnlyContentRule(),
 		responsive.NewMobileDensityOverloadRule(),
 		responsive.NewDynamicViewportInconsistencyRule(),
+
+		// responsive Wave 4 (Viewport Dynamics, Keyboard Obstruction & Grid Physics)
+		responsive.NewKeyboardObstructionRule(),
+		responsive.NewContainerOverconstraintRule(),
+		responsive.NewGridMinColumnRule(),
+		responsive.NewAspectRatioOverflowRule(),
 	}
 }
 

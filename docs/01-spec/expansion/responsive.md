@@ -42,14 +42,11 @@ flowchart TD
         R13["responsive.dynamic-viewport-inconsistency (Pencampuran vh/dvh tak konsisten)"]
     end
 
-    subgraph W4 ["Wave 4: Viewport Dynamics & Keyboard Obstruction (1 Rule)"]
+    subgraph W4 ["Wave 4: Viewport Dynamics, Keyboard Obstruction, Grid & Container Physics (4 Rules)"]
         R14["responsive.keyboard-obstruction (Virtual keyboard menutupi input/submit)"]
-    end
-
-    subgraph W5 ["Wave 5: Grid & Container Physics (3 Rules)"]
-        R16["responsive.container-overconstraint (Konten terjepit < 280px usable)"]
-        R17["responsive.grid-min-column (minmax grid terlalu besar untuk mobile)"]
-        R18["responsive.aspect-ratio-overflow (Rasio aspek media fixed tak responsif)"]
+        R15["responsive.container-overconstraint (Konten terjepit < 280px usable)"]
+        R16["responsive.grid-min-column (minmax grid terlalu besar untuk mobile)"]
+        R17["responsive.aspect-ratio-overflow (Rasio aspek media fixed tak responsif)"]
     end
 ```
 
@@ -497,29 +494,135 @@ flowchart TD
 - **Severity:** `warning`.
 - **Autofix:** No.
 
-### 2.16. `responsive.container-overconstraint`
-- **Tujuan:** Mendeteksi kombinasi constraint lebar yang menyebabkan area konten menjadi terlalu sempit di mobile ($< 280$px usable width).
-- **Mengapa Lolos Linter Standar:** Mengombinasikan `w-full max-w-xs px-10` sah di Tailwind. Hanya komputasi spasial yang dapat mendeteksi bahwa pada layar 360px, padding 80px menyisakan area usable yang tidak layak.
-- **Engine:** Token Geometry AST.
-- **Severity:** Advisory.
+---
 
-### 2.17. `responsive.grid-min-column`
-- **Tujuan:** Mencegah CSS grid menghasilkan horizontal overflow karena `minmax()` dengan nilai minimum kaku yang melebihi lebar layar smartphone.
-- **Mengapa Lolos Linter Standar:** `grid-cols-[repeat(auto-fit,minmax(400px,1fr))]` adalah CSS valid. Linter biasa tidak tahu bahwa 400px lebih lebar dari layar iPhone SE (375px) atau Android standar (360px).
-- **Bad:** `<div className="grid grid-cols-[repeat(auto-fit,minmax(400px,1fr))]">`
-- **Good:** `<div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))]">`
-- **Engine:** CSS/Tailwind AST.
-- **Severity:** Warning.
-
-### 2.18. `responsive.aspect-ratio-overflow`
-- **Tujuan:** Mencegah rasio aspek media kaku menghasilkan tinggi yang tak terkendali atau overflow pada viewport sempit.
-- **Mengapa Lolos Linter Standar:** Nilai aspect ratio statis valid secara CSS, namun memerlukan responsive boundary saat container menyusut.
-- **Engine:** JSX/TSX AST.
-- **Severity:** Warning.
+## 2.14. `responsive.keyboard-obstruction`
+- **Design Rationale:** WCAG 2.2 Guideline 2.1 (Keyboard Accessible), Material Design 3 Mobile Form Guidelines, & iOS Human Interface Guidelines.
+- **Konteks Realitas Mobile:**
+  Saat pengguna mengetuk input formulir pada ponsel cerdas, keyboard perangkat lunak virtual muncul dari bawah layar dan memakan 40% hingga 50% area pandang aktif. Elemen formulir dengan `fixed bottom-0` atau `sticky bottom-0` akan terpancang menutupi bidang input atau tombol kirim jika formulir tidak dibungkus dalam kontainer yang dapat digulir secara vertikal (`overflow-y-auto`).
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen formulir $F$:
+  $$\text{hasFixedBottom}(E) \land \text{inForm}(E) \land \text{hasInputs}(F) \land \neg\text{hasScrollContainer}(E) \implies \text{Violation (Warn)}$$
+- **Mengapa Lolos Linter Standar:**
+  Menyematkan tombol submit `fixed bottom-0` sah secara sintaksis CSS/HTML. Linter konvensional tidak menganalisis dampak kenaikan keyboard virtual mobile terhadap oklusi input formulir.
+- **Suspicious (Tombol Submit Fixed Bottom Tanpa Kontainer Scroll):**
+  ```tsx
+  <form className="h-screen flex flex-col justify-between">
+    <div className="p-4 space-y-4">
+      <input type="text" placeholder="Nama Lengkap" />
+      <input type="email" placeholder="Alamat Surel" />
+      <textarea placeholder="Pesan Anda" />
+    </div>
+    <div className="fixed bottom-0 inset-x-0 p-4 bg-surface border-t">
+      <button type="submit" className="w-full bg-primary text-white py-3 rounded">Kirim</button>
+    </div>
+  </form>
+  ```
+- **Compliant (Area Input Fleksibel dengan Scroll Vertikal):**
+  ```tsx
+  <form className="h-screen flex flex-col">
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <input type="text" placeholder="Nama Lengkap" />
+      <input type="email" placeholder="Alamat Surel" />
+      <textarea placeholder="Pesan Anda" />
+    </div>
+    <div className="p-4 bg-surface border-t">
+      <button type="submit" className="w-full bg-primary text-white py-3 rounded">Kirim</button>
+    </div>
+  </form>
+  ```
+- **Engine:** L1 Syntax + L2 Form Hierarchy AST (`internal/rules/responsive/keyboard_obstruction.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
 
 ---
 
-## 3. Ringkasan Matriks Rule `responsive.*` (18 Aturan Non-Redundan)
+## 2.15. `responsive.container-overconstraint`
+- **Design Rationale:** WCAG 2.2 SC 1.4.10 (Reflow - Level AA) & Responsive Web Design Usable Width Baseline (320px - 360px).
+- **Konteks Realitas Mobile:**
+  Pada layar ponsel sempit (360px), padding horizontal yang berlebihan seperti `px-16` (64px tiap sisi = 128px total) atau `px-20` mengurangi lebar area baca aktif menjadi hanya 232px. Jika dikombinasikan dengan batasan lebar sempit seperti `max-w-xs`, konten menjadi sangat terjepit, memicu pemotongan teks atau baris kata tunggal yang merusak keterbacaan.
+- **Invariant (Predikat AST):**
+  Untuk setiap kontainer $C$:
+  $$\text{hasExcessiveMobilePadding}(C) \land \neg\text{hasBreakpointPrefix}(C) \implies \text{Violation (Warn)}$$
+- **Mengapa Lolos Linter Standar:**
+  Mengombinasikan `container mx-auto px-20` sepenuhnya sah di Tailwind CSS. Linter standar tidak memperhitungkan sisa ruang fisik layar pada viewport mobile 360px.
+- **Suspicious (Padding Horizontal Ekstrem di Baseline Mobile):**
+  ```tsx
+  <div className="container mx-auto px-20 py-8 bg-surface">
+    <h1 className="text-2xl font-bold">Judul Halaman Warga</h1>
+    <p>Deskripsi layanan kependudukan desa.</p>
+  </div>
+  ```
+- **Compliant (Padding Fluida Dimulai dari Mobile-First):**
+  ```tsx
+  <div className="container mx-auto px-4 md:px-16 py-8 bg-surface">
+    <h1 className="text-2xl font-bold">Judul Halaman Warga</h1>
+    <p>Deskripsi layanan kependudukan desa.</p>
+  </div>
+  ```
+- **Engine:** L1 Token Spatial Geometry AST (`internal/rules/responsive/container_overconstraint.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
+
+## 2.16. `responsive.grid-min-column`
+- **Design Rationale:** W3C CSS Grid Layout Module Level 1 (The minmax() Function) & WCAG 2.2 SC 1.4.10 (Reflow - Level AA).
+- **Konteks Realitas Mobile:**
+  Pola umum grid auto-fit kartu seperti `grid-cols-[repeat(auto-fit,minmax(400px,1fr))]` menetapkan batas minimum kolom sebesar 400px. Karena 400px melebihi lebar layar fisik ponsel (360px) dan ambang batas minimum WCAG (320px), tata letak grid akan meluber keluar batas layar secara horizontal, memicu horizontal scrollbar di seluruh halaman mobile.
+- **Invariant (Predikat AST):**
+  Untuk setiap kelas grid $G$:
+  $$\text{isUnclampedMinmaxExceedingMobile}(G) \land \neg\text{hasBreakpointPrefix}(G) \implies \text{Violation (Warn)}$$
+- **Mengapa Lolos Linter Standar:**
+  Sintaks arbitrary Tailwind `grid-cols-[repeat(auto-fit,minmax(400px,1fr))]` sepenuhnya valid secara sintaksis CSS. Linter biasa tidak memahami dimensi fisik layar tempat antarmuka dirender.
+- **Suspicious (Grid Minmax Kaku Melebihi Lebar Layar Ponsel):**
+  ```tsx
+  <div className="grid grid-cols-[repeat(auto-fit,minmax(400px,1fr))] gap-4">
+    <div className="card">Kartu Layanan 1</div>
+    <div className="card">Kartu Layanan 2</div>
+  </div>
+  ```
+- **Compliant (Minmax Dijepit dengan min(100%, ...) atau Ber-Breakpoint):**
+  ```tsx
+  <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-4">
+    <div className="card">Kartu Layanan 1</div>
+    <div className="card">Kartu Layanan 2</div>
+  </div>
+  ```
+- **Engine:** L1 Syntax + L2 Token Parameter AST (`internal/rules/responsive/grid_min_column.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
+
+## 2.17. `responsive.aspect-ratio-overflow`
+- **Design Rationale:** W3C CSS Box Sizing Module Level 4 (The aspect-ratio Property) & Responsive Media Best Practices.
+- **Konteks Realitas Mobile:**
+  Properti CSS `aspect-ratio` menghitung dimensi yang belum ditentukan berdasarkan dimensi yang ada. Ketika elemen menentukan rasio `aspect-video` (16/9) dan menetapkan tinggi statis kaku `h-96` (384px) tanpa batas lebar fluida (`w-full` atau `max-w-full`), peramban menghitung lebar menjadi $384 \times (16/9) \approx 682\text{px}$. Pada ponsel 360px, ini langsung memicu ledakan horizontal ke samping.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen $E$:
+  $$\text{hasAspectRatio}(E) \land \text{hasRigidHeight}(E) \land \neg\text{hasFluidWidth}(E) \implies \text{Violation (Warn)}$$
+- **Mengapa Lolos Linter Standar:**
+  Menetapkan `aspect-video h-96` sepenuhnya sah di Tailwind CSS. Linter biasa tidak mengevaluasi implikasi kalkulasi aspek rasio terhadap lebar derived pada layar kecil.
+- **Suspicious (Aspek Rasio Dipasangkan dengan Tinggi Kaku):**
+  ```tsx
+  <div className="aspect-video h-96 bg-black rounded-lg">
+    <video src="/hero.mp4" controls />
+  </div>
+  ```
+- **Compliant (Lebar Fluida dengan Tinggi Diturunkan Alami):**
+  ```tsx
+  <div className="w-full aspect-video bg-black rounded-lg">
+    <video src="/hero.mp4" controls className="w-full h-full object-cover" />
+  </div>
+  ```
+- **Engine:** L1 Syntax + L2 Token Property AST (`internal/rules/responsive/aspect_ratio_overflow.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
+
+## 3. Ringkasan Matriks Rule `responsive.*` (17 Aturan Non-Redundan)
 
 | Rule ID | Fokus Invarian | Mengapa Tidak Tertangkap Linter Biasa | Severity | Engine Target |
 |---|---|---|---|---|
@@ -537,7 +640,7 @@ flowchart TD
 | `responsive.mobile-density-overload` | Toolbar > 4 tombol tanpa collapse | Meletakkan banyak button sah di HTML, tapi berdesakan di HP | warning | JSX/TSX AST |
 | `responsive.dynamic-viewport-inconsistency` | Hierarki viewport unit bentrok | Linter biasa tidak membandingkan unit parent vs child | warning | Relational AST |
 | `responsive.keyboard-obstruction` | Submit fixed menutupi input aktif | Linter tidak menganalisis kenaikan virtual keyboard | warning | JSX/TSX AST |
-| `responsive.container-overconstraint` | Konten terjepit < 280px | Butuh kalkulasi total lebar dikurangi padding | advisory | Token Geometry AST |
+| `responsive.container-overconstraint` | Konten terjepit < 280px | Butuh kalkulasi total lebar dikurangi padding | warning | Token Geometry AST |
 | `responsive.grid-min-column` | minmax grid kaku > lebar ponsel | CSS minmax 400px sah secara sintaksis, jebol di layar 360px | warning | CSS/Tailwind AST |
 | `responsive.aspect-ratio-overflow` | Rasio aspek media tak responsif | Aspek rasio statis tidak memperhitungkan viewport sempit | warning | JSX/TSX AST |
 
