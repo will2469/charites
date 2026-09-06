@@ -65,6 +65,7 @@ flowchart TD
 | `pwa` | 10 | [`pwa`](pwa) |
 | `responsive` | 17 | [`responsive`](responsive) |
 | `theme` | 32 | [`theme`](theme) |
+| `ux` | 4 | [`ux`](ux) |
 
 ---
 
@@ -168,6 +169,10 @@ flowchart TD
 | `theme.token-source-drift` | `theme` | `ERROR` | Detects hardcoded color values bypassing the single source of truth design token pipeline | [`theme.token-source-drift`](theme.token-source-drift) |
 | `theme.unlayered-token-definition` | `theme` | `ERROR` | Detects CSS custom property definitions declared outside @layer theme or @layer base | [`theme.unlayered-token-definition`](theme.unlayered-token-definition) |
 | `theme.unpaired-dark-variant` | `theme` | `WARN` | Detects one-sided dark theme variant declarations causing severe contrast collisions | [`theme.unpaired-dark-variant`](theme.unpaired-dark-variant) |
+| `ux.camouflaged-link` | `ux` | `WARN` | Warns when inline prose links rely solely on color without persistent underline or non-color affordance | [`ux.camouflaged-link`](ux.camouflaged-link) |
+| `ux.competing-primary-cta` | `ux` | `WARN` | Warns when an action group or interactive container contains more than one primary call-to-action button | [`ux.competing-primary-cta`](ux.competing-primary-cta) |
+| `ux.nav-overflow-chunking` | `ux` | `WARN` | Warns when a navigation landmark contains more than 7 direct navigation links without chunking mechanisms | [`ux.nav-overflow-chunking`](ux.nav-overflow-chunking) |
+| `ux.spacing-inversion` | `ux` | `WARN` | Warns when child element intra-spacing exceeds parent gap or when space-y conflicts with child mt margin in Tailwind v3 | [`ux.spacing-inversion`](ux.spacing-inversion) |
 
 ---
 

@@ -8,6 +8,7 @@ import (
 	"github.com/will2469/charites/internal/rules/pwa"
 	"github.com/will2469/charites/internal/rules/responsive"
 	"github.com/will2469/charites/internal/rules/theme"
+	"github.com/will2469/charites/internal/rules/ux"
 )
 
 // Invariant static compile-time check: seluruh rule wajib mengimplementasikan interface Rule.
@@ -101,6 +102,12 @@ var (
 	_ Rule = (*responsive.ContainerOverconstraintRule)(nil)
 	_ Rule = (*responsive.GridMinColumnRule)(nil)
 	_ Rule = (*responsive.AspectRatioOverflowRule)(nil)
+
+	// ux Wave 1 (Spatial Hierarchy, Navigation Chunking & CTA Clarity)
+	_ Rule = (*ux.SpacingInversionRule)(nil)
+	_ Rule = (*ux.NavOverflowChunkingRule)(nil)
+	_ Rule = (*ux.CompetingPrimaryCTARule)(nil)
+	_ Rule = (*ux.CamouflagedLinkRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -235,6 +242,12 @@ func builtinRules() []Rule {
 		responsive.NewContainerOverconstraintRule(),
 		responsive.NewGridMinColumnRule(),
 		responsive.NewAspectRatioOverflowRule(),
+
+		// ux Wave 1 (Spatial Hierarchy, Navigation Chunking & CTA Clarity)
+		ux.NewSpacingInversionRule(),
+		ux.NewNavOverflowChunkingRule(),
+		ux.NewCompetingPrimaryCTARule(),
+		ux.NewCamouflagedLinkRule(),
 	}
 }
 
