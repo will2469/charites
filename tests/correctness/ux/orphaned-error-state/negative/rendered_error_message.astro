@@ -1,0 +1,14 @@
+---
+// Negative fixture: Input with onBlur setting error, rendered with aria-errormessage
+---
+<div class="field">
+  <input
+    type="text"
+    id="user-input"
+    aria-invalid="true"
+    aria-errormessage="user-error"
+    onblur="if(!value) setValidationError('Wajib diisi');"
+    class="input"
+  />
+  <span id="user-error" class="text-sm text-destructive">Wajib diisi</span>
+</div>

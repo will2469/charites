@@ -1,0 +1,11 @@
+---
+// Positive fixture: Text input calling axios on input event without debounce
+---
+<div class="field">
+  <input
+    type="text"
+    placeholder="Cari pengguna..."
+    oninput="axios.get('/api/users?q=' + this.value)"
+    class="input"
+  />
+</div>

@@ -114,6 +114,12 @@ var (
 	_ Rule = (*ux.RadioOverchoiceRule)(nil)
 	_ Rule = (*ux.MonolithicFormBloatRule)(nil)
 	_ Rule = (*ux.MissingAutofillRule)(nil)
+
+	// ux Wave 3 (State Transparency, Defensive UI & Feedback Visibility)
+	_ Rule = (*ux.EmptyCollectionUnhandledRule)(nil)
+	_ Rule = (*ux.DisabledControlNoExplanationRule)(nil)
+	_ Rule = (*ux.OrphanedErrorStateRule)(nil)
+	_ Rule = (*ux.UnthrottledInputHandlerRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -260,6 +266,12 @@ func builtinRules() []Rule {
 		ux.NewRadioOverchoiceRule(),
 		ux.NewMonolithicFormBloatRule(),
 		ux.NewMissingAutofillRule(),
+
+		// ux Wave 3 (State Transparency, Defensive UI & Feedback Visibility)
+		ux.NewEmptyCollectionUnhandledRule(),
+		ux.NewDisabledControlNoExplanationRule(),
+		ux.NewOrphanedErrorStateRule(),
+		ux.NewUnthrottledInputHandlerRule(),
 	}
 }
 

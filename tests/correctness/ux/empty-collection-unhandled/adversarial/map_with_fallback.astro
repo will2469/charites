@@ -1,0 +1,7 @@
+---
+// Adversarial fixture: Dynamic list with emptyFallback attribute prop
+const items = ["A", "B", "C"];
+---
+<div class="container">
+  <List items={items.map(x => x)} emptyFallback="Tidak ada data" />
+</div>

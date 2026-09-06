@@ -1,0 +1,8 @@
+---
+// Adversarial fixture: Checkbox change triggering direct fetch (keystroke throttling does not apply to toggle checkboxes)
+---
+<input
+  type="checkbox"
+  id="agree"
+  onchange="fetch('/api/terms/accept', { method: 'POST' })"
+/>

@@ -10,12 +10,16 @@ The `ux` category contains static analysis rules for code quality, architectural
 | :--- | :---: | :--- | :--- | :---: |
 | `ux.camouflaged-link` | `WARN` | Warns when inline prose links rely solely on color without persistent underline or non-color affordance | [`ux.camouflaged-link`](ux.camouflaged-link) | `enabled` |
 | `ux.competing-primary-cta` | `WARN` | Warns when an action group or interactive container contains more than one primary call-to-action button | [`ux.competing-primary-cta`](ux.competing-primary-cta) | `enabled` |
+| `ux.disabled-control-no-explanation` | `WARN` | Enforces feedforward explanation for disabled interactive controls to prevent user dead ends | [`ux.disabled-control-no-explanation`](ux.disabled-control-no-explanation) | `enabled` |
+| `ux.empty-collection-unhandled` | `INFO` | Advises handling empty collection state when mapping dynamic items to avoid zero-state blindness | [`ux.empty-collection-unhandled`](ux.empty-collection-unhandled) | `enabled` |
 | `ux.missing-autofill` | `WARN` | Enforces W3C Living Standard autocomplete attributes on personal identity, credential, and payment form inputs (Tesler's Law) | [`ux.missing-autofill`](ux.missing-autofill) | `enabled` |
 | `ux.monolithic-form-bloat` | `WARN` | Warns when a monolithic form contains excessive unchunked inputs (> 9 total or > 7 per chunk), violating Cognitive Load Theory | [`ux.monolithic-form-bloat`](ux.monolithic-form-bloat) | `enabled` |
 | `ux.nav-overflow-chunking` | `WARN` | Warns when a navigation landmark contains more than 7 direct navigation links without chunking mechanisms | [`ux.nav-overflow-chunking`](ux.nav-overflow-chunking) | `enabled` |
+| `ux.orphaned-error-state` | `WARN` | Flags error state updates in event handlers that lack corresponding UI error presentation elements | [`ux.orphaned-error-state`](ux.orphaned-error-state) | `enabled` |
 | `ux.radio-overchoice` | `WARN` | Warns when radio groups present excessive flat options (> 7) without filtering or combobox grouping, violating Hick-Hyman Law | [`ux.radio-overchoice`](ux.radio-overchoice) | `enabled` |
 | `ux.spacing-inversion` | `WARN` | Warns when child element intra-spacing exceeds parent gap or when space-y conflicts with child mt margin in Tailwind v3 | [`ux.spacing-inversion`](ux.spacing-inversion) | `enabled` |
 | `ux.unconventional-home-link` | `WARN` | Enforces Jakob's Law by ensuring header logo/brand identity links to the root home page ('/') | [`ux.unconventional-home-link`](ux.unconventional-home-link) | `enabled` |
+| `ux.unthrottled-input-handler` | `WARN` | Flags text input handlers that trigger unthrottled network calls directly on keystrokes | [`ux.unthrottled-input-handler`](ux.unthrottled-input-handler) | `enabled` |
 
 ---
 ## How the Ux Analysis Pipeline Works

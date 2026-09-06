@@ -769,3 +769,242 @@ func matchAutofillPattern(typeClean string, id string) (string, string, bool) {
 
 	return "", "", false
 }
+
+// hasFeedforwardExplanation memeriksa apakah kontrol interaktif memiliki petunjuk feedforward saat terkunci.
+func hasFeedforwardExplanation(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	if hasDirectFeedforwardAttributes(node) || isInsideTooltipWrapper(node) {
+		return true
+	}
+	return hasFeedforwardSibling(node)
+}
+
+func hasDirectFeedforwardAttributes(node *ir.Node) bool {
+	if desc, ok := getAttrCaseInsensitive(node, "aria-describedby", "aria-description"); ok && cleanAttrValue(desc) != "" {
+		return true
+	}
+	if title, ok := getAttrCaseInsensitive(node, "title", "tooltip", "data-tooltip"); ok && cleanAttrValue(title) != "" {
+		return true
+	}
+	return false
+}
+
+func isInsideTooltipWrapper(node *ir.Node) bool {
+	curr := node.Parent
+	for curr != nil {
+		tagLower := strings.ToLower(curr.Tag)
+		if strings.Contains(tagLower, "tooltip") || strings.Contains(tagLower, "popover") {
+			return true
+		}
+		curr = curr.Parent
+	}
+	return false
+}
+
+func hasFeedforwardSibling(node *ir.Node) bool {
+	if node.Parent == nil {
+		return false
+	}
+	describedBy, _ := getAttrCaseInsensitive(node, "aria-describedby")
+	describedByClean := cleanAttrValue(describedBy)
+
+	for _, sib := range node.Parent.Children {
+		if sib == node || sib.Type != ir.NodeElement {
+			continue
+		}
+		if isExplanationSibling(sib, describedByClean) {
+			return true
+		}
+	}
+	return false
+}
+
+func isExplanationSibling(sib *ir.Node, describedBy string) bool {
+	if describedBy != "" {
+		if id, ok := getAttrCaseInsensitive(sib, "id"); ok && cleanAttrValue(id) == describedBy {
+			return true
+		}
+	}
+	if role, ok := getAttrCaseInsensitive(sib, "role"); ok {
+		r := cleanAttrValue(role)
+		if r == "status" || r == "alert" || r == "tooltip" {
+			return true
+		}
+	}
+	for _, cls := range sib.Classes {
+		base := strings.ToLower(StripVariantsOnlyBase(cls))
+		if strings.Contains(base, "hint") || strings.Contains(base, "helper") || strings.Contains(base, "desc") ||
+			strings.Contains(base, "feedback") || strings.Contains(base, "muted") || strings.Contains(base, "alert") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasErrorPresentationInSubtree memeriksa apakah pohon komponen menyediakan elemen presentasi error.
+func hasErrorPresentationInSubtree(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for n := range node.Walk() {
+		if isErrorDisplayNode(n) || hasErrorTextOrBindingNode(n) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasErrorTextOrBindingNode(n *ir.Node) bool {
+	if n.Type == ir.NodeText {
+		txt := strings.ToLower(n.RawClasses)
+		if strings.Contains(txt, "error") || strings.Contains(txt, "kesalahan") || strings.Contains(txt, "gagal") {
+			return true
+		}
+	}
+	for attrName, attrVal := range n.Attributes {
+		if isEventHandlerOrActionAttr(attrName) {
+			continue
+		}
+		nameLower := strings.ToLower(attrName)
+		valLower := strings.ToLower(attrVal)
+		if strings.Contains(nameLower, "error") || strings.Contains(nameLower, "errormessage") {
+			return true
+		}
+		if strings.Contains(valLower, "error") || strings.Contains(valLower, "iserror") || strings.Contains(valLower, "haserror") {
+			return true
+		}
+	}
+	return false
+}
+
+func isEventHandlerOrActionAttr(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasPrefix(lower, "on") || lower == "action" || lower == "validate" || lower == "onsubmit"
+}
+
+func isErrorDisplayNode(n *ir.Node) bool {
+	if n.Type != ir.NodeElement {
+		return false
+	}
+	if role, ok := getAttrCaseInsensitive(n, "role"); ok {
+		r := cleanAttrValue(role)
+		if r == "alert" || r == "status" {
+			return true
+		}
+	}
+	if _, ok := getAttrCaseInsensitive(n, "aria-invalid", "aria-errormessage", "error", "errormessage", "iserror", "isinvalid"); ok {
+		return true
+	}
+	tagLower := strings.ToLower(n.Tag)
+	if strings.Contains(tagLower, "error") || tagLower == "alert" || tagLower == "formerror" {
+		return true
+	}
+	for _, cls := range n.Classes {
+		base := strings.ToLower(StripVariantsOnlyBase(cls))
+		if strings.Contains(base, "error") || strings.Contains(base, "destructive") || strings.Contains(base, "invalid") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasEmptyStateInSubtree memeriksa apakah ada penanganan cabang state kosong di dalam subtree atau sibling.
+func hasEmptyStateInSubtree(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	if hasEmptyStateAttributes(node) {
+		return true
+	}
+	for n := range node.Walk() {
+		if isEmptyStateIndicatorNode(n) {
+			return true
+		}
+	}
+	if node.Parent != nil {
+		for _, sib := range node.Parent.Children {
+			if sib != node && isEmptyStateIndicatorNode(sib) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasEmptyStateAttributes(node *ir.Node) bool {
+	for k, v := range node.Attributes {
+		kLower := strings.ToLower(k)
+		if strings.Contains(kLower, "empty") || strings.Contains(kLower, "fallback") {
+			return true
+		}
+		vLower := strings.ToLower(v)
+		if strings.Contains(vLower, "length === 0") || strings.Contains(vLower, "length == 0") ||
+			strings.Contains(vLower, "length > 0") || strings.Contains(vLower, "isempty") {
+			return true
+		}
+	}
+	return false
+}
+
+func isEmptyStateIndicatorNode(n *ir.Node) bool {
+	if n.Type == ir.NodeElement {
+		tagLower := strings.ToLower(n.Tag)
+		if strings.Contains(tagLower, "empty") || strings.Contains(tagLower, "nodata") ||
+			strings.Contains(tagLower, "noresult") || tagLower == "fallback" {
+			return true
+		}
+		for _, cls := range n.Classes {
+			base := strings.ToLower(StripVariantsOnlyBase(cls))
+			if strings.Contains(base, "empty") || strings.Contains(base, "zero-state") || strings.Contains(base, "no-data") {
+				return true
+			}
+		}
+	}
+	if n.Type == ir.NodeText {
+		txt := strings.ToLower(n.RawClasses)
+		if strings.Contains(txt, "belum ada") || strings.Contains(txt, "tidak ada") ||
+			strings.Contains(txt, "kosong") || strings.Contains(txt, "no data") || strings.Contains(txt, "no items") {
+			return true
+		}
+	}
+	return false
+}
+
+// detectUnthrottledNetworkCall memeriksa apakah handler event memicu network API langsung tanpa debounce/throttle.
+func detectUnthrottledNetworkCall(handler string) (string, bool) {
+	lower := strings.ToLower(cleanAttrValue(handler))
+	if lower == "" {
+		return "", false
+	}
+
+	if isThrottledOrDebounced(lower) {
+		return "", false
+	}
+
+	return findDirectNetworkCall(lower)
+}
+
+func isThrottledOrDebounced(handler string) bool {
+	keywords := [...]string{"debounce", "throttle", "debounced", "throttled", "timeout"}
+	for _, kw := range keywords {
+		if strings.Contains(handler, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func findDirectNetworkCall(handler string) (string, bool) {
+	networkCalls := [...]string{
+		"fetch(", "axios.", "http.", "api.get(", "api.post(", "api.put(", "api.delete(",
+		"query(", "fetchsuggestions(", "searchapi(", "request(",
+	}
+	for _, call := range networkCalls {
+		if strings.Contains(handler, call) {
+			return call, true
+		}
+	}
+	return "", false
+}
