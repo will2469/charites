@@ -49,6 +49,17 @@
 </details>
 
 <details open>
+<summary><b>Cls</b> (4 rules)</summary>
+
+* [**Cls Overview**](cls)
+* [`cls.unconstrained-carousel`](cls.unconstrained-carousel)
+* [`cls.unreserved-ad-container`](cls.unreserved-ad-container)
+* [`cls.unsized-embed-frame`](cls.unsized-embed-frame)
+* [`cls.unsized-image`](cls.unsized-image)
+
+</details>
+
+<details open>
 <summary><b>Ergonomy</b> (4 rules)</summary>
 
 * [**Ergonomy Overview**](ergonomy)

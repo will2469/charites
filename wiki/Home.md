@@ -87,6 +87,7 @@ flowchart TD
 | :--- | :---: | :--- |
 | `a11y` | 16 | [`a11y`](a11y) |
 | `browser` | 12 | [`browser`](browser) |
+| `cls` | 4 | [`cls`](cls) |
 | `ergonomy` | 4 | [`ergonomy`](ergonomy) |
 | `mobile` | 5 | [`mobile`](mobile) |
 | `pwa` | 10 | [`pwa`](pwa) |
@@ -128,6 +129,10 @@ flowchart TD
 | `browser.scrollbar-vendor-incomplete` | `browser` | `WARN` | Enforces bidirectional cross-engine scrollbar styling pairing between WebKit pseudo-elements and W3C standard properties | [`browser.scrollbar-vendor-incomplete`](browser.scrollbar-vendor-incomplete) |
 | `browser.user-agent-sniffing` | `browser` | `WARN` | Flags conditional branching based on navigator.userAgent string sniffing and enforces W3C capability/feature detection | [`browser.user-agent-sniffing`](browser.user-agent-sniffing) |
 | `browser.webkit-only-api` | `browser` | `WARN` | Flags direct invocation of WebKit-prefixed legacy APIs without standard W3C equivalents or graceful fallbacks | [`browser.webkit-only-api`](browser.webkit-only-api) |
+| `cls.unconstrained-carousel` | `cls` | `WARN` | Warns when carousel or slider containers lack bounded height or slide aspect-ratio constraints | [`cls.unconstrained-carousel`](cls.unconstrained-carousel) |
+| `cls.unreserved-ad-container` | `cls` | `WARN` | Warns when dynamic ad containers lack reserved vertical dimensions or initial skeleton placeholders | [`cls.unreserved-ad-container`](cls.unreserved-ad-container) |
+| `cls.unsized-embed-frame` | `cls` | `WARN` | Warns when embedded media frames lack explicit dimensions or an aspect-ratio container wrapper | [`cls.unsized-embed-frame`](cls.unsized-embed-frame) |
+| `cls.unsized-image` | `cls` | `WARN` | Warns when image elements lack explicit dimensions, aspect-ratio, or Tailwind box sizing | [`cls.unsized-image`](cls.unsized-image) |
 | `ergonomy.bottom-nav-thumb-unreachable` | `ergonomy` | `INFO` | Warns when primary call-to-action (CTA) buttons are exclusively located in the top mobile header without reachable alternatives in the bottom thumb zone | [`ergonomy.bottom-nav-thumb-unreachable`](ergonomy.bottom-nav-thumb-unreachable) |
 | `ergonomy.gesture-without-touch-action` | `ergonomy` | `WARN` | Enforces CSS touch-action declaration on elements with custom gesture swipe/drag event handlers | [`ergonomy.gesture-without-touch-action`](ergonomy.gesture-without-touch-action) |
 | `ergonomy.missing-inputmode-keyboard` | `ergonomy` | `INFO` | Enforces contextual virtual keyboard inputmode and type attributes on mobile form inputs (Tesler's Law) | [`ergonomy.missing-inputmode-keyboard`](ergonomy.missing-inputmode-keyboard) |

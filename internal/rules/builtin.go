@@ -3,6 +3,7 @@ package rules
 import (
 	"github.com/will2469/charites/internal/rules/a11y"
 	"github.com/will2469/charites/internal/rules/browser"
+	"github.com/will2469/charites/internal/rules/cls"
 	"github.com/will2469/charites/internal/rules/ergonomy"
 	"github.com/will2469/charites/internal/rules/mobile"
 	"github.com/will2469/charites/internal/rules/pwa"
@@ -126,6 +127,12 @@ var (
 	_ Rule = (*ux.UnboundedAsyncFlagRule)(nil)
 	_ Rule = (*ux.DestructiveActionUnconfirmedRule)(nil)
 	_ Rule = (*ux.SilentCatchSwallowRule)(nil)
+
+	// cls Wave 1 (Rendering Box Reservation, Embed Frames, Ad Slots & Slider Physics)
+	_ Rule = (*cls.UnsizedImageRule)(nil)
+	_ Rule = (*cls.UnsizedEmbedFrameRule)(nil)
+	_ Rule = (*cls.UnreservedAdContainerRule)(nil)
+	_ Rule = (*cls.UnconstrainedCarouselRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -284,6 +291,12 @@ func builtinRules() []Rule {
 		ux.NewUnboundedAsyncFlagRule(),
 		ux.NewDestructiveActionUnconfirmedRule(),
 		ux.NewSilentCatchSwallowRule(),
+
+		// cls Wave 1 (Rendering Box Reservation, Embed Frames, Ad Slots & Slider Physics)
+		cls.NewUnsizedImageRule(),
+		cls.NewUnsizedEmbedFrameRule(),
+		cls.NewUnreservedAdContainerRule(),
+		cls.NewUnconstrainedCarouselRule(),
 	}
 }
 
