@@ -218,7 +218,12 @@ func (e *extractor) parseJSXAttributes(tagName string, savedPos, startLine, star
 
 		c := e.src[e.pos]
 		if c == '{' {
+			start := e.pos
 			e.skipBraceExpression()
+			expr := strings.TrimSpace(string(e.src[start:e.pos]))
+			if strings.HasPrefix(expr, "{...") {
+				res.attrs[expr] = expr
+			}
 			continue
 		}
 

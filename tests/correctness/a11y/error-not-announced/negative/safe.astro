@@ -1,0 +1,13 @@
+---
+// Negative fixture: input with aria-invalid connected to aria-describedby
+---
+<div>
+  <input
+    id="username"
+    aria-invalid="true"
+    aria-describedby="username-error"
+    class="border-red-500"
+    placeholder="Username"
+  />
+  <p id="username-error">Username is taken</p>
+</div>

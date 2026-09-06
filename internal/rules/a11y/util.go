@@ -284,3 +284,89 @@ func ParseFontSizeToPx(baseClass string) (float64, bool) {
 
 	return 0, false
 }
+
+// CleanAttr membersihkan pembungkus kutip, kurung kurawal ekspresi JSX, dan spasi dari nilai atribut mentah.
+func CleanAttr(val string) string {
+	return strings.Trim(strings.TrimSpace(val), "\"'`{}")
+}
+
+// FindRoot menelusuri pointer Parent ke atas hingga menemukan node akar dokumen.
+func FindRoot(node *ir.Node) *ir.Node {
+	if node == nil {
+		return nil
+	}
+	curr := node
+	for curr.Parent != nil {
+		curr = curr.Parent
+	}
+	return curr
+}
+
+// HasEnclosingLabel memeriksa apakah node dibungkus di dalam elemen <label> pada rantai ancestor.
+func HasEnclosingLabel(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	curr := node.Parent
+	for curr != nil {
+		if curr.Type == ir.NodeElement && strings.EqualFold(curr.Tag, "label") {
+			return true
+		}
+		curr = curr.Parent
+	}
+	return false
+}
+
+// HasDocumentElementWithID memeriksa apakah terdapat elemen dalam dokumen dengan id yang cocok.
+func HasDocumentElementWithID(root *ir.Node, targetID string) bool {
+	if root == nil || targetID == "" {
+		return false
+	}
+
+	cleanTarget := CleanAttr(targetID)
+	// Jika target id adalah ekspresi dinamis (mengandung operasi JS/interpolasi), jangan beri false-positive
+	if strings.ContainsAny(cleanTarget, "${}+()?:") {
+		return true
+	}
+
+	for n := range root.Walk() {
+		if n.Type != ir.NodeElement || n.Attributes == nil {
+			continue
+		}
+		if rawID, ok := n.Attributes["id"]; ok {
+			if CleanAttr(rawID) == cleanTarget {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// HasAssociatedLabel memeriksa apakah kontrol input memiliki label asosiasi,
+// baik melalui elemen pembungkus <label> maupun deklarasi <label htmlFor="id"> di dokumen.
+func HasAssociatedLabel(root, inputNode *ir.Node, inputID string) bool {
+	if HasEnclosingLabel(inputNode) {
+		return true
+	}
+
+	cleanID := CleanAttr(inputID)
+	if cleanID == "" || root == nil {
+		return false
+	}
+
+	for n := range root.Walk() {
+		if n.Type != ir.NodeElement || !strings.EqualFold(n.Tag, "label") || n.Attributes == nil {
+			continue
+		}
+
+		if forVal, ok := n.Attributes["htmlFor"]; ok && CleanAttr(forVal) == cleanID {
+			return true
+		}
+		if forVal, ok := n.Attributes["for"]; ok && CleanAttr(forVal) == cleanID {
+			return true
+		}
+	}
+
+	return false
+}

@@ -376,3 +376,270 @@ func TestMissingFocusRingRule(t *testing.T) {
 		})
 	}
 }
+
+func TestErrorNotAnnouncedRule(t *testing.T) {
+	rule := a11y.NewErrorNotAnnouncedRule()
+
+	tests := []struct {
+		name        string
+		node        *ir.Node
+		shouldFault bool
+	}{
+		{
+			name: "aria_invalid_without_describedby_violation",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "input",
+				Attributes: map[string]string{"aria-invalid": "true"},
+			},
+			shouldFault: true,
+		},
+		{
+			name: "aria_invalid_with_describedby_safe",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "input",
+				Attributes: map[string]string{
+					"aria-invalid":     "true",
+					"aria-describedby": "email-error",
+				},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "aria_invalid_false_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "input",
+				Attributes: map[string]string{"aria-invalid": "false"},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "no_aria_invalid_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "input",
+				Attributes: map[string]string{"id": "username"},
+			},
+			shouldFault: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			diags := rule.Evaluate(tc.node)
+			if tc.shouldFault && len(diags) == 0 {
+				t.Errorf("expected violation for %s, got 0", tc.name)
+			}
+			if !tc.shouldFault && len(diags) > 0 {
+				t.Errorf("unexpected violation for %s: %+v", tc.name, diags)
+			}
+		})
+	}
+}
+
+func TestPlaceholderAsLabelRule(t *testing.T) {
+	rule := a11y.NewPlaceholderAsLabelRule()
+
+	rootWithLabel := &ir.Node{
+		Type: ir.NodeElement,
+		Tag:  "form",
+		Children: []*ir.Node{
+			{
+				Type:       ir.NodeElement,
+				Tag:        "label",
+				Attributes: map[string]string{"htmlFor": "email"},
+			},
+			{
+				Type:       ir.NodeElement,
+				Tag:        "input",
+				Attributes: map[string]string{"id": "email", "placeholder": "nama@domain.com"},
+			},
+		},
+	}
+	rootWithLabel.Children[0].Parent = rootWithLabel
+	rootWithLabel.Children[1].Parent = rootWithLabel
+
+	tests := []struct {
+		name        string
+		node        *ir.Node
+		shouldFault bool
+	}{
+		{
+			name: "bare_placeholder_without_label_violation",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "input",
+				Attributes: map[string]string{"placeholder": "Enter email"},
+			},
+			shouldFault: true,
+		},
+		{
+			name: "input_with_aria_label_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "input",
+				Attributes: map[string]string{"placeholder": "Search...", "aria-label": "Search"},
+			},
+			shouldFault: false,
+		},
+		{
+			name:        "input_with_associated_label_in_tree_safe",
+			node:        rootWithLabel.Children[1],
+			shouldFault: false,
+		},
+		{
+			name: "input_enclosed_in_label_safe",
+			node: func() *ir.Node {
+				parentLabel := &ir.Node{Type: ir.NodeElement, Tag: "label"}
+				childInput := &ir.Node{
+					Type:       ir.NodeElement,
+					Tag:        "input",
+					Attributes: map[string]string{"placeholder": "Search"},
+					Parent:     parentLabel,
+				}
+				parentLabel.Children = []*ir.Node{childInput}
+				return childInput
+			}(),
+			shouldFault: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			diags := rule.Evaluate(tc.node)
+			if tc.shouldFault && len(diags) == 0 {
+				t.Errorf("expected violation for %s, got 0", tc.name)
+			}
+			if !tc.shouldFault && len(diags) > 0 {
+				t.Errorf("unexpected violation for %s: %+v", tc.name, diags)
+			}
+		})
+	}
+}
+
+func TestLabelMissingControlRule(t *testing.T) {
+	rule := a11y.NewLabelMissingControlRule()
+
+	docWithInput := &ir.Node{
+		Type: ir.NodeElement,
+		Tag:  "form",
+		Children: []*ir.Node{
+			{
+				Type:       ir.NodeElement,
+				Tag:        "label",
+				Attributes: map[string]string{"htmlFor": "user_id"},
+			},
+			{
+				Type:       ir.NodeElement,
+				Tag:        "input",
+				Attributes: map[string]string{"id": "userId"}, // Typo! user_id != userId
+			},
+			{
+				Type:       ir.NodeElement,
+				Tag:        "label",
+				Attributes: map[string]string{"htmlFor": "userId"}, // Matching!
+			},
+		},
+	}
+	for _, ch := range docWithInput.Children {
+		ch.Parent = docWithInput
+	}
+
+	tests := []struct {
+		name        string
+		node        *ir.Node
+		shouldFault bool
+	}{
+		{
+			name:        "label_htmlfor_mismatch_violation",
+			node:        docWithInput.Children[0],
+			shouldFault: true,
+		},
+		{
+			name:        "label_htmlfor_matching_safe",
+			node:        docWithInput.Children[2],
+			shouldFault: false,
+		},
+		{
+			name: "label_wrapping_input_without_htmlfor_safe",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "label",
+			},
+			shouldFault: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			diags := rule.Evaluate(tc.node)
+			if tc.shouldFault && len(diags) == 0 {
+				t.Errorf("expected violation for %s, got 0", tc.name)
+			}
+			if !tc.shouldFault && len(diags) > 0 {
+				t.Errorf("unexpected violation for %s: %+v", tc.name, diags)
+			}
+		})
+	}
+}
+
+func TestFormInputMissingNameRule(t *testing.T) {
+	rule := a11y.NewFormInputMissingNameRule()
+
+	tests := []struct {
+		name        string
+		node        *ir.Node
+		shouldFault bool
+	}{
+		{
+			name: "input_without_name_or_id_violation",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "input",
+				Attributes: map[string]string{"type": "text"},
+			},
+			shouldFault: true,
+		},
+		{
+			name: "input_with_name_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "input",
+				Attributes: map[string]string{"name": "email"},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "input_with_id_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "input",
+				Attributes: map[string]string{"id": "email"},
+			},
+			shouldFault: false,
+		},
+		{
+			name: "submit_button_input_safe",
+			node: &ir.Node{
+				Type:       ir.NodeElement,
+				Tag:        "input",
+				Attributes: map[string]string{"type": "submit"},
+			},
+			shouldFault: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			diags := rule.Evaluate(tc.node)
+			if tc.shouldFault && len(diags) == 0 {
+				t.Errorf("expected violation for %s, got 0", tc.name)
+			}
+			if !tc.shouldFault && len(diags) > 0 {
+				t.Errorf("unexpected violation for %s: %+v", tc.name, diags)
+			}
+		})
+	}
+}

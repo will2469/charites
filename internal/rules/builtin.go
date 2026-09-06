@@ -38,6 +38,12 @@ var (
 	_ Rule = (*a11y.InputIOSZoomHazardRule)(nil)
 	_ Rule = (*a11y.InputCrampedPaddingRule)(nil)
 	_ Rule = (*a11y.MissingFocusRingRule)(nil)
+
+	// a11y Wave 2 (Form Relational Integrity & Error Announcements)
+	_ Rule = (*a11y.ErrorNotAnnouncedRule)(nil)
+	_ Rule = (*a11y.PlaceholderAsLabelRule)(nil)
+	_ Rule = (*a11y.LabelMissingControlRule)(nil)
+	_ Rule = (*a11y.FormInputMissingNameRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -81,6 +87,12 @@ func builtinRules() []Rule {
 		a11y.NewInputIOSZoomHazardRule(),
 		a11y.NewInputCrampedPaddingRule(),
 		a11y.NewMissingFocusRingRule(),
+
+		// a11y Wave 2 (Form Relational Integrity & Error Announcements)
+		a11y.NewErrorNotAnnouncedRule(),
+		a11y.NewPlaceholderAsLabelRule(),
+		a11y.NewLabelMissingControlRule(),
+		a11y.NewFormInputMissingNameRule(),
 	}
 }
 
