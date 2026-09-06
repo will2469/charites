@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "charites": {
+      "command": "charites",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}
