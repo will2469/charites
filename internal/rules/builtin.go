@@ -108,6 +108,12 @@ var (
 	_ Rule = (*ux.NavOverflowChunkingRule)(nil)
 	_ Rule = (*ux.CompetingPrimaryCTARule)(nil)
 	_ Rule = (*ux.CamouflagedLinkRule)(nil)
+
+	// ux Wave 2 (Information Architecture, Mental Models & Form Load)
+	_ Rule = (*ux.UnconventionalHomeLinkRule)(nil)
+	_ Rule = (*ux.RadioOverchoiceRule)(nil)
+	_ Rule = (*ux.MonolithicFormBloatRule)(nil)
+	_ Rule = (*ux.MissingAutofillRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -248,6 +254,12 @@ func builtinRules() []Rule {
 		ux.NewNavOverflowChunkingRule(),
 		ux.NewCompetingPrimaryCTARule(),
 		ux.NewCamouflagedLinkRule(),
+
+		// ux Wave 2 (Information Architecture, Mental Models & Form Load)
+		ux.NewUnconventionalHomeLinkRule(),
+		ux.NewRadioOverchoiceRule(),
+		ux.NewMonolithicFormBloatRule(),
+		ux.NewMissingAutofillRule(),
 	}
 }
 

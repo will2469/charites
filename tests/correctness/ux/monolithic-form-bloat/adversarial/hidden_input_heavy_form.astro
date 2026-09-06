@@ -1,0 +1,23 @@
+---
+// Adversarial fixture: 12 hidden inputs for CSRF/tokens, but only 3 visible inputs (total interactive = 3 <= 9)
+---
+<form class="space-y-4">
+  <input type="hidden" name="_csrf" value="token123" />
+  <input type="hidden" name="_timestamp" value="1690000000" />
+  <input type="hidden" name="_origin" value="web" />
+  <input type="hidden" name="_version" value="2.0" />
+  <input type="hidden" name="ref_source" value="campaign_a" />
+  <input type="hidden" name="utm_source" value="google" />
+  <input type="hidden" name="utm_medium" value="cpc" />
+  <input type="hidden" name="session_id" value="sess_abc" />
+  <input type="hidden" name="device_fingerprint" value="fp_99" />
+  <input type="hidden" name="locale" value="id" />
+  <input type="hidden" name="client_uuid" value="uuid_123" />
+  <input type="hidden" name="retry_count" value="0" />
+
+  <input type="text" name="nama" placeholder="Nama" />
+  <input type="email" name="email" placeholder="Email" />
+  <input type="tel" name="telepon" placeholder="Nomor Telepon" />
+
+  <button type="submit">Submit</button>
+</form>

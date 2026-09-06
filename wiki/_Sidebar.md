@@ -152,13 +152,17 @@
 </details>
 
 <details open>
-<summary><b>Ux</b> (4 rules)</summary>
+<summary><b>Ux</b> (8 rules)</summary>
 
 * [**Ux Overview**](ux)
 * [`ux.camouflaged-link`](ux.camouflaged-link)
 * [`ux.competing-primary-cta`](ux.competing-primary-cta)
+* [`ux.missing-autofill`](ux.missing-autofill)
+* [`ux.monolithic-form-bloat`](ux.monolithic-form-bloat)
 * [`ux.nav-overflow-chunking`](ux.nav-overflow-chunking)
+* [`ux.radio-overchoice`](ux.radio-overchoice)
 * [`ux.spacing-inversion`](ux.spacing-inversion)
+* [`ux.unconventional-home-link`](ux.unconventional-home-link)
 
 </details>
 

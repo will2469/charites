@@ -415,3 +415,357 @@ func hasPersistentUnderlineAffordance(classes []string) bool {
 
 	return hasUnderline
 }
+
+// cleanAttrValue membersihkan nilai atribut (lowercase, trim whitespace dan tanda kutip).
+func cleanAttrValue(v string) string {
+	return strings.Trim(strings.TrimSpace(strings.ToLower(v)), "\"'`{}")
+}
+
+// getAttrCaseInsensitive mengambil nilai atribut secara case-insensitive untuk beberapa kemungkinan nama key.
+func getAttrCaseInsensitive(node *ir.Node, names ...string) (string, bool) {
+	if node == nil || node.Attributes == nil {
+		return "", false
+	}
+	for _, target := range names {
+		for k, v := range node.Attributes {
+			if strings.EqualFold(k, target) {
+				return v, true
+			}
+		}
+	}
+	return "", false
+}
+
+// isInsideHeaderBanner mengecek apakah node berada di dalam <header> atau elemen ber-role "banner".
+func isInsideHeaderBanner(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	curr := node.Parent
+	for curr != nil {
+		if curr.Type == ir.NodeElement {
+			if curr.Tag == "header" {
+				return true
+			}
+			if role, ok := getAttrCaseInsensitive(curr, "role"); ok && strings.ToLower(role) == "banner" {
+				return true
+			}
+		}
+		curr = curr.Parent
+	}
+	return false
+}
+
+// findEnclosingHeaderLink mencari tautan (<a> atau <Link>) pembungkus terdekat di dalam header.
+func findEnclosingHeaderLink(node *ir.Node) *ir.Node {
+	if node == nil {
+		return nil
+	}
+	curr := node.Parent
+	for curr != nil {
+		if curr.Type == ir.NodeElement {
+			// Berhenti jika sudah mencapai batas header
+			if curr.Tag == "header" {
+				break
+			}
+			if role, ok := getAttrCaseInsensitive(curr, "role"); ok && strings.ToLower(role) == "banner" {
+				break
+			}
+			if curr.Tag == "a" || strings.HasSuffix(curr.Tag, "Link") {
+				return curr
+			}
+			if role, ok := getAttrCaseInsensitive(curr, "role"); ok && strings.ToLower(role) == "link" {
+				return curr
+			}
+		}
+		curr = curr.Parent
+	}
+	return nil
+}
+
+// isBrandIdentityElement mengecek apakah elemen merepresentasikan identitas merek atau logo situs.
+func isBrandIdentityElement(node *ir.Node) bool {
+	if node == nil || node.Type != ir.NodeElement {
+		return false
+	}
+	if isNonBrandControlTag(node.Tag) {
+		return false
+	}
+	return isExplicitBrandTag(node.Tag) || hasBrandAttribute(node) || hasBrandClassOrID(node)
+}
+
+func isNonBrandControlTag(tag string) bool {
+	switch tag {
+	case "button", "input", "select", "textarea":
+		return true
+	default:
+		return false
+	}
+}
+
+func isExplicitBrandTag(tag string) bool {
+	tagLower := strings.ToLower(tag)
+	return tagLower == "logo" || tagLower == "sitelogo" || tagLower == "brandlogo" || tagLower == "brand"
+}
+
+func hasBrandAttribute(node *ir.Node) bool {
+	if alt, ok := getAttrCaseInsensitive(node, "alt"); ok {
+		altLower := strings.ToLower(alt)
+		if strings.Contains(altLower, "logo") || strings.Contains(altLower, "brand") {
+			return true
+		}
+	}
+	if label, ok := getAttrCaseInsensitive(node, "aria-label"); ok {
+		lblLower := strings.ToLower(label)
+		if strings.Contains(lblLower, "logo") || strings.Contains(lblLower, "brand") {
+			return true
+		}
+	}
+	if node.Tag == "img" || strings.HasSuffix(node.Tag, "Image") || node.Tag == "svg" {
+		if src, ok := getAttrCaseInsensitive(node, "src"); ok {
+			srcLower := strings.ToLower(src)
+			if strings.Contains(srcLower, "logo") || strings.Contains(srcLower, "brand") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasBrandClassOrID(node *ir.Node) bool {
+	for _, cls := range node.Classes {
+		base := StripVariantsOnlyBase(cls)
+		baseLower := strings.ToLower(base)
+		if baseLower == "logo" || baseLower == "brand" || strings.HasPrefix(baseLower, "logo-") ||
+			strings.HasSuffix(baseLower, "-logo") || strings.Contains(baseLower, "brand-logo") ||
+			baseLower == "site-logo" || baseLower == "site-title" || baseLower == "navbar-brand" {
+			return true
+		}
+	}
+	if id, ok := getAttrCaseInsensitive(node, "id"); ok {
+		idLower := strings.ToLower(id)
+		if strings.Contains(idLower, "logo") || strings.Contains(idLower, "brand") {
+			return true
+		}
+	}
+	return false
+}
+
+// isNormalizedRootHref memeriksa apakah target tautan mengarah ke root home page ("/").
+func isNormalizedRootHref(href string) bool {
+	clean := cleanAttrValue(href)
+	return isBasicRootHref(clean) || isLocalizedRootHref(clean)
+}
+
+func isBasicRootHref(clean string) bool {
+	if clean == "/" || clean == "" || clean == "./" {
+		return true
+	}
+	if strings.HasPrefix(clean, "/#") || strings.HasPrefix(clean, "/?") {
+		return true
+	}
+	if strings.HasPrefix(clean, "./#") || strings.HasPrefix(clean, "./?") {
+		return true
+	}
+	return false
+}
+
+func isLocalizedRootHref(clean string) bool {
+	if !strings.HasPrefix(clean, "/") {
+		return false
+	}
+	remainder := clean[1:]
+	slashIdx := strings.IndexByte(remainder, '/')
+	queryIdx := strings.IndexAny(remainder, "?#")
+
+	segment := remainder
+	if slashIdx != -1 {
+		segment = remainder[:slashIdx]
+	} else if queryIdx != -1 {
+		segment = remainder[:queryIdx]
+	}
+
+	if len(segment) != 2 || segment[0] < 'a' || segment[0] > 'z' || segment[1] < 'a' || segment[1] > 'z' {
+		return false
+	}
+	if slashIdx == -1 {
+		return true
+	}
+	sub := remainder[slashIdx+1:]
+	return sub == "" || strings.HasPrefix(sub, "?") || strings.HasPrefix(sub, "#")
+}
+
+// isFormChunkingContainer mengecek apakah elemen berfungsi sebagai kontainer pembatas form (fieldset, step, tab).
+func isFormChunkingContainer(node *ir.Node) bool {
+	if node == nil || node.Type != ir.NodeElement {
+		return false
+	}
+	if node.Tag == "fieldset" {
+		return true
+	}
+	tagLower := strings.ToLower(node.Tag)
+	switch tagLower {
+	case "step", "stepper", "wizardstep", "wizard", "tabpanel", "tabs", "tablist", "accordionitem", "accordion":
+		return true
+	}
+	if role, ok := getAttrCaseInsensitive(node, "role"); ok {
+		rLower := strings.ToLower(role)
+		if rLower == "group" || rLower == "tabpanel" {
+			return true
+		}
+	}
+	return false
+}
+
+// isInteractiveFormField mengecek apakah elemen adalah field form interaktif.
+// Mengembalikan isField dan logicalGroupKey (jika radio dengan nama tertentu, untuk dikelompokkan).
+func isInteractiveFormField(node *ir.Node) (bool, string) {
+	if node == nil || node.Type != ir.NodeElement {
+		return false, ""
+	}
+
+	tagLower := strings.ToLower(node.Tag)
+
+	if tagLower == "button" || strings.HasSuffix(tagLower, "button") {
+		return false, ""
+	}
+
+	if tagLower == "input" || node.Tag == "Input" {
+		typeVal, _ := getAttrCaseInsensitive(node, "type")
+		typeClean := cleanAttrValue(typeVal)
+		switch typeClean {
+		case "hidden", "submit", "button", "reset", "image":
+			return false, ""
+		case "radio":
+			nameVal, _ := getAttrCaseInsensitive(node, "name")
+			nameClean := cleanAttrValue(nameVal)
+			if nameClean == "" {
+				nameClean = "__unnamed_radio__"
+			}
+			return true, "radio:" + nameClean
+		default:
+			return true, ""
+		}
+	}
+
+	if tagLower == "select" || node.Tag == "Select" {
+		return true, ""
+	}
+
+	if tagLower == "textarea" || node.Tag == "Textarea" {
+		return true, ""
+	}
+
+	if node.Tag == "Combobox" || node.Tag == "DatePicker" {
+		return true, ""
+	}
+
+	return false, ""
+}
+
+// detectAutofillCategory mendeteksi apakah input meminta data pribadi/PII, kredensial, atau pembayaran.
+func detectAutofillCategory(node *ir.Node) (category string, expectedToken string, isSevere bool, identifier string) {
+	if node == nil || node.Type != ir.NodeElement {
+		return "", "", false, ""
+	}
+
+	tagLower := strings.ToLower(node.Tag)
+	if tagLower != "input" && node.Tag != "Input" && tagLower != "textarea" && node.Tag != "Textarea" {
+		return "", "", false, ""
+	}
+
+	typeVal, _ := getAttrCaseInsensitive(node, "type")
+	typeClean := cleanAttrValue(typeVal)
+	if typeClean == "" {
+		typeClean = "text"
+	}
+	if isNonTextualInputType(typeClean) {
+		return "", "", false, ""
+	}
+
+	id := extractSemanticFieldID(node)
+	if isSearchOrFilterField(typeClean, id) {
+		return "", "", false, ""
+	}
+
+	cat, token, severe := matchAutofillPattern(typeClean, id)
+	return cat, token, severe, id
+}
+
+func isNonTextualInputType(typeClean string) bool {
+	switch typeClean {
+	case "hidden", "submit", "button", "reset", "checkbox", "radio", "file", "image", "color", "range", "date", "datetime-local", "time", "month", "week":
+		return true
+	default:
+		return false
+	}
+}
+
+func extractSemanticFieldID(node *ir.Node) string {
+	for _, key := range [...]string{"name", "id", "placeholder", "aria-label"} {
+		if val, ok := getAttrCaseInsensitive(node, key); ok {
+			c := cleanAttrValue(val)
+			if c != "" {
+				return c
+			}
+		}
+	}
+	return ""
+}
+
+func isSearchOrFilterField(typeClean string, id string) bool {
+	if typeClean == "search" {
+		return true
+	}
+	for _, kw := range [...]string{"search", "cari", "filter", "query", "keyword"} {
+		if strings.Contains(id, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchAutofillPattern(typeClean string, id string) (string, string, bool) {
+	// 1. Password
+	if typeClean == "password" || strings.Contains(id, "password") || strings.Contains(id, "passwd") || strings.Contains(id, "sandi") {
+		return "password", "current-password", true
+	}
+
+	// 2. Payment / Credit Card
+	for _, kw := range [...]string{"cc-", "cardnumber", "card-number", "card_number", "cardnum", "cvv", "cvc", "ccexp", "exp-date", "exp_date"} {
+		if strings.Contains(id, kw) {
+			return "payment", "cc-number", true
+		}
+	}
+
+	// 3. Email
+	if typeClean == "email" || strings.Contains(id, "email") || strings.Contains(id, "surel") {
+		return "email", "email", false
+	}
+
+	// 4. Phone
+	if typeClean == "tel" || strings.Contains(id, "phone") || strings.Contains(id, "telepon") || strings.Contains(id, "hp") ||
+		strings.Contains(id, "wa") || strings.Contains(id, "whatsapp") || strings.Contains(id, "mobile_number") ||
+		strings.Contains(id, "nohp") || strings.Contains(id, "no_hp") {
+		return "phone", "tel", false
+	}
+
+	// 5. Name / Username
+	if id == "username" || id == "user_name" || strings.Contains(id, "username") {
+		return "username", "username", false
+	}
+	for _, kw := range [...]string{"fname", "lname", "firstname", "lastname", "first_name", "last_name", "full_name", "fullname", "nama"} {
+		if strings.Contains(id, kw) {
+			return "name", "name", false
+		}
+	}
+
+	// 6. Address / Location
+	for _, kw := range [...]string{"address", "street", "alamat", "postal", "zipcode", "zip_code", "kodepos", "city", "country", "kota", "provinsi"} {
+		if strings.Contains(id, kw) {
+			return "address", "street-address", false
+		}
+	}
+
+	return "", "", false
+}
