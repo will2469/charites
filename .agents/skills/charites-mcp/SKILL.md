@@ -64,7 +64,7 @@ Arsitektur Charites MCP memproses setiap pesan masuk secara independen:
 
 ## 2. Tools Resmi Charites MCP
 
-Charites mengekspos 3 tool terdaftar:
+Charites mengekspos 4 tool terdaftar:
 
 ### 1. `charites_scan`
 - **Tujuan:** Menjalankan pemindaian AST statis pada path target (file atau direktori).
@@ -102,10 +102,33 @@ Charites mengekspos 3 tool terdaftar:
   ```json
   {
     "type": "object",
-    "properties": {}
+    "properties": {
+      "category": { "type": "string", "description": "Optional category filter (e.g. theme, a11y, responsive)" }
+    }
   }
   ```
 - **Output:** JSON array memuat seluruh rule metadata (ID, Category, Severity, Description).
+
+### 4. `charites_report_issue`
+- **Tujuan:** Pelaporan issue, false-positive, atau rule-gap berbasis Human-in-the-Loop (HITL) kriptografis dua tahap ke GitHub.
+- **Phase 1 (Drafting):** Dipanggil tanpa `token`, mengembalikan token kriptografis `appr_<hex>` (TTL 10 menit), hash SHA-256 anti-tampering, dan pratinjau judul/badan issue.
+- **Phase 2 (Submission):** Setelah disetujui pengguna secara eksplisit, dipanggil ulang dengan parameter yang sama persis beserta `token` untuk pengiriman otomatis melalui `gh` CLI atau pembuatan prefilled browser URL.
+- **Input Schema:**
+  ```json
+  {
+    "type": "object",
+    "properties": {
+      "rule_id": { "type": "string", "description": "Canonical rule identifier involved" },
+      "title": { "type": "string", "description": "Summary of the issue or false positive" },
+      "description": { "type": "string", "description": "Detailed explanation" },
+      "snippet": { "type": "string", "description": "Reproducible code snippet" },
+      "category": { "type": "string", "description": "Issue category: false-positive, bug, rule-gap, enhancement" },
+      "token": { "type": "string", "description": "Cryptographic approval token from Phase 1" }
+    },
+    "required": ["rule_id", "title", "description"]
+  }
+  ```
+- **Output:** JSON berisi status submission (`submitted` atau `ready_for_submission`) dan URL issue terkait.
 
 ---
 

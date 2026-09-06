@@ -25,6 +25,8 @@ type ConventionConfig = token.ConventionConfig
 // Config merepresentasikan konfigurasi proyek dari charites.yaml.
 type Config struct {
 	Format     string            `json:"format" yaml:"format"`
+	Output     string            `json:"output" yaml:"output"`                           // Path berkas output laporan (misal: report.md)
+	Telemetry  *bool             `json:"telemetry,omitempty" yaml:"telemetry,omitempty"` // Status izin pelaporan telemetri / issue (default: true)
 	ScanPath   string            `json:"scan_path" yaml:"scan_path"`
 	Theme      string            `json:"theme" yaml:"theme"`           // Custom path ke SSOT tema (CSS/JSON) jika di luar path standar
 	Convention ConventionConfig  `json:"convention" yaml:"convention"` // Konfigurasi konvensi semantik token
@@ -129,14 +131,24 @@ func parseTopLevel(trimmed string, cfg *Config, currentSection *string) {
 		key := strings.TrimSpace(k)
 		val := cleanValue(v)
 		switch key {
-		case "format":
+		case "format", "report_format":
 			cfg.Format = val
+		case "output", "output_file", "report_file":
+			cfg.Output = val
 		case "scan_path":
 			cfg.ScanPath = val
 		case "theme":
 			cfg.Theme = val
+		case "telemetry":
+			b := parseBool(val)
+			cfg.Telemetry = &b
 		}
 	}
+}
+
+func parseBool(val string) bool {
+	norm := strings.ToLower(strings.TrimSpace(val))
+	return norm == "true" || norm == "1" || norm == "on" || norm == "yes"
 }
 
 func parseIndentedSection(trimmed, currentSection string, cfg *Config) {
@@ -328,4 +340,23 @@ func (c *Config) resolveRuleSeverity(rule rules.Rule) (ir.Severity, bool) {
 	}
 
 	return effectiveSev, true
+}
+
+// IsTelemetryEnabled mengembalikan apakah pelaporan issue dan telemetri diizinkan.
+// Variabel lingkungan CHARITES_TELEMETRY memiliki presedensi tertinggi atas berkas konfigurasi.
+// Default bernilai true (opt-out).
+func (c *Config) IsTelemetryEnabled() bool {
+	if env := os.Getenv("CHARITES_TELEMETRY"); env != "" {
+		norm := strings.ToLower(strings.TrimSpace(env))
+		if norm == "false" || norm == "0" || norm == "off" || norm == "no" {
+			return false
+		}
+		if norm == "true" || norm == "1" || norm == "on" || norm == "yes" {
+			return true
+		}
+	}
+	if c != nil && c.Telemetry != nil {
+		return *c.Telemetry
+	}
+	return true
 }

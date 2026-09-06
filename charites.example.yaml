@@ -5,7 +5,9 @@
 # ==============================================================================
 
 # General settings
-format: inline # inline | json
+format: inline # inline | json | markdown
+# output: charites-report.md # Path berkas output laporan audit (opsional). Jika berakhiran .md, otomatis memilih format markdown.
+# telemetry: false # Status izin pelaporan telemetri dan pembuatan issue (default: true)
 scan_path: .
 
 # Custom theme SSOT path (optional)

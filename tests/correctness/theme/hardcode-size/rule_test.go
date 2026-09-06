@@ -37,6 +37,8 @@ func TestRule_ThemeHardcodeSize_TriCorpus(t *testing.T) {
 			"top-[14px]",
 			"leading-[23px]",
 			"tracking-[0.7px]",
+			"p-3.25",
+			"w-2.75",
 		}
 
 		foundMap := make(map[string]bool)

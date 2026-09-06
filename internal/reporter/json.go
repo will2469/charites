@@ -24,6 +24,7 @@ type jsonDiagnostic struct {
 	Severity string `json:"severity"`
 	Message  string `json:"message"`
 	Hint     string `json:"hint,omitempty"`
+	DocURL   string `json:"doc_url"`
 }
 
 type jsonDocument struct {
@@ -63,6 +64,7 @@ func (r *JSONReporter) Render(w io.Writer, result *ScanResult) error {
 			Severity: string(d.Severity),
 			Message:  d.Message,
 			Hint:     d.Hint,
+			DocURL:   "https://github.com/will2469/charites/wiki/" + d.Rule,
 		})
 	}
 

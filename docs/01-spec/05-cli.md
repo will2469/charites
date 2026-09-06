@@ -81,7 +81,8 @@ Available Commands:
 
 | Flag | Shorthand | Tipe | Nilai Bawaan | Deskripsi |
 | :--- | :---: | :---: | :---: | :--- |
-| `--format` | `-f` | `string` | `inline` | Format output: `inline` (ANSI) atau `json` (Dokumen JSON) |
+| `--format` | `-f` | `string` | `inline` | Format output: `inline` (ANSI), `json` (Dokumen JSON), atau `markdown`/`md` (Laporan Audit Markdown) |
+| `--output` | `-o` | `string` | `""` | Path berkas tujuan untuk menyimpan laporan audit (misal: `report.md`) |
 | `--ext` | `-e` | `string` | `astro,tsx,jsx` | Filter ekstensi yang dipindai (koma terpisah atau berulang) |
 | `--category` | `-c` | `string` | `""` (semua) | Filter kategori rule (`theme`, `a11y`, `perf`, dll.) |
 | `--rule` | `-r` | `string` | `""` (semua) | Filter satu Charites Rule ID spesifik (`<category>.<slug>`) |
@@ -194,6 +195,56 @@ Format dokumen JSON tunggal lengkap (*complete JSON document*) yang dicetak di a
 
 - **Skema Waktu:** Durasi pemindaian dicatat dalam field `"duration_ms"` sebagai integer milidetik.
 - **Determinis Biner:** Urutan isi slice `diagnostics` mengikuti *total ordering* Fase 4 (`File` $\rightarrow$ `Line` $\rightarrow$ `Col` $\rightarrow$ `RuleID` $\rightarrow$ `Severity` $\rightarrow$ `Message` $\rightarrow$ `Hint`).
+
+### 3.4. Markdown Audit Reporter (`--format=markdown`, `--format=md`)
+Format dokumen Markdown lengkap bertaraf industri yang mengadopsi standar tata letak dan hierarki dari Argus Audit Engine, ideal untuk ringkasan PR GitHub, audit berkala, dan dokumentasi kepatuhan tim:
+
+```markdown
+# Charites Frontend Static Analysis & UI Ergonomics Audit Report
+
+**Timestamp:** 2026-09-06T12:00:00.000Z
+**Status:** FAILED (Violations Found)
+
+## Summary
+
+| Metric | Jumlah |
+| :--- | :--- |
+| Total Berkas | 28 |
+| Durasi Pemindaian | 18ms |
+| Rules Attached | 35 |
+| Total Issues | 2 |
+| Errors | 1 |
+| Warnings | 1 |
+| Info | 0 |
+
+## Detailed Info
+
+| ID | Category | Description | Issues Found | Status |
+| :--- | :--- | :--- | :---: | :---: |
+| theme.hardcode-color | theme | Detects hardcoded hex/rgb colors... | 1 | FAILED |
+| theme.hardcode-opacity-color | theme | Detects hardcoded slash opacity... | 1 | FAILED |
+...
+
+## Result
+
+Found 2 violations across scanned components:
+
+### theme.hardcode-opacity-color
+
+- **Severity:** error
+- **Category:** theme
+- **Description:** Detects utility classes with hardcoded slash opacity modifiers that have official semantic token replacements
+- **Wiki:** [theme.hardcode-opacity-color Documentation](https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color)
+- **Suppression:** `<!-- charites:ignore theme.hardcode-opacity-color <reason> -->` (Astro) or `// charites:ignore theme.hardcode-opacity-color <reason>` (TSX/JSX)
+
+- **[src/pages/index.astro:14:8](file:///path/to/src/pages/index.astro#L14)**
+  - *Message:* Hardcode opacity color: "bg-primary/10"
+  - *Hint:* Use semantic token "primary-light".
+```
+
+- **Fitur Cerdas Supresi:** Menyarankan sintaks komentar supresi yang relevan secara otomatis berdasarkan ekstensi berkas pelanggar (`<!-- charites:ignore -->` untuk berkas `.astro`, `// charites:ignore` untuk berkas `.tsx`/`.jsx`).
+- **Tautan Berkas Interaktif:** Seluruh lokasi temuan diformat sebagai tautan markdown dengan skema `file:///` dan hash baris `#L<line>` sehingga dapat langsung diklik oleh developer di editor atau viewer markdown.
+- **Penyimpanan Berkas Laporan:** Dapat ditulis langsung ke berkas via flag `-o` / `--output` (misal: `charites scan -f md -o charites-report.md`). Jika `--output` berakhiran `.md` tanpa menyertakan flag `--format`, format markdown dipilih secara otomatis.
 
 ---
 

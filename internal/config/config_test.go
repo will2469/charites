@@ -251,3 +251,76 @@ convention:
 		t.Errorf("unexpected fallbacks for accent: %+v", cfgBullet.Convention.Fallbacks["accent"])
 	}
 }
+
+func TestConfig_OutputAndReportFile(t *testing.T) {
+	tests := []struct {
+		yaml string
+		want string
+	}{
+		{"output: report.md", "report.md"},
+		{"output_file: custom-dir/audit.md", "custom-dir/audit.md"},
+		{"report_file: reports/charites.md", "reports/charites.md"},
+	}
+
+	for _, tc := range tests {
+		cfg, err := config.Parse([]byte(tc.yaml))
+		if err != nil {
+			t.Fatalf("config.Parse failed for %q: %v", tc.yaml, err)
+		}
+		if cfg.Output != tc.want {
+			t.Errorf("for %q, expected Output=%q, got %q", tc.yaml, tc.want, cfg.Output)
+		}
+	}
+}
+
+func TestConfig_Telemetry(t *testing.T) {
+	// 1. Nil config defaults to true
+	var nilCfg *config.Config
+	if !nilCfg.IsTelemetryEnabled() {
+		t.Errorf("expected nil config telemetry to be enabled by default")
+	}
+
+	// 2. Empty config defaults to true
+	emptyCfg := &config.Config{}
+	if !emptyCfg.IsTelemetryEnabled() {
+		t.Errorf("expected empty config telemetry to be enabled by default")
+	}
+
+	// 3. YAML telemetry: false
+	cfgDisabled, err := config.Parse([]byte("telemetry: false"))
+	if err != nil {
+		t.Fatalf("failed parsing telemetry: false: %v", err)
+	}
+	if cfgDisabled.IsTelemetryEnabled() {
+		t.Errorf("expected telemetry to be false when configured false")
+	}
+
+	// 4. YAML telemetry: true
+	cfgEnabled, err := config.Parse([]byte("telemetry: true"))
+	if err != nil {
+		t.Fatalf("failed parsing telemetry: true: %v", err)
+	}
+	if !cfgEnabled.IsTelemetryEnabled() {
+		t.Errorf("expected telemetry to be true when configured true")
+	}
+
+	// 5. Env var precedence over config (CHARITES_TELEMETRY=false overrides config true)
+	t.Setenv("CHARITES_TELEMETRY", "false")
+	if cfgEnabled.IsTelemetryEnabled() {
+		t.Errorf("expected env CHARITES_TELEMETRY=false to override config true")
+	}
+
+	// 6. Env var precedence over config (CHARITES_TELEMETRY=true overrides config false)
+	t.Setenv("CHARITES_TELEMETRY", "true")
+	if !cfgDisabled.IsTelemetryEnabled() {
+		t.Errorf("expected env CHARITES_TELEMETRY=true to override config false")
+	}
+
+	// 7. Alternate env forms: 0, off, no
+	for _, val := range []string{"0", "off", "no", "OFF"} {
+		t.Setenv("CHARITES_TELEMETRY", val)
+		if cfgEnabled.IsTelemetryEnabled() {
+			t.Errorf("expected env CHARITES_TELEMETRY=%s to disable telemetry", val)
+		}
+	}
+}

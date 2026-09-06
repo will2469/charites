@@ -17,7 +17,8 @@
       "category": "theme",
       "severity": "error",
       "message": "Hardcode opacity color: \"bg-primary/10\"",
-      "hint": "Use semantic token \"primary-light\"."
+      "hint": "Use semantic token \"primary-light\".",
+      "doc_url": "https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color"
     },
     {
       "file": "src/components/Card.tsx",
@@ -27,7 +28,8 @@
       "category": "theme",
       "severity": "warn",
       "message": "Hardcode hex color: \"#2563eb\"",
-      "hint": "Use semantic token \"bg-primary\"."
+      "hint": "Use semantic token \"bg-primary\".",
+      "doc_url": "https://github.com/will2469/charites/wiki/theme.hardcode-color"
     }
   ]
 }

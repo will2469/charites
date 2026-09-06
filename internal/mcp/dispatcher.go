@@ -11,6 +11,7 @@ import (
 
 	"github.com/will2469/charites/internal/analyzer"
 	"github.com/will2469/charites/internal/config"
+	"github.com/will2469/charites/internal/ir"
 	"github.com/will2469/charites/internal/rules"
 	"github.com/will2469/charites/internal/scanner"
 	"github.com/will2469/charites/internal/wiki"
@@ -201,6 +202,8 @@ func (s *Server) handleToolCall(req *JSONRPCRequest) *JSONRPCResponse {
 		return s.handleExplain(req.ID, params.Arguments)
 	case "charites_list_rules":
 		return s.handleListRules(req.ID, params.Arguments)
+	case "charites_report_issue":
+		return s.handleReportIssue(req.ID, params.Arguments)
 	default:
 		return NewErrorResponse(req.ID, CodeMethodNotFound, fmt.Sprintf("Tool not found: %s", params.Name))
 	}
@@ -353,20 +356,47 @@ func (s *Server) handleScan(reqID json.RawMessage, argsRaw json.RawMessage) *JSO
 		return NewErrorResponse(reqID, CodeInternalToolError, fmt.Sprintf("Scan execution failed: %v", err))
 	}
 
-	diagsJSON, jsonErr := json.MarshalIndent(diags, "", "  ")
-	if jsonErr != nil {
-		return NewErrorResponse(reqID, CodeInternalToolError, fmt.Sprintf("Failed to encode diagnostics: %v", jsonErr))
+	outputText, fmtErr := formatScanDiagnostics(diags)
+	if fmtErr != nil {
+		return NewErrorResponse(reqID, CodeInternalToolError, fmt.Sprintf("Failed to encode diagnostics: %v", fmtErr))
 	}
 
 	result := CallToolResult{
 		Content: []ContentItem{
 			{
 				Type: "text",
-				Text: string(diagsJSON),
+				Text: outputText,
 			},
 		},
 	}
 	return NewResultResponse(reqID, result)
+}
+
+func formatScanDiagnostics(diags []ir.Diagnostic) (string, error) {
+	if len(diags) == 0 {
+		return " CLEAN - No violations found across scanned components.", nil
+	}
+
+	items := make([]ScanDiagnosticItem, 0, len(diags))
+	for _, d := range diags {
+		items = append(items, ScanDiagnosticItem{
+			File:        filepath.ToSlash(d.File),
+			Line:        d.Line,
+			Column:      d.Column,
+			Rule:        d.Rule,
+			Severity:    string(d.Severity),
+			Message:     d.Message,
+			Hint:        d.Hint,
+			WikiURL:     "https://github.com/will2469/charites/wiki/" + d.Rule,
+			ExplainHint: fmt.Sprintf("Call MCP tool 'charites_explain_rule' with rule_id: %q for full 8-Pillars documentation, good/bad examples, and remediation guidance.", d.Rule),
+		})
+	}
+
+	data, err := json.MarshalIndent(items, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 func (s *Server) handleExplain(reqID json.RawMessage, argsRaw json.RawMessage) *JSONRPCResponse {

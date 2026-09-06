@@ -265,3 +265,84 @@ func TestResolveExitCode(t *testing.T) {
 		t.Errorf("expected warning with failOnWarn to return ExitViolations, got %d", code)
 	}
 }
+
+func TestRunScan_MarkdownFormat(t *testing.T) {
+	dir := setupViolationTestRepo(t)
+
+	var stdout, stderr bytes.Buffer
+	code := cli.RunScan([]string{"-f", "md", dir}, &stdout, &stderr)
+
+	if code != cli.ExitViolations {
+		t.Fatalf("expected exit violations (1), got %d, stderr: %s", code, stderr.String())
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "# Charites Frontend Static Analysis & UI Ergonomics Audit Report") {
+		t.Errorf("expected markdown header in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "FAILED (Violations Found)") {
+		t.Errorf("expected FAILED status in markdown report")
+	}
+	if !strings.Contains(out, "### theme.hardcode-opacity-color") {
+		t.Errorf("expected theme.hardcode-opacity-color section in markdown report")
+	}
+}
+
+func TestRunScan_OutputFile(t *testing.T) {
+	dir := setupViolationTestRepo(t)
+	reportPath := filepath.Join(dir, "report.md")
+
+	var stdout, stderr bytes.Buffer
+	code := cli.RunScan([]string{"-o", reportPath, dir}, &stdout, &stderr)
+
+	if code != cli.ExitViolations {
+		t.Fatalf("expected exit violations (1), got %d, stderr: %s", code, stderr.String())
+	}
+
+	if !strings.Contains(stdout.String(), "Charites audit report saved to") {
+		t.Errorf("expected success notification on stdout, got: %s", stdout.String())
+	}
+
+	content, err := os.ReadFile(filepath.Clean(reportPath)) //nolint:gosec // controlled test fixture path
+	if err != nil {
+		t.Fatalf("failed to read output report file: %v", err)
+	}
+
+	out := string(content)
+	if !strings.Contains(out, "# Charites Frontend Static Analysis & UI Ergonomics Audit Report") {
+		t.Errorf("expected markdown report in written file, got:\n%s", out)
+	}
+	if !strings.Contains(out, "### theme.hardcode-opacity-color") {
+		t.Errorf("expected rule section in written file")
+	}
+}
+
+func TestRunScan_ConfigOutput(t *testing.T) {
+	dir := setupViolationTestRepo(t)
+	reportPath := filepath.Join(dir, "config-report.md")
+	configYAML := `
+output: ` + reportPath + `
+`
+	_ = os.WriteFile(filepath.Join(dir, "charites.yaml"), []byte(configYAML), 0o600)
+
+	var stdout, stderr bytes.Buffer
+	code := cli.RunScan([]string{dir}, &stdout, &stderr)
+
+	if code != cli.ExitViolations {
+		t.Fatalf("expected exit violations (1), got %d, stderr: %s", code, stderr.String())
+	}
+
+	if !strings.Contains(stdout.String(), "Charites audit report saved to") {
+		t.Errorf("expected success notification on stdout, got: %s", stdout.String())
+	}
+
+	content, err := os.ReadFile(filepath.Clean(reportPath)) //nolint:gosec // controlled test fixture path
+	if err != nil {
+		t.Fatalf("failed to read output report file: %v", err)
+	}
+
+	out := string(content)
+	if !strings.Contains(out, "# Charites Frontend Static Analysis & UI Ergonomics Audit Report") {
+		t.Errorf("expected markdown report in written file, got:\n%s", out)
+	}
+}

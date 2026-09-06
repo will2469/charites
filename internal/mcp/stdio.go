@@ -25,6 +25,8 @@ type Server struct {
 	activeScans sync.Map // string(key) -> context.CancelFunc
 	wg          sync.WaitGroup
 	mu          sync.RWMutex
+	approval    *ApprovalManager
+	submitter   IssueSubmitter
 }
 
 // NewServer membuat instance Server MCP baru.
@@ -47,6 +49,8 @@ func NewServer(workspace string, stdin io.Reader, stdout, stderr io.Writer, reg 
 		stdin:     stdin,
 		stdout:    stdout,
 		stderr:    stderr,
+		approval:  DefaultApprovalManager(),
+		submitter: defaultGHSubmitter,
 	}
 }
 
@@ -62,6 +66,40 @@ func (s *Server) SetState(st ServerState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.state = st
+}
+
+// SetApprovalManager menyetel ApprovalManager kustom (berguna untuk pengujian isolasi / mock TTL).
+func (s *Server) SetApprovalManager(am *ApprovalManager) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.approval = am
+}
+
+// getApprovalManager mengembalikan ApprovalManager aktif secara thread-safe.
+func (s *Server) getApprovalManager() *ApprovalManager {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.approval == nil {
+		return DefaultApprovalManager()
+	}
+	return s.approval
+}
+
+// SetIssueSubmitter menyetel IssueSubmitter kustom (berguna untuk pengujian unit tanpa memanggil gh CLI riil).
+func (s *Server) SetIssueSubmitter(sub IssueSubmitter) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.submitter = sub
+}
+
+// getIssueSubmitter mengembalikan IssueSubmitter aktif secara thread-safe.
+func (s *Server) getIssueSubmitter() IssueSubmitter {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.submitter == nil {
+		return defaultGHSubmitter
+	}
+	return s.submitter
 }
 
 // Run memulai loop pemrosesan pesan dari stdin hingga mencapai EOF atau error I/O fatal.

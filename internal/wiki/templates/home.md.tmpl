@@ -184,9 +184,44 @@ flowchart TD
 ### Testing Tier Flow:
 1. **Layer 1 (Subsystem Units):** Validates deterministic lexing, zero-panic parsing, graph cycle detection (`ErrCycleDetected`), and traversal recursion budget limits (`ErrEvaluationBudgetExceeded`).
 2. **Layer 2 (1-SSOT Golden Tri-Corpus):** Every static analysis rule is tested against an exhaustive 17-pattern matrix in `tests/correctness/<rule-id>/`:
-   - **Positive (P1-P5):** Obvious, indirect, helper-wrapped, deeply nested, and aliased violations.
-   - **Negative (N1-N5):** Valid tokens, explicit ignore directives, third-party libraries, standard HTML, and untokenized custom values (the Banana Test).
-   - **Adversarial (A1-A7):** Template literal interpolations, ternary conditionals, spread props, dynamic classes, variable shadowing, and cyclic references.
+
+```mermaid
+flowchart TD
+    subgraph GoldenCorpus ["Canonical 1-SSOT Tri-Corpus Architecture (tests/correctness/<rule_id>/)"]
+        subgraph P ["Positive Corpus (positive/) - Verified True Positives"]
+            P1["P1: Obvious Direct Violation"]
+            P2["P2: Indirect / Variant Concatenation"]
+            P3["P3: Helper / clsx / cn Wrapper"]
+            P4["P4: Deeply Nested Elements"]
+            P5["P5: Aliased Imports / Re-exports"]
+        end
+        subgraph N ["Negative Corpus (negative/) - Zero False Positives"]
+            N1["N1: Valid Design Tokens"]
+            N2["N2: Explicit charites:ignore Directive"]
+            N3["N3: Third-Party / Vendor Components"]
+            N4["N4: Clean Semantic HTML"]
+            N5["N5: Untokenized Custom Values (Banana Test)"]
+        end
+        subgraph A ["Adversarial Corpus (adversarial/) - Anti-Evasion Resilience"]
+            A1["A1: Template Literal Interpolations"]
+            A2["A2: Ternary Conditional Expressions"]
+            A3["A3: Spread Properties & Dynamic Overrides"]
+            A4["A4: Dynamic Object Class Syntax"]
+            A5["A5: Shadowed Variable Identifiers"]
+            A6["A6: Nested Closures & HOC Wrappers"]
+            A7["A7: Obfuscated Classes & Cyclic Tokens"]
+        end
+    end
+
+    P --> TestRunner["Automated Runner (rule_test.go)"]
+    N --> TestRunner
+    A --> TestRunner
+    TestRunner --> Gates["Quality Gates: Zero Panic, Zero False-Positive, Zero Bypass"]
+```
+
+   - **Positive Fixtures (P1-P5):** Obvious, indirect, helper-wrapped, deeply nested, and aliased violations. Verified to trigger diagnostics at exact lines and column spans.
+   - **Negative Fixtures (N1-N5):** Valid tokens, explicit ignore directives, third-party libraries, standard HTML, and untokenized custom values (the Banana Test). Verified to produce zero diagnostics.
+   - **Adversarial Fixtures (A1-A7):** Template literal interpolations, ternary conditionals, spread props, dynamic classes, variable shadowing, and cyclic references. Verified to prevent bypass.
 3. **Layer 3 (Monorepo Integration):** Validates end-to-end multi-scope token resolution (`:root` vs `.dark`), upward directory walks, and CLI output rendering in `tests/token_integration_test.go`.
 4. **Layer 4 (Continuous Fuzzing):** Employs native Go 1.26 fuzzing (`tests/fuzz/css_fuzz_test.go`) over tens of thousands of malformed mutations to guarantee memory safety and crash resilience.
 

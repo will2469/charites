@@ -25,7 +25,8 @@ Available Commands:
   help        Bantuan penggunaan perintah
 
 Flags:
-  -f, --format string      Format output: inline (default ANSI) atau json (default "inline")
+  -f, --format string      Format output: inline (default ANSI), json, atau markdown/md (default "inline")
+  -o, --output string      Path berkas untuk menyimpan laporan hasil pemindaian (misal: report.md)
   -e, --ext string         Filter ekstensi yang dipindai (default "astro,tsx,jsx")
   -c, --category string    Filter kategori rule (theme, a11y, perf, dll.)
   -r, --rule string        Filter satu Charites Rule ID spesifik (<category>.<slug>)

@@ -3,6 +3,7 @@
     {
       "category": "theme",
       "column": 5,
+      "doc_url": "https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color",
       "file": "fixtures/projects/opacity_violations/src/components/Card.tsx",
       "hint": "Use semantic token \"primary-light\".",
       "line": 5,
@@ -13,6 +14,7 @@
     {
       "category": "theme",
       "column": 3,
+      "doc_url": "https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color",
       "file": "fixtures/projects/opacity_violations/src/pages/index.astro",
       "hint": "Use semantic token \"primary-light\".",
       "line": 8,

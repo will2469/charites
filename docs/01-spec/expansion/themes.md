@@ -229,7 +229,7 @@ flowchart TD
 | **`theme.inline-style-hardcode`** | Research (AP-8) | TSX / Astro / JSX | `error` | Atribut style dengan hardcode value: `style={{ color: '#2563eb' }}`, `style="background:#fff"` | Pindahkan ke class utility token semantik atau CSS variable. Inline style menangkal cascade tema |
 | **`theme.pseudo-hardcode-color`** | Gap Analysis | TSX / Astro | `warn` | `placeholder:text-gray-400`, `selection:bg-yellow-200` pada pseudo | Perluas validasi token ke seluruh varian pseudo-element/class |
 | **`theme.important-override`** | Research (AP-17) | TSX / Astro / CSS | `error` | Penggunaan `!important` pada utility class: `!bg-red-500`, `!text-white` | Hindari `!important`; gunakan layer/token precedence yang benar. `!important` merusak cascade tema |
-| **`theme.hardcode-size`** | Legacy (R1-Size) | TSX / Astro | `warn` | Arbitrary size: `p-[13px]`, `w-[230px]`, `text-[15px]` | Gunakan skala modular W3C: `p-4`, `w-64`, `text-base` |
+| **`theme.hardcode-size`** | Legacy (R1-Size) | TSX / Astro | `warn` | Arbitrary size: `p-[13px]`, `w-[230px]`, `text-[15px]` & pecahan liar: `p-3.25`, `w-2.75` | Gunakan skala modular W3C: `p-3`, `p-3.5`, `p-4`, `w-64`, `text-base` |
 | **`theme.hardcode-border-radius`**| Research (AP-11) | TSX / Astro | `warn` | Arbitrary radius: `rounded-[7px]`, `rounded-[11px]` | Gunakan skala radius token: `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl` |
 | **`theme.hardcode-z-index`** | Research (AP-10) | TSX / Astro / CSS | `warn` | Arbitrary z-index: `z-[999]`, `z-[10000]` yang tidak mengikuti skala token | Gunakan skala token z-index: `z-dropdown`, `z-modal`, `z-toast` |
 | **`theme.hardcode-shadow-color`** | Research (AP-12) | TSX / Astro / CSS | `warn` | Shadow dengan warna hardcode: `shadow-[0_4px_10px_#00000040]` | Gunakan token shadow semantik: `shadow-md`, `shadow-lg`, atau shadow-colored berbasis token |
@@ -386,10 +386,10 @@ Untuk memastikan parser Charites tidak menghasilkan *false positive* maupun *fal
 ### 5.2. Kelompok 2: Token Spasial, Bentuk & Elevasi
 
 #### `theme.hardcode-size`
-- **Tujuan:** Mempertahankan ritme tata letak modular 4px/8px dan mencegah drift tipografi.
-- **In-Scope:** Class `(w|h|p|px|py|m|mx|my|gap|top|bottom|left|right|text|inset)-\[\d+px\]`.
-- **Bad:** `<div className="p-[19px] text-[15px]">`
-- **Good:** `<div className="p-5 text-base">`
+- **Tujuan:** Mempertahankan ritme tata letak modular 4px/8px dan mencegah drift tipografi serta sub-pixel blur akibat desimal liar.
+- **In-Scope:** Class `(w|h|p|px|py|m|mx|my|gap|top|bottom|left|right|text|inset)-\[\d+px\]` serta pecahan desimal non-standar (`p-3.25`, `w-2.75`, `gap-1.25`).
+- **Bad:** `<div className="p-[19px] p-3.25 w-2.75 text-[15px]">`
+- **Good:** `<div className="p-3.5 p-4 text-base">`
 
 #### `theme.hardcode-border-radius`
 - **Tujuan:** Menjaga keselarasan bentuk geometris komponen sesuai skala shape design token.

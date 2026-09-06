@@ -412,7 +412,68 @@ var SpatialPropertyNames = map[string]bool{
 	"font-size": true, "line-height": true, "letter-spacing": true,
 }
 
-// IsHardcodedSizeUtility mendeteksi apakah token menggunakan utility dimensi, spacing, posisi, atau tipografi hardcode.
+// SpatialScalePrefixes adalah daftar prefix utilitas ukuran/spacing Tailwind untuk deteksi desimal pecahan liar.
+// Diurutkan dari prefix terpanjang ke terpendek untuk mencegah ambiguitas pencocokan (misal px- sebelum p-).
+var SpatialScalePrefixes = []string{
+	"scroll-px-", "scroll-py-", "scroll-pt-", "scroll-pb-", "scroll-pl-", "scroll-pr-",
+	"scroll-mx-", "scroll-my-", "scroll-mt-", "scroll-mb-", "scroll-ml-", "scroll-mr-",
+	"scroll-p-", "scroll-m-", "-space-x-", "-space-y-", "-inset-x-", "-inset-y-",
+	"space-x-", "space-y-", "inset-x-", "inset-y-",
+	"-bottom-", "bottom-",
+	"min-w-", "max-w-", "min-h-", "max-h-", "gap-x-", "gap-y-", "-right-", "right-",
+	"size-", "inset-", "-left-", "left-", "-inset-",
+	"gap-", "-top-", "top-",
+	"-mx-", "-my-", "-mt-", "-mb-", "-ml-", "-mr-", "-ms-", "-me-",
+	"px-", "py-", "pt-", "pb-", "pl-", "pr-", "ps-", "pe-",
+	"mx-", "my-", "mt-", "mb-", "ml-", "mr-", "ms-", "me-",
+	"-m-", "w-", "h-", "p-", "m-",
+}
+
+func isNonStandardDecimal(s string) bool {
+	dotIdx := strings.IndexByte(s, '.')
+	if dotIdx == -1 {
+		return false
+	}
+
+	// Seluruh karakter sebelum dan sesudah titik wajib berupa digit numerik
+	if dotIdx == 0 || dotIdx == len(s)-1 {
+		return false
+	}
+	for i := 0; i < dotIdx; i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	for i := dotIdx + 1; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+
+	// 4 langkah setengah (half-steps) resmi yang sah di Tailwind core:
+	// 0.5 (2px), 1.5 (6px), 2.5 (10px), 3.5 (14px)
+	if s == "0.5" || s == "1.5" || s == "2.5" || s == "3.5" {
+		return false
+	}
+
+	// Semua pecahan desimal lainnya (.25, .75, .1, .2, 4.5, dst.) adalah skala liar non-standar
+	return true
+}
+
+// IsNonStandardFractionalScale mendeteksi apakah token menggunakan pecahan desimal non-standar
+// (seperti p-3.25, p-2.75, w-3.25, gap-1.25) yang merusak irama grid modular 4px/8px.
+func IsNonStandardFractionalScale(base string) bool {
+	for _, prefix := range SpatialScalePrefixes {
+		if strings.HasPrefix(base, prefix) {
+			val := base[len(prefix):]
+			return isNonStandardDecimal(val)
+		}
+	}
+	return false
+}
+
+// IsHardcodedSizeUtility mendeteksi apakah token menggunakan utility dimensi, spacing, posisi, atau tipografi hardcode
+// baik dalam format kurung arbitrer ([13px], [230px]) maupun notasi pecahan desimal non-standar (p-3.25, p-2.75).
 func IsHardcodedSizeUtility(base string) bool {
 	if prop, val, ok := ParseArbitraryProperty(base); ok {
 		if SpatialPropertyNames[strings.ToLower(prop)] {
@@ -438,6 +499,12 @@ func IsHardcodedSizeUtility(base string) bool {
 			}
 		}
 	}
+
+	// Deteksi pecahan desimal liar (misal p-3.25, p-2.75, w-3.25)
+	if IsNonStandardFractionalScale(base) {
+		return true
+	}
+
 	return false
 }
 

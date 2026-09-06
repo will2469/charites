@@ -73,60 +73,114 @@ type CancelledParams struct {
 	RequestID any `json:"requestId"`
 }
 
+// ScanDiagnosticItem merepresentasikan temuan diagnostik yang diperkaya dengan tautan wiki kanonikal dan petunjuk explain untuk AI agent.
+type ScanDiagnosticItem struct {
+	File        string `json:"file"`
+	Line        int    `json:"line"`
+	Column      int    `json:"column"`
+	Rule        string `json:"rule"`
+	Severity    string `json:"severity"`
+	Message     string `json:"message"`
+	Hint        string `json:"hint,omitempty"`
+	WikiURL     string `json:"wiki_url"`
+	ExplainHint string `json:"explain_hint"`
+}
+
 // DefaultTools mengembalikan daftar 3 tool kanonikal Charites MCP.
 func DefaultTools() []ToolDefinition {
 	return []ToolDefinition{
 		{
-			Name:        "charites_scan",
-			Description: "Pindai berkas frontend (Astro, React TSX/JSX) di dalam workspace untuk audit kualitas token semantik, aksesibilitas, dan performa.",
+			Name: "charites_scan",
+			Description: "MANDATORY FRONTEND AUDITOR: Run this tool to audit Astro (.astro) and React (.tsx/.jsx) components " +
+				"for design token violations, accessibility regressions (WCAG 2.2), touch target ergonomics, and responsive layout blowouts. " +
+				"Returns structured diagnostics with line numbers, error descriptions, online wiki URLs, and explain hints.",
 			InputSchema: ToolInputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
 					"path": {
 						Type:        "string",
-						Description: "Path relatif berkas atau direktori di dalam workspace yang akan dipindai (wajib).",
+						Description: "Workspace-relative or absolute path to the file or directory to scan (required).",
 					},
 					"category": {
 						Type:        "string",
-						Description: "Filter opsional kategori rule (contoh: theme, a11y, responsive, perf, tailwind).",
+						Description: "Optional category filter (e.g. theme, a11y, responsive, ergonomy, inp, cls, lcp, perf).",
 					},
 					"rule": {
 						Type:        "string",
-						Description: "Filter opsional Charites Rule ID spesifik (<category>.<slug>, contoh: theme.hardcode-opacity-color).",
+						Description: "Optional canonical rule identifier filter (<category>.<slug>, e.g. theme.hardcode-opacity-color).",
 					},
 					"ext": {
 						Type:        "string",
-						Description: "Filter opsional ekstensi berkas yang dipisahkan koma (default: astro,tsx,jsx).",
+						Description: "Optional comma-separated file extension filter (default: astro,tsx,jsx).",
 					},
 				},
 				Required: []string{"path"},
 			},
 		},
 		{
-			Name:        "charites_explain_rule",
-			Description: "Ambil dokumentasi komprehensif 8-Pillars (alasan larangan, contoh buruk, contoh benar, rekomendasi perbaikan) untuk satu Charites Rule ID spesifik.",
+			Name: "charites_explain_rule",
+			Description: "Authoritative 8-Pillars documentation and remediation engine for any Charites static analysis rule. " +
+				"Returns complete architectural overview, technical grounding, risk taxonomy, non-compliant code examples, " +
+				"compliant implementations, and inline suppression directives.",
 			InputSchema: ToolInputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
 					"rule_id": {
 						Type:        "string",
-						Description: "Charites Rule ID kanonikal (<category>.<slug>, contoh: theme.hardcode-opacity-color).",
+						Description: "Canonical Semgrep rule identifier (<category>.<slug>, e.g. theme.hardcode-color).",
 					},
 				},
 				Required: []string{"rule_id"},
 			},
 		},
 		{
-			Name:        "charites_list_rules",
-			Description: "Daftar seluruh rule analisis statis Charites yang terdaftar beserta kategori, tingkat keparahan, dan deskripsinya.",
+			Name: "charites_list_rules",
+			Description: "Lists all 90 available Charites static analysis rules across theme, a11y, responsive, ergonomy, " +
+				"inp, cls, lcp, and perf categories, including severity and description.",
 			InputSchema: ToolInputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
 					"category": {
 						Type:        "string",
-						Description: "Filter opsional berdasarkan nama kategori (contoh: theme).",
+						Description: "Optional filter by category name (e.g. theme, a11y, responsive).",
 					},
 				},
+			},
+		},
+		{
+			Name: "charites_report_issue",
+			Description: "Two-Phase Human-in-the-Loop (HITL) issue reporter for filing false-positives, rule gaps, or bugs directly to GitHub. " +
+				"Phase 1: Call without 'token' to generate a cryptographic draft preview and single-use approval token. " +
+				"Phase 2: Present the draft preview to the user. Once explicitly approved, call this tool again with the exact same parameters and the 'token' to submit via GitHub CLI or prefilled browser URL.",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"rule_id": {
+						Type:        "string",
+						Description: "Canonical rule identifier involved in the issue (required, e.g. theme.hardcode-color).",
+					},
+					"title": {
+						Type:        "string",
+						Description: "Short summary of the issue or false-positive (required).",
+					},
+					"description": {
+						Type:        "string",
+						Description: "Detailed description of why this rule triggered inappropriately or what the bug is (required).",
+					},
+					"snippet": {
+						Type:        "string",
+						Description: "Minimal reproducible code snippet demonstrating the false positive or issue (optional).",
+					},
+					"category": {
+						Type:        "string",
+						Description: "Issue category: false-positive, bug, rule-gap, or enhancement (default: false-positive).",
+					},
+					"token": {
+						Type:        "string",
+						Description: "Cryptographic approval token from Phase 1. Leave empty for Phase 1 draft generation; provide token for Phase 2 submission.",
+					},
+				},
+				Required: []string{"rule_id", "title", "description"},
 			},
 		},
 	}

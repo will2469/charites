@@ -49,6 +49,7 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 	fs.Usage = func() {}
 
 	var format string
+	var outputFile string
 	var category string
 	var rule string
 	var configPath string
@@ -57,8 +58,11 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 	var extFlags stringSliceFlag
 	var ignoreFlags stringSliceFlag
 
-	fs.StringVar(&format, "format", "inline", "Output format: inline or json")
+	fs.StringVar(&format, "format", "inline", "Output format: inline, json, or markdown (alias: md)")
 	fs.StringVar(&format, "f", "inline", "Output format (shorthand)")
+
+	fs.StringVar(&outputFile, "output", "", "Path to output report file (e.g. report.md)")
+	fs.StringVar(&outputFile, "o", "", "Path to output report file (shorthand)")
 
 	fs.Var(&extFlags, "ext", "Filter extensions: astro, tsx, jsx")
 	fs.Var(&extFlags, "e", "Filter extensions (shorthand)")
@@ -93,6 +97,21 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 		target = positionalArgs[0]
 	}
 
+	isExplicitConfig := isFlagPassed(args, "-config", "--config")
+	cfg, ok := resolveScanConfig(target, configPath, isExplicitConfig, stderr)
+	if !ok {
+		return ExitOperational
+	}
+
+	if !isFlagPassed(args, "-f", "--format") && cfg != nil && cfg.Format != "" {
+		format = cfg.Format
+	}
+	if !isFlagPassed(args, "-o", "--output") && cfg != nil && cfg.Output != "" {
+		outputFile = cfg.Output
+	}
+
+	format = resolveReportFormat(format, outputFile)
+
 	if !validateScanTargetAndFormat(target, format, positionalArgs, stderr) {
 		return ExitOperational
 	}
@@ -105,12 +124,6 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 
 	reg := rules.DefaultRegistry()
 	if !validateCategoryAndRule(reg, category, rule, stderr) {
-		return ExitOperational
-	}
-
-	isExplicitConfig := isFlagPassed(args, "-config", "--config")
-	cfg, ok := resolveScanConfig(target, configPath, isExplicitConfig, stderr)
-	if !ok {
 		return ExitOperational
 	}
 
@@ -139,10 +152,47 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 		return ExitOperational
 	}
 
-	result := buildScanResult(ca, diags, durationMS, failOnWarn)
-	renderScanResult(stdout, result, format, noColor)
+	result := buildScanResult(ca, diags, durationMS, failOnWarn, activeRules, target, startTime)
+	if outputFile != "" {
+		if code := saveReportToFile(outputFile, result, format, noColor, stdout, stderr); code != -1 {
+			return code
+		}
+	} else {
+		renderScanResult(stdout, result, format, noColor)
+	}
 
 	return ResolveExitCode(&result.Summary, failOnWarn)
+}
+
+func resolveReportFormat(format, outputFile string) string {
+	if outputFile != "" && format == "inline" {
+		lowerOut := strings.ToLower(outputFile)
+		if strings.HasSuffix(lowerOut, ".md") || strings.HasSuffix(lowerOut, ".markdown") {
+			return "markdown"
+		}
+		if strings.HasSuffix(lowerOut, ".json") {
+			return "json"
+		}
+	}
+	return format
+}
+
+func saveReportToFile(outputFile string, result *reporter.ScanResult, format string, noColor bool, stdout, stderr io.Writer) int {
+	cleanOutput := filepath.Clean(outputFile)
+	outDir := filepath.Dir(cleanOutput)
+	if err := os.MkdirAll(outDir, 0o750); err != nil {
+		_, _ = fmt.Fprintf(stderr, "charites: error: failed to create output directory: %v\n", err)
+		return ExitOperational
+	}
+	f, err := os.Create(filepath.Clean(cleanOutput))
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "charites: error: failed to create output report file: %v\n", err)
+		return ExitOperational
+	}
+	renderScanResult(f, result, format, noColor)
+	_ = f.Close()
+	_, _ = fmt.Fprintf(stdout, "Charites audit report saved to %s\n", cleanOutput)
+	return -1
 }
 
 func validateScanTargetAndFormat(target, format string, positionalArgs []string, stderr io.Writer) bool {
@@ -155,8 +205,8 @@ func validateScanTargetAndFormat(target, format string, positionalArgs []string,
 		return false
 	}
 	formatLower := strings.ToLower(strings.TrimSpace(format))
-	if formatLower != "inline" && formatLower != "json" {
-		_, _ = fmt.Fprintf(stderr, "charites: error: unsupported format %q. Supported formats: inline, json.\n", format)
+	if formatLower != "inline" && formatLower != "json" && formatLower != "markdown" && formatLower != "md" {
+		_, _ = fmt.Fprintf(stderr, "charites: error: unsupported format %q. Supported formats: inline, json, markdown, md.\n", format)
 		return false
 	}
 	return true
@@ -232,7 +282,7 @@ func buildScanMatcher(target string, cfg *config.Config, ignoreFlags []string, s
 	return matcher, true
 }
 
-func buildScanResult(ca *countingAnalyzer, diags []ir.Diagnostic, durationMS int64, failOnWarn bool) *reporter.ScanResult {
+func buildScanResult(ca *countingAnalyzer, diags []ir.Diagnostic, durationMS int64, failOnWarn bool, activeRules []config.ActiveRule, target string, startTime time.Time) *reporter.ScanResult {
 	var errCount, warnCount, infoCount int
 	for _, d := range diags {
 		switch d.Severity {
@@ -250,8 +300,46 @@ func buildScanResult(ca *countingAnalyzer, diags []ir.Diagnostic, durationMS int
 		passed = false
 	}
 
+	counts := make(map[string]int)
+	for _, d := range diags {
+		counts[d.Rule]++
+	}
+
+	attached := make([]reporter.RuleAuditInfo, 0, len(activeRules))
+	for _, ar := range activeRules {
+		r := ar.Rule
+		c := counts[r.ID()]
+		st := "PASS"
+		if c > 0 {
+			st = "FAILED"
+		}
+		sev := string(ar.EffectiveSeverity)
+		if sev == "" {
+			sev = string(r.DefaultSeverity())
+		}
+		attached = append(attached, reporter.RuleAuditInfo{
+			ID:          r.ID(),
+			Category:    r.Category(),
+			Description: r.Description(),
+			Severity:    sev,
+			IssuesFound: c,
+			Status:      st,
+		})
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = target
+	}
+	absRoot, err := filepath.Abs(cwd)
+	if err != nil {
+		absRoot = cwd
+	}
+
 	return &reporter.ScanResult{
-		Version: Version,
+		Version:   Version,
+		Timestamp: startTime,
+		RootDir:   absRoot,
 		Summary: reporter.ScanSummary{
 			ScannedFiles: int(ca.count.Load()),
 			DurationMS:   durationMS,
@@ -260,18 +348,27 @@ func buildScanResult(ca *countingAnalyzer, diags []ir.Diagnostic, durationMS int
 			InfoCount:    infoCount,
 			Passed:       passed,
 		},
-		Diagnostics: diags,
+		Diagnostics:   diags,
+		AttachedRules: attached,
 	}
 }
 
-func renderScanResult(stdout io.Writer, result *reporter.ScanResult, format string, noColor bool) {
-	if strings.ToLower(strings.TrimSpace(format)) == "json" {
+func renderScanResult(w io.Writer, result *reporter.ScanResult, format string, noColor bool) {
+	fmtLower := strings.ToLower(strings.TrimSpace(format))
+	switch fmtLower {
+	case "json":
 		rep := reporter.NewJSONReporter()
-		_ = rep.Render(stdout, result)
-	} else {
-		colorMode := reporter.ResolveColorMode(noColor, stdout)
+		_ = rep.Render(w, result)
+	case "markdown", "md":
+		rep := reporter.NewMarkdownReporter(
+			reporter.WithRootDir(result.RootDir),
+			reporter.WithTimestamp(result.Timestamp),
+		)
+		_ = rep.Render(w, result)
+	default:
+		colorMode := reporter.ResolveColorMode(noColor, w)
 		rep := reporter.NewInlineReporter(colorMode)
-		_ = rep.Render(stdout, result)
+		_ = rep.Render(w, result)
 	}
 }
 
@@ -286,6 +383,7 @@ func partitionArgs(args []string) ([]string, []string) {
 		"-r": true, "--rule": true,
 		"-config": true, "--config": true,
 		"-ignore": true, "--ignore": true,
+		"-o": true, "--output": true,
 	}
 
 	for i := 0; i < len(args); i++ {

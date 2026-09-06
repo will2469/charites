@@ -3,6 +3,7 @@
     {
       "category": "theme",
       "column": 5,
+      "doc_url": "https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color",
       "file": "fixtures/projects/config_override/src/components/Card.tsx",
       "hint": "Use semantic token \"primary-light\".",
       "line": 5,

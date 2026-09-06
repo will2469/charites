@@ -458,8 +458,8 @@ func TestMCP_ToolsExecution(t *testing.T) {
 	}
 	listMap := respList.Result.(map[string]any)
 	toolsSlice := listMap["tools"].([]any)
-	if len(toolsSlice) != 3 {
-		t.Errorf("expected 3 tools, got %d", len(toolsSlice))
+	if len(toolsSlice) != 4 {
+		t.Errorf("expected 4 tools, got %d", len(toolsSlice))
 	}
 
 	// 2. charites_explain_rule
@@ -742,4 +742,111 @@ func TestMCP_ListRules_EdgeCases(t *testing.T) {
 		t.Fatalf("unexpected error for listing rules: %v", resp.Error)
 	}
 	_ = srv
+}
+
+func TestMCP_Scan_CleanOutput(t *testing.T) {
+	ws := t.TempDir()
+	cleanFile := filepath.Join(ws, "Clean.astro")
+	_ = os.WriteFile(cleanFile, []byte(`<div>Clean Component</div>`), 0o600)
+
+	_, inW, outR, _, cleanup := setupTestServer(t, ws)
+	defer cleanup()
+
+	// Handshake
+	_, _ = inW.Write([]byte(`{"jsonrpc":"2.0","id":1,"method":"initialize"}` + "\n"))
+	_ = readJSONResponse(t, outR)
+	_, _ = inW.Write([]byte(`{"jsonrpc":"2.0","method":"notifications/initialized"}` + "\n"))
+	time.Sleep(20 * time.Millisecond)
+
+	// Scan clean file
+	_, _ = inW.Write([]byte(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"charites_scan","arguments":{"path":"Clean.astro"}}}` + "\n"))
+	resp := readJSONResponse(t, outR)
+	if resp.Error != nil {
+		t.Fatalf("unexpected error on clean scan: %v", resp.Error)
+	}
+
+	callRes, ok := resp.Result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected result map, got: %T", resp.Result)
+	}
+	contentSlice, ok := callRes["content"].([]any)
+	if !ok || len(contentSlice) == 0 {
+		t.Fatalf("expected non-empty content slice, got: %v", callRes["content"])
+	}
+	firstItem := contentSlice[0].(map[string]any)
+	text := firstItem["text"].(string)
+
+	if text == "null" {
+		t.Errorf("expected clean message, got literal 'null'")
+	}
+	if !strings.Contains(text, " CLEAN") {
+		t.Errorf("expected text to contain ' CLEAN', got: %s", text)
+	}
+}
+
+func TestMCP_Scan_RichDiagnosticMetadata(t *testing.T) {
+	ws := t.TempDir()
+	violationFile := filepath.Join(ws, "Violations.astro")
+	_ = os.WriteFile(violationFile, []byte(`<div class="bg-black/50">Violations</div>`), 0o600)
+
+	_, inW, outR, _, cleanup := setupTestServer(t, ws)
+	defer cleanup()
+
+	// Handshake
+	_, _ = inW.Write([]byte(`{"jsonrpc":"2.0","id":1,"method":"initialize"}` + "\n"))
+	_ = readJSONResponse(t, outR)
+	_, _ = inW.Write([]byte(`{"jsonrpc":"2.0","method":"notifications/initialized"}` + "\n"))
+	time.Sleep(20 * time.Millisecond)
+
+	// Scan file with violations
+	_, _ = inW.Write([]byte(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"charites_scan","arguments":{"path":"Violations.astro"}}}` + "\n"))
+	resp := readJSONResponse(t, outR)
+	if resp.Error != nil {
+		t.Fatalf("unexpected error on scan: %v", resp.Error)
+	}
+
+	callRes := resp.Result.(map[string]any)
+	contentSlice := callRes["content"].([]any)
+	firstItem := contentSlice[0].(map[string]any)
+	text := firstItem["text"].(string)
+
+	var items []mcp.ScanDiagnosticItem
+	if err := json.Unmarshal([]byte(text), &items); err != nil {
+		t.Fatalf("failed to unmarshal scan diagnostic items: %v, raw: %s", err, text)
+	}
+	if len(items) == 0 {
+		t.Fatalf("expected at least 1 violation item, got 0")
+	}
+
+	item := items[0]
+	if !strings.HasPrefix(item.WikiURL, "https://github.com/will2469/charites/wiki/") {
+		t.Errorf("expected canonical online wiki URL, got: %s", item.WikiURL)
+	}
+	if !strings.Contains(item.ExplainHint, "charites_explain_rule") {
+		t.Errorf("expected explain hint mentioning charites_explain_rule, got: %s", item.ExplainHint)
+	}
+}
+
+func TestMCP_Tools_PromptSteering(t *testing.T) {
+	tools := mcp.DefaultTools()
+	toolMap := make(map[string]mcp.ToolDefinition)
+	for _, tool := range tools {
+		toolMap[tool.Name] = tool
+	}
+
+	scanTool, ok := toolMap["charites_scan"]
+	if !ok {
+		t.Fatal("missing charites_scan tool")
+	}
+	if !strings.Contains(scanTool.Description, "MANDATORY FRONTEND AUDITOR") {
+		t.Errorf("expected scan tool to contain prompt steering directive, got: %s", scanTool.Description)
+	}
+
+	explainTool, ok := toolMap["charites_explain_rule"]
+	if !ok {
+		t.Fatal("missing charites_explain_rule tool")
+	}
+	if !strings.Contains(explainTool.Description, "Authoritative 8-Pillars documentation") {
+		t.Errorf("expected explain tool to mention 8-Pillars, got: %s", explainTool.Description)
+	}
 }
