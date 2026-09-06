@@ -360,6 +360,11 @@ func TestScenario14_ZeroHostFootprintAudit(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	configDir := filepath.Join(home, ".config", "charites")
 	cacheDir := filepath.Join(home, ".cache", "charites")
+	if stale, _ := filepath.Glob(filepath.Join(os.TempDir(), "charites*")); len(stale) > 0 {
+		for _, s := range stale {
+			_ = os.RemoveAll(s)
+		}
+	}
 
 	_, _, code := runBinary(t, []string{"scan", cleanDir})
 	if code != 0 {

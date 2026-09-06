@@ -101,7 +101,7 @@ type ruleTemplateData struct {
 
 // Generate menghasilkan berkas Home.md, <category>.md, dan <category>/<slug>.md ke direktori target.
 func (g *Generator) Generate(outputDir string) error {
-	tmpDir, err := os.MkdirTemp("", "charites-wiki-staging-*")
+	tmpDir, err := os.MkdirTemp("", ".charites-wiki-staging-*")
 	if err != nil {
 		return fmt.Errorf("failed to create staging directory: %w", err)
 	}

@@ -111,7 +111,7 @@ Subcommand `charites wiki [output_dir]` (default: `./wiki/`) me-render tiga lapi
 - **Invarian Nol Pergeseran Git (Zero Churn):** Generator dilarang menyertakan timestamp pembuatan yang berubah-ubah di dalam output markdown. Pengeksekusian berulang pada binary yang sama menjamin output biner identik.
 
 ### 4. Generasi Berkas Bersifat Atomik (Atomic Directory Generation)
-- Generator merender seluruh berkas ke dalam direktori staging sementara (`os.MkdirTemp("", "charites-wiki-staging-*")`).
+- Generator merender seluruh berkas ke dalam direktori staging sementara (`os.MkdirTemp("", ".charites-wiki-staging-*")`).
 - Jika terjadi kegagalan rendering pada salah satu template atau berkas, proses dibatalkan dan direktori sementara dibersihkan tanpa memodifikasi direktori `wiki/` yang ada.
 - Jika seluruh berkas berhasil dirender 100%, staging disinkronkan secara atomik ke direktori sasaran.
 
