@@ -1,0 +1,14 @@
+---
+// Astro Component with touch-none for canvas drawing
+---
+
+<div class="interactive-workspace">
+  <!-- Compliant: touch-none gives complete drawing isolation -->
+  <div
+    id="signature-canvas"
+    onpointermove="trackSignature(event)"
+    class="w-full h-64 border rounded-2xl bg-card touch-none"
+  >
+    <span>Area Tanda Tangan Digital</span>
+  </div>
+</div>

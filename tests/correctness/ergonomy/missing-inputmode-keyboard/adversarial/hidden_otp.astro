@@ -1,0 +1,11 @@
+---
+// Astro Component with hidden security token
+---
+
+<form method="POST">
+  <!-- Hidden inputs should not trigger virtual keyboard checks -->
+  <input type="hidden" name="otp_nonce" value="a8f93e1b" />
+  <button type="submit" class="h-11 px-4 bg-primary text-primary-foreground rounded-xl">
+    Kirim Ulang
+  </button>
+</form>

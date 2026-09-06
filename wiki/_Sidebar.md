@@ -49,6 +49,16 @@
 </details>
 
 <details open>
+<summary><b>Ergonomy</b> (3 rules)</summary>
+
+* [**Ergonomy Overview**](ergonomy)
+* [`ergonomy.gesture-without-touch-action`](ergonomy.gesture-without-touch-action)
+* [`ergonomy.missing-inputmode-keyboard`](ergonomy.missing-inputmode-keyboard)
+* [`ergonomy.tap-highlight-not-handled`](ergonomy.tap-highlight-not-handled)
+
+</details>
+
+<details open>
 <summary><b>Theme</b> (32 rules)</summary>
 
 * [**Theme Overview**](theme)

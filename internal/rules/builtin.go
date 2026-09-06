@@ -3,6 +3,7 @@ package rules
 import (
 	"github.com/will2469/charites/internal/rules/a11y"
 	"github.com/will2469/charites/internal/rules/browser"
+	"github.com/will2469/charites/internal/rules/ergonomy"
 	"github.com/will2469/charites/internal/rules/theme"
 )
 
@@ -134,6 +135,11 @@ func builtinRules() []Rule {
 		browser.NewChromeOnlyAPIRule(),
 		browser.NewFirefoxOnlyAPIRule(),
 		browser.NewSafariOnlyAPIRule(),
+
+		// ergonomy Wave 1 (Virtual Keypad, Touch Feedback & Gesture Ergonomics)
+		ergonomy.NewMissingInputmodeKeyboardRule(),
+		ergonomy.NewTapHighlightNotHandledRule(),
+		ergonomy.NewGestureWithoutTouchActionRule(),
 	}
 }
 

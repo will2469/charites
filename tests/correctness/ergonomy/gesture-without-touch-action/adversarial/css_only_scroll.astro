@@ -1,0 +1,11 @@
+---
+// Astro Component with pure CSS scroll
+---
+
+<div class="scroll-container">
+  <!-- Pure CSS scroll container without JS event listeners should NOT require touch-action -->
+  <div class="flex overflow-x-auto gap-4 p-4">
+    <div class="w-64 h-40 bg-card rounded-2xl shrink-0">Item A</div>
+    <div class="w-64 h-40 bg-card rounded-2xl shrink-0">Item B</div>
+  </div>
+</div>

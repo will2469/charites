@@ -1,0 +1,14 @@
+---
+// Astro Component with clickable non-native element lacking tap feedback
+---
+
+<div class="card-list">
+  <div
+    role="button"
+    tabindex="0"
+    onclick="alert('Pilih berkas')"
+    class="p-4 bg-card border rounded-2xl cursor-pointer"
+  >
+    <span>Pengajuan Surat Nikah</span>
+  </div>
+</div>

@@ -1,0 +1,14 @@
+---
+// Astro Component with pointermove drag without touch-action
+---
+
+<div class="interactive-workspace">
+  <!-- Missing touch-none or touch-action declaration -->
+  <div
+    id="signature-canvas"
+    onpointermove="trackSignature(event)"
+    class="w-full h-64 border rounded-2xl bg-card"
+  >
+    <span>Area Tanda Tangan Digital</span>
+  </div>
+</div>
