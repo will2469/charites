@@ -1,0 +1,9 @@
+---
+// Negative fixture: Catch block re-throwing the error
+---
+<button
+  onclick="try { await submitForm(); } catch (err) { throw err; }"
+  class="btn"
+>
+  Kirim
+</button>

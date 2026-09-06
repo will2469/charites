@@ -1,0 +1,6 @@
+---
+// Positive fixture: Form with async submit handler lacking disabled reentry lock and feedback
+---
+<form onsubmit="fetch('/api/checkout', { method: 'POST' })" class="space-y-4">
+  <button type="submit" class="bg-primary text-white p-2">Kirim Pesanan</button>
+</form>

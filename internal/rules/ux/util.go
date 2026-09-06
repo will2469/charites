@@ -1008,3 +1008,249 @@ func findDirectNetworkCall(handler string) (string, bool) {
 	}
 	return "", false
 }
+
+// detectAsyncMutationHandler memeriksa apakah handler memicu mutasi asinkron.
+func detectAsyncMutationHandler(handler string) bool {
+	lower := strings.ToLower(cleanAttrValue(handler))
+	if lower == "" {
+		return false
+	}
+	if strings.Contains(lower, "api.post") || strings.Contains(lower, "api.put") ||
+		strings.Contains(lower, "api.delete") || strings.Contains(lower, "api.patch") ||
+		strings.Contains(lower, "fetch(") || strings.Contains(lower, "mutate(") ||
+		strings.Contains(lower, "mutation(") || strings.Contains(lower, "await ") {
+		return true
+	}
+	return false
+}
+
+// hasReentryGuard memeriksa keberadaan guard kunci interaksi (R1).
+func hasReentryGuard(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, attr := range [...]string{"disabled", "aria-disabled"} {
+		if val, ok := getAttrCaseInsensitive(node, attr); ok {
+			lower := strings.ToLower(cleanAttrValue(val))
+			if lower != "false" && lower != "{false}" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasPerceivableFeedback memeriksa keberadaan umpan balik visual bahwa proses sedang berjalan (R2).
+func hasPerceivableFeedback(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	if val, ok := getAttrCaseInsensitive(node, "aria-busy"); ok {
+		lower := strings.ToLower(cleanAttrValue(val))
+		if lower != "false" && lower != "{false}" {
+			return true
+		}
+	}
+	for n := range node.Walk() {
+		if isPendingIndicatorNode(n) {
+			return true
+		}
+	}
+	return false
+}
+
+func isPendingIndicatorNode(n *ir.Node) bool {
+	if n.Type == ir.NodeElement {
+		tagLower := strings.ToLower(n.Tag)
+		if strings.Contains(tagLower, "spinner") || strings.Contains(tagLower, "loader") ||
+			strings.Contains(tagLower, "loading") {
+			return true
+		}
+		for _, cls := range n.Classes {
+			base := strings.ToLower(StripVariantsOnlyBase(cls))
+			if strings.Contains(base, "spin") || strings.Contains(base, "loading") {
+				return true
+			}
+		}
+	}
+	if n.Type == ir.NodeText {
+		txt := strings.ToLower(n.RawClasses)
+		if strings.Contains(txt, "memproses") || strings.Contains(txt, "loading") ||
+			strings.Contains(txt, "menyimpan") || strings.Contains(txt, "submitting") {
+			return true
+		}
+	}
+	return false
+}
+
+// detectDestructiveAction memeriksa apakah elemen memicu mutasi atau aksi destruktif.
+func detectDestructiveAction(node *ir.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	for attrName, attrVal := range node.Attributes {
+		if !isEventHandlerOrActionAttr(attrName) {
+			continue
+		}
+		if act, ok := matchDestructiveKeyword(attrVal); ok {
+			return act, true
+		}
+	}
+	if isDestructiveStyledElement(node) {
+		for _, child := range node.Children {
+			if child.Type == ir.NodeText {
+				if act, ok := matchDestructiveKeyword(child.RawClasses); ok {
+					return act, true
+				}
+			}
+		}
+	}
+	return "", false
+}
+
+func matchDestructiveKeyword(text string) (string, bool) {
+	lower := strings.ToLower(text)
+	keywords := [...]string{"delete", "remove", "destroy", "purge", "revoke", "hapus"}
+	for _, kw := range keywords {
+		if strings.Contains(lower, kw) {
+			return kw, true
+		}
+	}
+	return "", false
+}
+
+func isDestructiveStyledElement(node *ir.Node) bool {
+	for _, cls := range node.Classes {
+		base := strings.ToLower(StripVariantsOnlyBase(cls))
+		if strings.Contains(base, "destructive") || strings.Contains(base, "danger") ||
+			strings.HasPrefix(base, "bg-red-") || strings.HasPrefix(base, "text-red-") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasConfirmationGating memeriksa apakah aksi destruktif dilindungi dialog atau konfirmasi.
+func hasConfirmationGating(node *ir.Node, handler string) bool {
+	if node == nil {
+		return false
+	}
+	lowerHandler := strings.ToLower(cleanAttrValue(handler))
+	if strings.Contains(lowerHandler, "confirm(") || strings.Contains(lowerHandler, "window.confirm(") {
+		return true
+	}
+	if hasConfirmationAttribute(node) {
+		return true
+	}
+	return isInsideConfirmationWrapper(node)
+}
+
+func hasConfirmationAttribute(node *ir.Node) bool {
+	for k, v := range node.Attributes {
+		kLower := strings.ToLower(k)
+		if strings.Contains(kLower, "confirm") {
+			return true
+		}
+		vLower := strings.ToLower(v)
+		if strings.Contains(vLower, "confirm") || strings.Contains(vLower, "step === 2") {
+			return true
+		}
+	}
+	return false
+}
+
+func isInsideConfirmationWrapper(node *ir.Node) bool {
+	curr := node.Parent
+	for curr != nil {
+		tagLower := strings.ToLower(curr.Tag)
+		if strings.Contains(tagLower, "confirm") || strings.Contains(tagLower, "dialog") ||
+			strings.Contains(tagLower, "modal") || strings.Contains(tagLower, "alertdialog") {
+			return true
+		}
+		curr = curr.Parent
+	}
+	return false
+}
+
+// detectUnboundedAsyncLoading memeriksa apakah handler mengaktifkan loading sebelum await tanpa me-reset di exit path.
+func detectUnboundedAsyncLoading(handler string) bool {
+	lower := strings.ToLower(cleanAttrValue(handler))
+	if !hasAsyncLoadingStart(lower) {
+		return false
+	}
+	if !strings.Contains(lower, "await ") {
+		return false
+	}
+	if strings.Contains(lower, "finally") {
+		return false
+	}
+	return !hasAsyncLoadingEnd(lower)
+}
+
+func hasAsyncLoadingStart(lower string) bool {
+	starts := [...]string{
+		"setloading(true)", "setisloading(true)", "setpending(true)",
+		"setispending(true)", "setsubmitting(true)",
+	}
+	for _, s := range starts {
+		if strings.Contains(lower, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasAsyncLoadingEnd(lower string) bool {
+	ends := [...]string{
+		"setloading(false)", "setisloading(false)", "setpending(false)",
+		"setispending(false)", "setsubmitting(false)",
+	}
+	for _, e := range ends {
+		if strings.Contains(lower, e) {
+			return true
+		}
+	}
+	return false
+}
+
+// detectSilentCatchSwallow memeriksa apakah blok catch menelan error tanpa memberi umpan balik atau re-throw.
+func detectSilentCatchSwallow(handler string) bool {
+	lower := strings.ToLower(cleanAttrValue(handler))
+	catchIdx := strings.Index(lower, "catch")
+	if catchIdx == -1 {
+		return false
+	}
+	catchBody := lower[catchIdx:]
+
+	if hasErrorFeedbackInCatch(catchBody) || strings.Contains(catchBody, "throw ") || strings.Contains(catchBody, "throw;") {
+		return false
+	}
+
+	return hasSwallowPatternInCatch(catchBody)
+}
+
+func hasErrorFeedbackInCatch(catchBody string) bool {
+	feedbackKeywords := [...]string{
+		"toast.", "toast(", "seterror(", "seterr(", "alert(",
+		"banner(", "notification(", "notify(", "reporterror(",
+		"message.error(", "dispatch(",
+	}
+	for _, kw := range feedbackKeywords {
+		if strings.Contains(catchBody, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSwallowPatternInCatch(catchBody string) bool {
+	if strings.Contains(catchBody, "console.log(") || strings.Contains(catchBody, "console.error(") ||
+		strings.Contains(catchBody, "console.warn(") {
+		return true
+	}
+	stripped := strings.ReplaceAll(catchBody, " ", "")
+	stripped = strings.ReplaceAll(stripped, "\t", "")
+	stripped = strings.ReplaceAll(stripped, "\n", "")
+	stripped = strings.ReplaceAll(stripped, "\r", "")
+	return strings.Contains(stripped, "{}") || strings.Contains(stripped, "{;}")
+}

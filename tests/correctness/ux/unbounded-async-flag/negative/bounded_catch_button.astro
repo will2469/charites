@@ -1,0 +1,9 @@
+---
+// Negative fixture: Loading flag explicitly reset in catch block
+---
+<button
+  onclick="setLoading(true); try { await api.save(); } catch (e) { setLoading(false); }"
+  class="btn"
+>
+  Simpan
+</button>

@@ -1,0 +1,8 @@
+---
+// Negative fixture: Form with async submit having disabled and aria-busy
+---
+<form onsubmit="fetch('/api/checkout', { method: 'POST' })" disabled="true" aria-busy="true">
+  <button type="submit" disabled class="bg-gray-400 p-2">
+    <div class="animate-spin inline-block"></div> Memproses...
+  </button>
+</form>

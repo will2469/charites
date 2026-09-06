@@ -65,7 +65,7 @@ flowchart TD
 | `pwa` | 10 | [`pwa`](pwa) |
 | `responsive` | 17 | [`responsive`](responsive) |
 | `theme` | 32 | [`theme`](theme) |
-| `ux` | 12 | [`ux`](ux) |
+| `ux` | 16 | [`ux`](ux) |
 
 ---
 
@@ -171,6 +171,7 @@ flowchart TD
 | `theme.unpaired-dark-variant` | `theme` | `WARN` | Detects one-sided dark theme variant declarations causing severe contrast collisions | [`theme.unpaired-dark-variant`](theme.unpaired-dark-variant) |
 | `ux.camouflaged-link` | `ux` | `WARN` | Warns when inline prose links rely solely on color without persistent underline or non-color affordance | [`ux.camouflaged-link`](ux.camouflaged-link) |
 | `ux.competing-primary-cta` | `ux` | `WARN` | Warns when an action group or interactive container contains more than one primary call-to-action button | [`ux.competing-primary-cta`](ux.competing-primary-cta) |
+| `ux.destructive-action-unconfirmed` | `ux` | `ERROR` | Enforces confirmation gating for destructive actions to prevent accidental data loss from slips | [`ux.destructive-action-unconfirmed`](ux.destructive-action-unconfirmed) |
 | `ux.disabled-control-no-explanation` | `ux` | `WARN` | Enforces feedforward explanation for disabled interactive controls to prevent user dead ends | [`ux.disabled-control-no-explanation`](ux.disabled-control-no-explanation) |
 | `ux.empty-collection-unhandled` | `ux` | `INFO` | Advises handling empty collection state when mapping dynamic items to avoid zero-state blindness | [`ux.empty-collection-unhandled`](ux.empty-collection-unhandled) |
 | `ux.missing-autofill` | `ux` | `WARN` | Enforces W3C Living Standard autocomplete attributes on personal identity, credential, and payment form inputs (Tesler's Law) | [`ux.missing-autofill`](ux.missing-autofill) |
@@ -178,7 +179,10 @@ flowchart TD
 | `ux.nav-overflow-chunking` | `ux` | `WARN` | Warns when a navigation landmark contains more than 7 direct navigation links without chunking mechanisms | [`ux.nav-overflow-chunking`](ux.nav-overflow-chunking) |
 | `ux.orphaned-error-state` | `ux` | `WARN` | Flags error state updates in event handlers that lack corresponding UI error presentation elements | [`ux.orphaned-error-state`](ux.orphaned-error-state) |
 | `ux.radio-overchoice` | `ux` | `WARN` | Warns when radio groups present excessive flat options (> 7) without filtering or combobox grouping, violating Hick-Hyman Law | [`ux.radio-overchoice`](ux.radio-overchoice) |
+| `ux.silent-catch-swallow` | `ux` | `ERROR` | Detects swallowed catch blocks in event handlers that lack user feedback (toast/alert) or re-throw | [`ux.silent-catch-swallow`](ux.silent-catch-swallow) |
 | `ux.spacing-inversion` | `ux` | `WARN` | Warns when child element intra-spacing exceeds parent gap or when space-y conflicts with child mt margin in Tailwind v3 | [`ux.spacing-inversion`](ux.spacing-inversion) |
+| `ux.submit-feedback-missing` | `ux` | `WARN` | Enforces reentry guard (disabled) and perceivable feedback (aria-busy/spinner) on async mutation triggers | [`ux.submit-feedback-missing`](ux.submit-feedback-missing) |
+| `ux.unbounded-async-flag` | `ux` | `ERROR` | Detects async handlers setting loading flags without guaranteed reset in finally/catch exit paths | [`ux.unbounded-async-flag`](ux.unbounded-async-flag) |
 | `ux.unconventional-home-link` | `ux` | `WARN` | Enforces Jakob's Law by ensuring header logo/brand identity links to the root home page ('/') | [`ux.unconventional-home-link`](ux.unconventional-home-link) |
 | `ux.unthrottled-input-handler` | `ux` | `WARN` | Flags text input handlers that trigger unthrottled network calls directly on keystrokes | [`ux.unthrottled-input-handler`](ux.unthrottled-input-handler) |
 

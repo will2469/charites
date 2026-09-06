@@ -1,0 +1,8 @@
+---
+// Positive fixture: Input handler with completely empty catch block
+---
+<input
+  type="text"
+  onchange="try { await sendFeedback(this.value); } catch (err) {}"
+  class="input"
+/>

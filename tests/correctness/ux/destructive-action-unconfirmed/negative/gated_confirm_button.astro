@@ -1,0 +1,9 @@
+---
+// Negative fixture: Delete button protected with window.confirm() check
+---
+<button
+  onclick="if(confirm('Yakin ingin menghapus item ini?')) deleteRecord();"
+  class="text-red-500 font-medium"
+>
+  Hapus Item
+</button>

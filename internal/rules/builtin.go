@@ -120,6 +120,12 @@ var (
 	_ Rule = (*ux.DisabledControlNoExplanationRule)(nil)
 	_ Rule = (*ux.OrphanedErrorStateRule)(nil)
 	_ Rule = (*ux.UnthrottledInputHandlerRule)(nil)
+
+	// ux Wave 4 (Async Control-Flow, Action Safety & Doherty Threshold)
+	_ Rule = (*ux.SubmitFeedbackMissingRule)(nil)
+	_ Rule = (*ux.UnboundedAsyncFlagRule)(nil)
+	_ Rule = (*ux.DestructiveActionUnconfirmedRule)(nil)
+	_ Rule = (*ux.SilentCatchSwallowRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -272,6 +278,12 @@ func builtinRules() []Rule {
 		ux.NewDisabledControlNoExplanationRule(),
 		ux.NewOrphanedErrorStateRule(),
 		ux.NewUnthrottledInputHandlerRule(),
+
+		// ux Wave 4 (Async Control-Flow, Action Safety & Doherty Threshold)
+		ux.NewSubmitFeedbackMissingRule(),
+		ux.NewUnboundedAsyncFlagRule(),
+		ux.NewDestructiveActionUnconfirmedRule(),
+		ux.NewSilentCatchSwallowRule(),
 	}
 }
 

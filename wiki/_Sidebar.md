@@ -152,11 +152,12 @@
 </details>
 
 <details open>
-<summary><b>Ux</b> (12 rules)</summary>
+<summary><b>Ux</b> (16 rules)</summary>
 
 * [**Ux Overview**](ux)
 * [`ux.camouflaged-link`](ux.camouflaged-link)
 * [`ux.competing-primary-cta`](ux.competing-primary-cta)
+* [`ux.destructive-action-unconfirmed`](ux.destructive-action-unconfirmed)
 * [`ux.disabled-control-no-explanation`](ux.disabled-control-no-explanation)
 * [`ux.empty-collection-unhandled`](ux.empty-collection-unhandled)
 * [`ux.missing-autofill`](ux.missing-autofill)
@@ -164,7 +165,10 @@
 * [`ux.nav-overflow-chunking`](ux.nav-overflow-chunking)
 * [`ux.orphaned-error-state`](ux.orphaned-error-state)
 * [`ux.radio-overchoice`](ux.radio-overchoice)
+* [`ux.silent-catch-swallow`](ux.silent-catch-swallow)
 * [`ux.spacing-inversion`](ux.spacing-inversion)
+* [`ux.submit-feedback-missing`](ux.submit-feedback-missing)
+* [`ux.unbounded-async-flag`](ux.unbounded-async-flag)
 * [`ux.unconventional-home-link`](ux.unconventional-home-link)
 * [`ux.unthrottled-input-handler`](ux.unthrottled-input-handler)
 

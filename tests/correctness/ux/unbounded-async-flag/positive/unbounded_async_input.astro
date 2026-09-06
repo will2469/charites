@@ -1,0 +1,8 @@
+---
+// Positive fixture: Input handler turning on loading state without finally reset
+---
+<input
+  type="text"
+  onchange="setIsLoading(true); await fetch('/api/search');"
+  class="input"
+/>
