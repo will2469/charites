@@ -117,7 +117,7 @@ func (r *InputCrampedPaddingRule) Evaluate(node *ir.Node) []ir.Diagnostic {
 				Rule:     r.ID(),
 				Severity: r.DefaultSeverity(),
 				Message:  fmt.Sprintf("Input <%s> has cramped height '%s' (%.0fpx < 42px), impeding touch targeting and text readability", node.Tag, state.heightClass, state.explicitHeight),
-				Hint:     "Use at least 'h-11' (44px) or 'min-h-[44px]' for accessible form controls (WCAG 2.5.8 / Apple HIG).",
+				Hint:     "Use at least 'h-11' (2.75rem / 44px) or 'py-2.5' for accessible form controls (WCAG 2.5.8 / Apple HIG).",
 			},
 		}
 	}

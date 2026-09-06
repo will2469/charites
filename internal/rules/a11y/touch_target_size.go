@@ -66,13 +66,13 @@ func (r *TouchTargetSizeRule) Doc() ir.RuleDocumentation {
 		GoodExamples: []ir.CodeExample{
 			{
 				Language: "tsx",
-				Comment:  "44px target with centered inner icon",
+				Comment:  "44px (2.75rem) target with centered inner icon",
 				Code:     `<button className="h-11 w-11 flex items-center justify-center"><TrashIcon className="h-5 w-5" /></button>`,
 			},
 			{
 				Language: "astro",
-				Comment:  "Explicit minimum dimensions to guarantee 44px tap zone",
-				Code:     `<button class="h-8 w-8 min-h-[44px] min-w-[44px] flex items-center justify-center"><CloseIcon /></button>`,
+				Comment:  "Explicit minimum dimensions to guarantee 44px (2.75rem) tap zone",
+				Code:     `<button class="h-8 w-8 min-h-11 min-w-11 flex items-center justify-center"><CloseIcon /></button>`,
 			},
 		},
 		Risks: []ir.RiskItem{
@@ -162,7 +162,7 @@ func (r *TouchTargetSizeRule) Evaluate(node *ir.Node) []ir.Diagnostic {
 				Rule:     r.ID(),
 				Severity: r.DefaultSeverity(),
 				Message:  fmt.Sprintf("Interactive <%s> touch target size is too small (%s < 44px)", node.Tag, dimDesc),
-				Hint:     "Ensure at least 44x44px target area using 'min-h-11 min-w-11' or 'min-h-[44px] min-w-[44px]' (Apple HIG / WCAG 2.5.8).",
+				Hint:     "Ensure at least 44x44px (2.75rem) target area using 'size-11', 'min-h-11 min-w-11', or padding compensation (Apple HIG / WCAG 2.5.8).",
 			},
 		}
 	}
