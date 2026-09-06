@@ -106,15 +106,19 @@
 </details>
 
 <details open>
-<summary><b>Lcp</b> (8 rules)</summary>
+<summary><b>Lcp</b> (12 rules)</summary>
 
 * [**Lcp Overview**](lcp)
+* [`lcp.blocked-critical-font`](lcp.blocked-critical-font)
 * [`lcp.client-only-lcp-content`](lcp.client-only-lcp-content)
+* [`lcp.external-font-discovery-delay`](lcp.external-font-discovery-delay)
 * [`lcp.heavy-raster-lcp-asset`](lcp.heavy-raster-lcp-asset)
 * [`lcp.image-source-density-mismatch`](lcp.image-source-density-mismatch)
 * [`lcp.lazy-loaded-lcp-image`](lcp.lazy-loaded-lcp-image)
+* [`lcp.legacy-critical-font-resource`](lcp.legacy-critical-font-resource)
 * [`lcp.missing-lcp-image-preload`](lcp.missing-lcp-image-preload)
 * [`lcp.oversized-lcp-resource-selection`](lcp.oversized-lcp-resource-selection)
+* [`lcp.preload-font-cors-mismatch`](lcp.preload-font-cors-mismatch)
 * [`lcp.undiscoverable-lcp-image`](lcp.undiscoverable-lcp-image)
 * [`lcp.unhinted-lcp-image-priority`](lcp.unhinted-lcp-image-priority)
 

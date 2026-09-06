@@ -651,3 +651,241 @@ func hasFallbackSlot(node *ir.Node) bool {
 	}
 	return false
 }
+
+// getStyleNodeText mengekstrak seluruh teks CSS dari child node NodeText dalam <style> atau dari RawClasses.
+func getStyleNodeText(node *ir.Node) string {
+	if node == nil {
+		return ""
+	}
+	if len(node.Children) == 0 {
+		return node.RawClasses
+	}
+	var sb strings.Builder
+	for _, child := range node.Children {
+		if child != nil && child.Type == ir.NodeText {
+			sb.WriteString(child.RawClasses)
+		}
+	}
+	res := sb.String()
+	if len(res) == 0 {
+		return node.RawClasses
+	}
+	return res
+}
+
+// extractFontFaceBlocks mengekstrak blok deklarasi di dalam @font-face { ... }.
+func extractFontFaceBlocks(css string) []string {
+	if !strings.Contains(css, "@font-face") {
+		return nil
+	}
+	var blocks []string
+	idx := 0
+	for {
+		pos := strings.Index(css[idx:], "@font-face")
+		if pos == -1 {
+			break
+		}
+		start := idx + pos + len("@font-face")
+		braceOpen := strings.IndexByte(css[start:], '{')
+		if braceOpen == -1 {
+			break
+		}
+		blockStart := start + braceOpen + 1
+		braceClose := strings.IndexByte(css[blockStart:], '}')
+		if braceClose == -1 {
+			break
+		}
+		blockEnd := blockStart + braceClose
+		blocks = append(blocks, css[blockStart:blockEnd])
+		idx = blockEnd + 1
+	}
+	return blocks
+}
+
+// extractFontFamilyName mengekstrak nilai font-family dari blok @font-face.
+func extractFontFamilyName(block string) string {
+	lower := strings.ToLower(block)
+	pos := strings.Index(lower, "font-family")
+	if pos == -1 {
+		return "custom-font"
+	}
+	after := block[pos+len("font-family"):]
+	colon := strings.IndexByte(after, ':')
+	if colon == -1 {
+		return "custom-font"
+	}
+	val := after[colon+1:]
+	semi := strings.IndexByte(val, ';')
+	if semi != -1 {
+		val = val[:semi]
+	}
+	trimmed := strings.Trim(strings.TrimSpace(val), `'"`)
+	if len(trimmed) == 0 {
+		return "custom-font"
+	}
+	return trimmed
+}
+
+// isIconFontFamily memeriksa apakah jenis font merupakan icon font yang sengaja menggunakan font-display block.
+func isIconFontFamily(family string) bool {
+	lower := strings.ToLower(family)
+	return strings.Contains(lower, "icon") ||
+		strings.Contains(lower, "glyph") ||
+		strings.Contains(lower, "symbol") ||
+		strings.Contains(lower, "feather") ||
+		strings.Contains(lower, "fa-") ||
+		strings.Contains(lower, "awesome")
+}
+
+// isLocalOnlyFontFace memeriksa apakah blok @font-face hanya merujuk pada font sistem lokal tanpa mengunduh font web via url().
+func isLocalOnlyFontFace(block string) bool {
+	lower := strings.ToLower(block)
+	srcPos := strings.Index(lower, "src")
+	if srcPos == -1 {
+		return false
+	}
+	srcContent := lower[srcPos:]
+	return strings.Contains(srcContent, "local(") && !strings.Contains(srcContent, "url(")
+}
+
+// hasValidSwapFontDisplay memeriksa apakah deklarasi @font-face memiliki font-display swap atau optional.
+func hasValidSwapFontDisplay(block string) bool {
+	lower := strings.ToLower(block)
+	pos := strings.Index(lower, "font-display")
+	if pos == -1 {
+		return false
+	}
+	after := lower[pos+len("font-display"):]
+	colon := strings.IndexByte(after, ':')
+	if colon == -1 {
+		return false
+	}
+	val := after[colon+1:]
+	semi := strings.IndexByte(val, ';')
+	if semi != -1 {
+		val = val[:semi]
+	}
+	val = strings.TrimSpace(val)
+	return val == "swap" || val == "optional"
+}
+
+// isThirdPartyFontStylesheet mendeteksi tag <link rel="stylesheet"> yang memuat font pihak ketiga (misal: Google Fonts).
+func isThirdPartyFontStylesheet(node *ir.Node) (string, bool) {
+	if node == nil || !strings.EqualFold(node.Tag, "link") || node.Attributes == nil {
+		return "", false
+	}
+	rel, okRel := node.Attributes["rel"]
+	if !okRel || !strings.EqualFold(cleanAttrVal(rel), "stylesheet") {
+		return "", false
+	}
+	href, okHref := node.Attributes["href"]
+	if !okHref {
+		return "", false
+	}
+	cleanHref := cleanAttrVal(href)
+	lower := strings.ToLower(cleanHref)
+	if strings.Contains(lower, "fonts.googleapis.com") ||
+		strings.Contains(lower, "use.typekit.net") ||
+		strings.Contains(lower, "api.fontshare.com") ||
+		strings.Contains(lower, "fonts.cdnfonts.com") {
+		return cleanHref, true
+	}
+	return "", false
+}
+
+// getRequiredFontPreconnectOrigin mengembalikan origin biner font yang wajib di-preconnect.
+func getRequiredFontPreconnectOrigin(href string) string {
+	lower := strings.ToLower(href)
+	if strings.Contains(lower, "fonts.googleapis.com") {
+		return "fonts.gstatic.com"
+	}
+	if strings.Contains(lower, "use.typekit.net") {
+		return "typekit.net"
+	}
+	if strings.Contains(lower, "api.fontshare.com") {
+		return "fontshare.com"
+	}
+	return "cdnfonts.com"
+}
+
+// hasPreconnectHint memeriksa apakah dokumen memiliki <link rel="preconnect"> yang merujuk pada origin font.
+func hasPreconnectHint(node *ir.Node, originSubstr string) bool {
+	root := findDocumentRoot(node)
+	if root == nil {
+		return false
+	}
+	for curr := range root.Walk() {
+		if curr != nil && strings.EqualFold(curr.Tag, "link") && curr.Attributes != nil {
+			if rel, ok := curr.Attributes["rel"]; ok && strings.EqualFold(cleanAttrVal(rel), "preconnect") {
+				if href, okHref := curr.Attributes["href"]; okHref {
+					if strings.Contains(strings.ToLower(cleanAttrVal(href)), originSubstr) {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+// isFontPreloadMissingCORS memeriksa apakah <link rel="preload" as="font"> tidak memiliki atribut crossorigin.
+func isFontPreloadMissingCORS(node *ir.Node) bool {
+	if node == nil || !strings.EqualFold(node.Tag, "link") || node.Attributes == nil {
+		return false
+	}
+	rel, okRel := node.Attributes["rel"]
+	if !okRel || !strings.EqualFold(cleanAttrVal(rel), "preload") {
+		return false
+	}
+	asVal, okAs := node.Attributes["as"]
+	if !okAs || !strings.EqualFold(cleanAttrVal(asVal), "font") {
+		return false
+	}
+	if _, ok := node.Attributes["crossorigin"]; ok {
+		return false
+	}
+	if _, ok := node.Attributes["crossOrigin"]; ok {
+		return false
+	}
+	return true
+}
+
+// hasLegacyFontFormatViolation memeriksa apakah deklarasi src: @font-face menggunakan format lawas tanpa WOFF2 sebagai prioritas pertama.
+func hasLegacyFontFormatViolation(block string) (string, bool) {
+	lower := strings.ToLower(block)
+	srcPos := strings.Index(lower, "src")
+	if srcPos == -1 {
+		return "", false
+	}
+	srcContent := lower[srcPos:]
+	if semi := strings.IndexByte(srcContent, ';'); semi != -1 {
+		srcContent = srcContent[:semi]
+	}
+
+	woff2Idx := strings.Index(srcContent, "woff2")
+
+	legacyFormats := [...]string{".ttf", ".otf", ".eot", "truetype", "opentype", "embedded-opentype"}
+	earliestLegacyIdx := -1
+	foundLegacy := ""
+
+	for _, format := range legacyFormats {
+		idx := strings.Index(srcContent, format)
+		if idx != -1 {
+			if earliestLegacyIdx == -1 || idx < earliestLegacyIdx {
+				earliestLegacyIdx = idx
+				foundLegacy = format
+			}
+		}
+	}
+
+	if earliestLegacyIdx == -1 {
+		return "", false
+	}
+
+	// Jika format woff2 sama sekali tidak ada, atau diletakkan setelah format lawas
+	if woff2Idx == -1 || earliestLegacyIdx < woff2Idx {
+		return foundLegacy, true
+	}
+
+	return "", false
+}

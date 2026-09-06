@@ -189,6 +189,12 @@ var (
 	_ Rule = (*lcp.HeavyRasterLCPAssetRule)(nil)
 	_ Rule = (*lcp.ImageSourceDensityMismatchRule)(nil)
 	_ Rule = (*lcp.ClientOnlyLCPContentRule)(nil)
+
+	// lcp Wave 3 (Font Delivery & Text Block Paint)
+	_ Rule = (*lcp.BlockedCriticalFontRule)(nil)
+	_ Rule = (*lcp.ExternalFontDiscoveryDelayRule)(nil)
+	_ Rule = (*lcp.PreloadFontCORSMismatchRule)(nil)
+	_ Rule = (*lcp.LegacyCriticalFontResourceRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -407,6 +413,12 @@ func builtinRules() []Rule {
 		lcp.NewHeavyRasterLCPAssetRule(),
 		lcp.NewImageSourceDensityMismatchRule(),
 		lcp.NewClientOnlyLCPContentRule(),
+
+		// lcp Wave 3 (Font Delivery & Text Block Paint)
+		lcp.NewBlockedCriticalFontRule(),
+		lcp.NewExternalFontDiscoveryDelayRule(),
+		lcp.NewPreloadFontCORSMismatchRule(),
+		lcp.NewLegacyCriticalFontResourceRule(),
 	}
 }
 
