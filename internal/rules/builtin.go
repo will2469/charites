@@ -69,6 +69,12 @@ var (
 	// pwa Wave 2 (Apple Standalone & Security)
 	_ Rule = (*pwa.AppleMetaMissingRule)(nil)
 	_ Rule = (*pwa.InsecureContextResourceRule)(nil)
+
+	// pwa Wave 3 (Service Worker Lifecycle & Offline Cache)
+	_ Rule = (*pwa.ServiceWorkerNoOfflineFallbackRule)(nil)
+	_ Rule = (*pwa.ServiceWorkerMissingRule)(nil)
+	_ Rule = (*pwa.ServiceWorkerRegistrationRule)(nil)
+	_ Rule = (*pwa.CacheRuntimeAPIRiskRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -172,6 +178,12 @@ func builtinRules() []Rule {
 		// pwa Wave 2 (Apple Standalone & Security)
 		pwa.NewAppleMetaMissingRule(),
 		pwa.NewInsecureContextResourceRule(),
+
+		// pwa Wave 3 (Service Worker Lifecycle & Offline Cache)
+		pwa.NewServiceWorkerNoOfflineFallbackRule(),
+		pwa.NewServiceWorkerMissingRule(),
+		pwa.NewServiceWorkerRegistrationRule(),
+		pwa.NewCacheRuntimeAPIRiskRule(),
 	}
 }
 

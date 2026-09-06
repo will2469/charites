@@ -1,0 +1,8 @@
+---
+---
+<script>
+  self.addEventListener("activate", (event) => {
+    const token = localStorage.getItem("token");
+    alert("Worker activated: " + token);
+  });
+</script>

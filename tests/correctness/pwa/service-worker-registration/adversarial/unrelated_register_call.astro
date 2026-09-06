@@ -1,0 +1,12 @@
+---
+---
+<script>
+  // Custom non-ServiceWorker object registration
+  class AuthClient {
+    register(user) {
+      return Promise.resolve(user);
+    }
+  }
+  const client = new AuthClient();
+  client.register({ name: 'Warga' });
+</script>

@@ -1,0 +1,9 @@
+---
+---
+<script>
+  self.addEventListener("install", (event) => {
+    // Note: Do not use window.location or document.title in worker thread!
+    /* localStorage.getItem("test") is not available */
+    event.waitUntil(Promise.resolve());
+  });
+</script>

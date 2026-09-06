@@ -12,5 +12,6 @@ import { Card } from '../components/Card';
     <main class="p-8">
       <Card />
     </main>
+    <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(() => {}); }</script>
   </body>
 </html>

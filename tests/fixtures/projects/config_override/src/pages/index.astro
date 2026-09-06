@@ -10,5 +10,10 @@ import { WarningCard } from '../components/Card';
   </head>
   <body class="bg-surface p-4">
     <WarningCard />
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      }
+    </script>
   </body>
 </html>

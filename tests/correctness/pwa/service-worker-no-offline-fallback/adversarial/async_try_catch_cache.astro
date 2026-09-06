@@ -1,0 +1,16 @@
+---
+---
+<script>
+  self.addEventListener("fetch", (event) => {
+    event.respondWith(
+      (async () => {
+        try {
+          const res = await fetch(event.request);
+          return res;
+        } catch {
+          return (await caches.match("/offline.html")) || new Response("Offline");
+        }
+      })()
+    );
+  });
+</script>

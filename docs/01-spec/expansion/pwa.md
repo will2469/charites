@@ -267,21 +267,151 @@ flowchart TD
 
 ## 4. Spesifikasi Detail Rule Wave 3: Service Worker Lifecycle & Offline Cache (4 Rules)
 
+---
+
 ### 4.1. `pwa.service-worker-no-offline-fallback`
-- **Tujuan:** Memastikan Service Worker memiliki strategi offline fallback (bukan pass-through fetch kosong) agar tidak memunculkan layar dinosaurus putus koneksi.
-- **Severity:** Warning.
+- **Design Rationale:** W3C Service Workers 1 (Offline Resilience) & Cache-first Fallback Strategy.
+- **Konteks Realitas Mobile:**
+  Di lingkungan jaringan seluler pedesaan atau koneksi nirkabel tidak stabil (*spotty 3G/4G connectivity*), Service Worker yang mencegat event `fetch` tanpa menyediakan strategi cadangan cache lokal akan menyebabkan browser langsung menampilkan layar kegagalan koneksi (*network error* atau layar dinosaurus). Strategi fallback offline (seperti `caches.match` atau penanganan `.catch()`) wajib disediakan untuk menjamin ketahanan aplikasi saat perangkat terputus dari jaringan internet.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen `<script>` yang mendengarkan event `fetch`:
+  $$\text{hasFetchListener}(S) \land \text{interceptsFetch}(S) \land \neg \text{hasCacheFallback}(S) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasFetchListener}$ memeriksa keberadaan `addEventListener("fetch")`, $\text{interceptsFetch}$ memeriksa `respondWith` atau pemanggilan `fetch`, dan $\text{hasCacheFallback}$ memeriksa penggunaan `caches.match`, `cache.match`, `caches.open`, atau penanganan error `.catch()`.
+- **Mengapa Lolos Linter Standar:**
+  Linter JavaScript umum hanya memvalidasi keabsahan sintaksis fungsi dan Promise, tanpa mengevaluasi arsitektur ketahanan offline aplikasi PWA.
+- **Suspicious (Fetch Interception Tanpa Fallback Cache Offline):**
+  ```tsx
+  {/* Pass-through kosong tanpa fallback cache saat koneksi terputus */}
+  <script>
+    self.addEventListener("fetch", (event) => {
+      event.respondWith(fetch(event.request));
+    });
+  </script>
+  ```
+- **Compliant (Menyediakan Fallback Cache Offline Saat Terputus):**
+  ```tsx
+  {/* Mengambil dari cache lokal atau fallback ke offline.html saat gagal */}
+  <script>
+    self.addEventListener("fetch", (event) => {
+      event.respondWith(
+        caches.match(event.request).then((cached) => {
+          return cached || fetch(event.request).catch(() => caches.match("/offline.html"));
+        })
+      );
+    });
+  </script>
+  ```
+- **Engine:** L1 Syntax + L2 Script AST (`internal/rules/pwa/service_worker_no_offline_fallback.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 4.2. `pwa.service-worker-missing`
-- **Tujuan:** Memastikan proyek PWA mendaftarkan service worker untuk mengelola offline caching.
-- **Severity:** Warning.
+- **Design Rationale:** W3C Service Workers & W3C Web App Manifest Integration.
+- **Konteks Realitas Mobile:**
+  Aplikasi web yang mendeklarasikan tautan manifest `<link rel="manifest">` pada `<head>` namun tidak pernah mendaftarkan Service Worker (`navigator.serviceWorker.register`) tidak akan dapat menyimpan *app shell* ke cache perangkat, gagal beroperasi saat luring (*offline*), dan tidak memenuhi kriteria instalabilitas aplikasi PWA modern.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen `<head>` dokumen yang memuat deklarasi `<link rel="manifest">`:
+  $$\text{hasManifestLink}(Head) \land \neg \text{hasServiceWorkerRegistration}(Doc) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasServiceWorkerRegistration}$ memeriksa keberadaan pemanggilan registrasi service worker atau tautan skrip service worker di dalam dokumen.
+- **Mengapa Lolos Linter Standar:**
+  Elemen `<head>` dan `<link>` sah secara sintaksis HTML standar. Keterkaitan antara manifest dan registrasi service worker berada di luar jangkauan linter HTML biasa.
+- **Suspicious (Dokumen PWA dengan Manifest Tanpa Registrasi Service Worker):**
+  ```tsx
+  {/* Dokumen menyatakan manifest tetapi tidak mendaftarkan Service Worker */}
+  <head>
+    <title>Layanan Desa</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+  </head>
+  ```
+- **Compliant (Registrasi Service Worker Disediakan):**
+  ```tsx
+  {/* Service Worker didaftarkan dengan feature detection dan penanganan error */}
+  <head>
+    <title>Layanan Desa</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(console.error);
+      }
+    </script>
+  </head>
+  ```
+- **Engine:** L1 Syntax + L2 Document AST (`internal/rules/pwa/service_worker_missing.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 4.3. `pwa.service-worker-registration`
-- **Tujuan:** Mendeteksi registrasi Service Worker tanpa feature detect `'serviceWorker' in navigator` atau tanpa penanganan error `.catch()`.
-- **Severity:** Warning.
+- **Design Rationale:** W3C Service Workers (Feature Detection & Graceful Failure Resilience).
+- **Konteks Realitas Mobile:**
+  Memanggil `navigator.serviceWorker.register()` secara langsung tanpa memeriksa ketersediaan fitur `'serviceWorker' in navigator` memicu *TypeError* fatal pada browser lawas, Webview terbatas, atau koneksi HTTP non-aman. Selain itu, pendaftaran tanpa penanganan error (`.catch()` atau `try/catch`) menghasilkan *unhandled promise rejection* yang dapat menghentikan inisialisasi skrip antarmuka pengguna.
+- **Invariant (Predikat AST):**
+  Untuk setiap skrip yang memanggil pendaftaran Service Worker:
+  $$\text{registersSW}(S) \land (\neg \text{hasFeatureDetection}(S) \lor \neg \text{hasErrorHandling}(S)) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasFeatureDetection}$ memeriksa ketersediaan `'serviceWorker' in navigator` dan $\text{hasErrorHandling}$ memeriksa penanganan `.catch()` atau blok `try/catch`.
+- **Mengapa Lolos Linter Standar:**
+  Sintaks pemanggilan metode JavaScript valid, dan penanganan Promise bersifat opsional bagi linter bahasa umum.
+- **Suspicious (Registrasi Tanpa Feature Detection atau Error Handling):**
+  ```tsx
+  {/* Berisiko memicu TypeError dan unhandled promise rejection */}
+  <script>
+    navigator.serviceWorker.register('/sw.js');
+  </script>
+  ```
+- **Compliant (Memiliki Guard Feature Detection dan Error Handling):**
+  ```tsx
+  {/* Aman dieksekusi di segala varian browser dan context */}
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('SW registered:', reg.scope))
+        .catch((err) => console.error('SW registration failed:', err));
+    }
+  </script>
+  ```
+- **Engine:** L1 Syntax + L2 Script AST (`internal/rules/pwa/service_worker_registration.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 4.4. `pwa.pwa-cache-runtime-api-risk`
-- **Tujuan:** Mencegah akses API DOM (`window`, `document`, `localStorage`) di dalam thread Service Worker yang memicu crash seketika.
-- **Severity:** Error.
+- **Design Rationale:** W3C Service Workers (Execution Context Invariants & WorkerGlobalScope Isolation).
+- **Konteks Realitas Mobile:**
+  Service Worker dijalankan di dalam thread latar belakang terpisah (`ServiceWorkerGlobalScope`) tanpa akses ke antarmuka DOM (`window`, `document`) maupun penyimpanan sinkron Web Storage (`localStorage`, `sessionStorage`). Memanggil API main-thread ini di dalam skrip Service Worker akan langsung melempar *ReferenceError* saat worker diinisialisasi, menggagalkan instalasi worker dan merusak seluruh fungsi offline caching.
+- **Invariant (Predikat AST):**
+  Untuk setiap skrip konteks Service Worker $W$:
+  $$\text{isWorkerScope}(W) \land \text{accessesMainThreadAPI}(W) \implies \text{Violation (Error)}$$
+  di mana $\text{isWorkerScope}$ mendeteksi pendengar lifecycle worker (`install`, `activate`, `fetch`), dan $\text{accessesMainThreadAPI}$ mendeteksi referensi ke `window`, `document`, `localStorage`, `sessionStorage`, atau dialog browser (`alert`, `confirm`, `prompt`).
+- **Mengapa Lolos Linter Standar:**
+  Linter JavaScript umum sering kali mengasumsikan lingkup eksekusi peramban standar (*window scope*), sehingga variabel global `window` atau `document` dianggap valid.
+- **Suspicious (Mengakses API DOM/Window di Dalam Service Worker):**
+  ```tsx
+  {/* Menyebabkan ReferenceError fatal saat Service Worker diinisialisasi */}
+  <script>
+    self.addEventListener("install", (event) => {
+      const token = localStorage.getItem("token");
+      document.title = "Caching resources...";
+    });
+  </script>
+  ```
+- **Compliant (Hanya Mengakses Cache Storage API dan Worker Primitives):**
+  ```tsx
+  {/* Menggunakan Cache Storage API resmi yang aman di thread Worker */}
+  <script>
+    self.addEventListener("install", (event) => {
+      event.waitUntil(
+        caches.open("v1").then((cache) => cache.addAll(["/", "/offline.html"]))
+      );
+    });
+  </script>
+  ```
+- **Engine:** L1 Syntax + L2 Script AST (`internal/rules/pwa/pwa_cache_runtime_api_risk.go`).
+- **Severity:** `error`.
+- **Autofix:** No.
 
 ---
 

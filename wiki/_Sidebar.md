@@ -72,7 +72,7 @@
 </details>
 
 <details open>
-<summary><b>Pwa</b> (6 rules)</summary>
+<summary><b>Pwa</b> (10 rules)</summary>
 
 * [**Pwa Overview**](pwa)
 * [`pwa.apple-meta-missing`](pwa.apple-meta-missing)
@@ -80,6 +80,10 @@
 * [`pwa.insecure-context-resource`](pwa.insecure-context-resource)
 * [`pwa.manifest-missing`](pwa.manifest-missing)
 * [`pwa.manifest-required-fields-missing`](pwa.manifest-required-fields-missing)
+* [`pwa.pwa-cache-runtime-api-risk`](pwa.pwa-cache-runtime-api-risk)
+* [`pwa.service-worker-missing`](pwa.service-worker-missing)
+* [`pwa.service-worker-no-offline-fallback`](pwa.service-worker-no-offline-fallback)
+* [`pwa.service-worker-registration`](pwa.service-worker-registration)
 * [`pwa.start-url-inconsistency`](pwa.start-url-inconsistency)
 
 </details>

@@ -338,3 +338,172 @@ func fallbackParseManifest(s string) *WebAppManifest {
 	}
 	return manifest
 }
+
+func skipLineComment(runes []rune, i, n int) int {
+	i += 2
+	for i < n && runes[i] != '\n' {
+		i++
+	}
+	return i
+}
+
+func skipBlockComment(runes []rune, i, n int) int {
+	i += 2
+	for i+1 < n && !(runes[i] == '*' && runes[i+1] == '/') {
+		i++
+	}
+	return i + 2
+}
+
+func stripJSComments(code string) string {
+	var sb strings.Builder
+	runes := []rune(code)
+	n := len(runes)
+	i := 0
+	for i < n {
+		if runes[i] == '/' && i+1 < n {
+			if runes[i+1] == '/' {
+				i = skipLineComment(runes, i, n)
+				continue
+			}
+			if runes[i+1] == '*' {
+				i = skipBlockComment(runes, i, n)
+				continue
+			}
+		}
+		sb.WriteRune(runes[i])
+		i++
+	}
+	return sb.String()
+}
+
+func hasServiceWorkerRegistration(headNode *ir.Node) bool {
+	if headNode == nil {
+		return false
+	}
+	root := headNode
+	for root.Parent != nil {
+		root = root.Parent
+	}
+
+	for child := range root.Walk() {
+		if child.Type != ir.NodeElement || !strings.EqualFold(child.Tag, "script") {
+			continue
+		}
+		if isSWScriptTag(child) {
+			return true
+		}
+	}
+	return false
+}
+
+func isSWScriptTag(child *ir.Node) bool {
+	if src, ok := child.GetAttr("src"); ok {
+		cleanSrc := strings.ToLower(cleanAttrValue(src))
+		if strings.Contains(cleanSrc, "sw.js") ||
+			strings.Contains(cleanSrc, "service-worker.js") ||
+			strings.Contains(cleanSrc, "serviceworker.js") ||
+			strings.Contains(cleanSrc, "register-sw.js") ||
+			strings.Contains(cleanSrc, "sw-register.js") ||
+			strings.Contains(cleanSrc, "pwa.js") {
+			return true
+		}
+	}
+	txt := extractScriptText(child)
+	return containsSWRegistrationSnippet(txt)
+}
+
+func containsSWRegistrationSnippet(txt string) bool {
+	return strings.Contains(txt, "serviceWorker.register") ||
+		strings.Contains(txt, "navigator.serviceWorker.register") ||
+		strings.Contains(txt, "registerRoute") ||
+		strings.Contains(txt, "workbox.register") ||
+		strings.Contains(txt, "registerSW")
+}
+
+func hasSWFetchListener(txt string) bool {
+	return strings.Contains(txt, "addEventListener(\"fetch\"") ||
+		strings.Contains(txt, "addEventListener('fetch'") ||
+		strings.Contains(txt, "addEventListener(`fetch`") ||
+		strings.Contains(txt, "self.onfetch") ||
+		strings.Contains(txt, "onfetch =")
+}
+
+func interceptsFetch(txt string) bool {
+	return strings.Contains(txt, "respondWith(") ||
+		strings.Contains(txt, "respondWith (")
+}
+
+func hasSWOfflineFallback(txt string) bool {
+	lower := strings.ToLower(txt)
+	if strings.Contains(lower, "caches.match") ||
+		strings.Contains(lower, "cache.match") ||
+		strings.Contains(lower, "caches.open") ||
+		strings.Contains(lower, "caches.keys") ||
+		strings.Contains(lower, "caches.has") {
+		return true
+	}
+	if strings.Contains(txt, ".catch(") || strings.Contains(txt, ".catch (") {
+		return true
+	}
+	return strings.Contains(txt, "catch") && (strings.Contains(lower, "offline") || strings.Contains(lower, "fallback") || strings.Contains(lower, "response"))
+}
+
+func hasSWFeatureDetection(txt string) bool {
+	return strings.Contains(txt, "'serviceWorker' in navigator") ||
+		strings.Contains(txt, "\"serviceWorker\" in navigator") ||
+		strings.Contains(txt, "'serviceWorker' in window.navigator") ||
+		strings.Contains(txt, "\"serviceWorker\" in window.navigator") ||
+		strings.Contains(txt, "if (navigator.serviceWorker") ||
+		strings.Contains(txt, "if (window.navigator && 'serviceWorker' in window.navigator)") ||
+		strings.Contains(txt, "navigator.serviceWorker &&")
+}
+
+func hasSWErrorHandling(txt string) bool {
+	if strings.Contains(txt, ".catch(") || strings.Contains(txt, ".catch (") {
+		return true
+	}
+	return strings.Contains(txt, "try") && strings.Contains(txt, "catch")
+}
+
+func isWorkerScope(txt string) bool {
+	return strings.Contains(txt, "addEventListener(\"install\"") ||
+		strings.Contains(txt, "addEventListener('install'") ||
+		strings.Contains(txt, "addEventListener(\"activate\"") ||
+		strings.Contains(txt, "addEventListener('activate'") ||
+		strings.Contains(txt, "addEventListener(\"fetch\"") ||
+		strings.Contains(txt, "addEventListener('fetch'") ||
+		strings.Contains(txt, "self.addEventListener") ||
+		strings.Contains(txt, "clients.claim") ||
+		strings.Contains(txt, "skipWaiting") ||
+		strings.Contains(txt, "importScripts(")
+}
+
+func collectForbiddenWorkerAPIs(raw string) []string {
+	clean := stripJSComments(raw)
+	var forbidden []string
+
+	if strings.Contains(clean, "window.") || strings.Contains(clean, "window[") {
+		forbidden = append(forbidden, "window")
+	}
+	if strings.Contains(clean, "document.") || strings.Contains(clean, "document[") {
+		forbidden = append(forbidden, "document")
+	}
+	if strings.Contains(clean, "localStorage.") || strings.Contains(clean, "localStorage[") {
+		forbidden = append(forbidden, "localStorage")
+	}
+	if strings.Contains(clean, "sessionStorage.") || strings.Contains(clean, "sessionStorage[") {
+		forbidden = append(forbidden, "sessionStorage")
+	}
+	if strings.Contains(clean, "alert(") {
+		forbidden = append(forbidden, "alert()")
+	}
+	if strings.Contains(clean, "confirm(") {
+		forbidden = append(forbidden, "confirm()")
+	}
+	if strings.Contains(clean, "prompt(") {
+		forbidden = append(forbidden, "prompt()")
+	}
+
+	return forbidden
+}

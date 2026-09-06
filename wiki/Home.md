@@ -62,7 +62,7 @@ flowchart TD
 | `browser` | 12 | [`browser`](browser) |
 | `ergonomy` | 4 | [`ergonomy`](ergonomy) |
 | `mobile` | 5 | [`mobile`](mobile) |
-| `pwa` | 6 | [`pwa`](pwa) |
+| `pwa` | 10 | [`pwa`](pwa) |
 | `theme` | 32 | [`theme`](theme) |
 
 ---
@@ -113,6 +113,10 @@ flowchart TD
 | `pwa.insecure-context-resource` | `pwa` | `ERROR` | Errors when a resource element loads assets over an insecure HTTP protocol (http://) in violation of W3C Secure Contexts | [`pwa.insecure-context-resource`](pwa.insecure-context-resource) |
 | `pwa.manifest-missing` | `pwa` | `WARN` | Warns when the HTML document <head> is missing a <link rel="manifest" href="..."> declaration | [`pwa.manifest-missing`](pwa.manifest-missing) |
 | `pwa.manifest-required-fields-missing` | `pwa` | `ERROR` | Errors when a Web App Manifest definition is missing required fields (name/short_name, start_url, display, icons) | [`pwa.manifest-required-fields-missing`](pwa.manifest-required-fields-missing) |
+| `pwa.pwa-cache-runtime-api-risk` | `pwa` | `ERROR` | Prevents access to main-thread DOM and synchronous Web Storage APIs (window, document, localStorage) inside Service Worker scripts | [`pwa.pwa-cache-runtime-api-risk`](pwa.pwa-cache-runtime-api-risk) |
+| `pwa.service-worker-missing` | `pwa` | `WARN` | Warns when an HTML document head links to a Web App Manifest but lacks a Service Worker registration in the document | [`pwa.service-worker-missing`](pwa.service-worker-missing) |
+| `pwa.service-worker-no-offline-fallback` | `pwa` | `WARN` | Warns when a Service Worker intercepts fetch events without providing an offline cache fallback or failure handler | [`pwa.service-worker-no-offline-fallback`](pwa.service-worker-no-offline-fallback) |
+| `pwa.service-worker-registration` | `pwa` | `WARN` | Warns when Service Worker registration lacks feature detection ('serviceWorker' in navigator) or error handling (.catch) | [`pwa.service-worker-registration`](pwa.service-worker-registration) |
 | `pwa.start-url-inconsistency` | `pwa` | `ERROR` | Errors when a Web App Manifest start_url uses an insecure protocol (http://), script scheme (javascript:), or path traversal (../) | [`pwa.start-url-inconsistency`](pwa.start-url-inconsistency) |
 | `theme.apply-bloat` | `theme` | `WARN` | Detects excessive use of @apply with more than 8 utility classes in CSS or style blocks | [`theme.apply-bloat`](theme.apply-bloat) |
 | `theme.backdrop-blur-hardcode` | `theme` | `WARN` | Detects hardcoded arbitrary blur and backdrop-blur scalars in Tailwind utility classes | [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode) |

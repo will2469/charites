@@ -1,0 +1,11 @@
+export function SWWorker() {
+  return (
+    <script>
+      {`
+        self.addEventListener('fetch', (event) => {
+          event.respondWith(fetch(event.request));
+        });
+      `}
+    </script>
+  );
+}

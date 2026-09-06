@@ -13,5 +13,10 @@ import { SuppressedCard } from '../components/Card';
     <div class="bg-primary/20">
       <SuppressedCard />
     </div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      }
+    </script>
   </body>
 </html>
