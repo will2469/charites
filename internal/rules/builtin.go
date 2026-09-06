@@ -164,6 +164,12 @@ var (
 	_ Rule = (*inp.HydrationHeavyIslandRule)(nil)
 	_ Rule = (*inp.RenderBlockingScriptRule)(nil)
 	_ Rule = (*inp.MissingStartTransitionRule)(nil)
+
+	// inp Wave 3 (React Lifecycle & Effect Pipeline)
+	_ Rule = (*inp.UnboundedEffectDepsRule)(nil)
+	_ Rule = (*inp.SyncLayoutEffectRule)(nil)
+	_ Rule = (*inp.ContextReRenderCascadeRule)(nil)
+	_ Rule = (*inp.ExpensiveRenderComputationRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -358,6 +364,12 @@ func builtinRules() []Rule {
 		inp.NewHydrationHeavyIslandRule(),
 		inp.NewRenderBlockingScriptRule(),
 		inp.NewMissingStartTransitionRule(),
+
+		// inp Wave 3 (React Lifecycle & Effect Pipeline)
+		inp.NewUnboundedEffectDepsRule(),
+		inp.NewSyncLayoutEffectRule(),
+		inp.NewContextReRenderCascadeRule(),
+		inp.NewExpensiveRenderComputationRule(),
 	}
 }
 

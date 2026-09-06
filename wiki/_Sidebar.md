@@ -83,9 +83,11 @@
 </details>
 
 <details open>
-<summary><b>Inp</b> (8 rules)</summary>
+<summary><b>Inp</b> (12 rules)</summary>
 
 * [**Inp Overview**](inp)
+* [`inp.context-re-render-cascade`](inp.context-re-render-cascade)
+* [`inp.expensive-render-computation`](inp.expensive-render-computation)
 * [`inp.heavy-event-handler`](inp.heavy-event-handler)
 * [`inp.hydration-contention`](inp.hydration-contention)
 * [`inp.hydration-heavy-island`](inp.hydration-heavy-island)
@@ -93,6 +95,8 @@
 * [`inp.missing-start-transition`](inp.missing-start-transition)
 * [`inp.render-blocking-script`](inp.render-blocking-script)
 * [`inp.repeated-state-update`](inp.repeated-state-update)
+* [`inp.sync-layout-effect`](inp.sync-layout-effect)
+* [`inp.unbounded-effect-deps`](inp.unbounded-effect-deps)
 * [`inp.unyielded-long-task`](inp.unyielded-long-task)
 
 </details>

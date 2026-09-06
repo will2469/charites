@@ -96,7 +96,16 @@ func (e *extractor) extract() *ir.Node {
 		e.advance()
 	}
 
-	return e.bld.Root()
+	root := e.bld.Root()
+	if root != nil && len(e.src) > 0 {
+		root.Children = append(root.Children, &ir.Node{
+			Type:       ir.NodeComment,
+			RawClasses: string(e.src),
+			Parent:     root,
+			Span:       ir.Span{Line: 1, Column: 1, EndLine: e.line, EndColumn: e.col},
+		})
+	}
+	return root
 }
 
 // tryHandleJSX mencoba memproses token JSX. Mengembalikan true jika berhasil mengenali JSX tag/fragment.

@@ -537,3 +537,230 @@ func hasMissingStartTransition(code string) (string, bool) {
 
 	return "", false
 }
+
+// getScriptOrSourceContent mengambil konten script baik dari elemen <script> maupun dari NodeComment sumber file.
+func getScriptOrSourceContent(node *ir.Node) string {
+	if node == nil {
+		return ""
+	}
+	if node.Type == ir.NodeElement && strings.EqualFold(node.Tag, "script") {
+		return extractScriptNodeText(node)
+	}
+	if node.Type == ir.NodeComment && len(node.RawClasses) > 0 {
+		return node.RawClasses
+	}
+	return ""
+}
+
+// findUnboundedEffectDeps mencari pemanggilan useEffect atau useLayoutEffect yang kekurangan array dependensi.
+func findUnboundedEffectDeps(code string) (string, int, bool) {
+	if len(code) == 0 {
+		return "", 0, false
+	}
+	if !strings.Contains(code, "useEffect") && !strings.Contains(code, "useLayoutEffect") {
+		return "", 0, false
+	}
+
+	for _, hook := range [...]string{"useLayoutEffect", "useEffect"} {
+		idx := 0
+		for {
+			pos := strings.Index(code[idx:], hook+"(")
+			if pos == -1 {
+				break
+			}
+			absPos := idx + pos
+			if isHookIdentifierBoundary(code, absPos) {
+				argStart := absPos + len(hook) + 1
+				if hasSecondArg, lineOffset := checkHookArgs(code[argStart:]); !hasSecondArg {
+					line := 1 + strings.Count(code[:absPos], "\n") + lineOffset
+					return hook, line, true
+				}
+			}
+			idx = absPos + len(hook) + 1
+		}
+	}
+	return "", 0, false
+}
+
+func isHookIdentifierBoundary(code string, pos int) bool {
+	if pos == 0 {
+		return true
+	}
+	prev := code[pos-1]
+	return !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z') || (prev >= '0' && prev <= '9') || prev == '_')
+}
+
+func checkHookArgs(argsCode string) (bool, int) {
+	parenDepth := 1
+	braceDepth := 0
+	bracketDepth := 0
+	hasComma := false
+	lineOffset := 0
+
+	for i := 0; i < len(argsCode); i++ {
+		c := argsCode[i]
+		if c == '\n' {
+			lineOffset++
+		}
+		switch c {
+		case '(':
+			parenDepth++
+		case ')':
+			parenDepth--
+			if parenDepth == 0 {
+				return hasComma, lineOffset
+			}
+		case '{':
+			braceDepth++
+		case '}':
+			braceDepth--
+		case '[':
+			bracketDepth++
+		case ']':
+			bracketDepth--
+		case ',':
+			if parenDepth == 1 && braceDepth == 0 && bracketDepth == 0 {
+				hasComma = true
+			}
+		}
+	}
+	return hasComma, lineOffset
+}
+
+// findSyncLayoutEffectViolation memeriksa apakah terdapat komputasi non-geometris berat di dalam useLayoutEffect.
+func findSyncLayoutEffectViolation(code string) (string, int, bool) {
+	if len(code) == 0 || !strings.Contains(code, "useLayoutEffect") {
+		return "", 0, false
+	}
+
+	hook := "useLayoutEffect"
+	idx := 0
+	for {
+		pos := strings.Index(code[idx:], hook+"(")
+		if pos == -1 {
+			break
+		}
+		absPos := idx + pos
+		if isHookIdentifierBoundary(code, absPos) {
+			argStart := absPos + len(hook) + 1
+			body := extractHookBody(code[argStart:])
+			if op, isHeavy := isHeavyLayoutEffectBody(body); isHeavy {
+				line := 1 + strings.Count(code[:absPos], "\n")
+				return op, line, true
+			}
+		}
+		idx = absPos + len(hook) + 1
+	}
+	return "", 0, false
+}
+
+func extractHookBody(code string) string {
+	braceStart := strings.IndexByte(code, '{')
+	if braceStart == -1 {
+		return ""
+	}
+	end := findMatchingBrace(code[braceStart+1:])
+	if end == -1 {
+		return ""
+	}
+	return code[braceStart+1 : braceStart+1+end]
+}
+
+var heavyLayoutOps = [...]string{
+	"fetch(",
+	"axios",
+	"localStorage",
+	"sessionStorage",
+	"JSON.parse(",
+	"async ",
+}
+
+var geomMeasurementProps = [...]string{
+	"getBoundingClientRect",
+	"offsetHeight",
+	"offsetWidth",
+	"clientHeight",
+	"clientWidth",
+	"scrollHeight",
+	"scrollWidth",
+}
+
+func isHeavyLayoutEffectBody(body string) (string, bool) {
+	if len(body) == 0 {
+		return "", false
+	}
+	// Pengecualian: jika melakukan pengukuran geometri DOM murni
+	for _, geom := range geomMeasurementProps {
+		if strings.Contains(body, geom) {
+			return "", false
+		}
+	}
+
+	for _, op := range heavyLayoutOps {
+		if strings.Contains(body, op) {
+			return op, true
+		}
+	}
+
+	if strings.Contains(body, "setData") || strings.Contains(body, "setUsers") || strings.Contains(body, "setItems") {
+		return "state update without DOM measurement", true
+	}
+
+	return "", false
+}
+
+// isInlineContextObjectValue memeriksa apakah elemen Context.Provider menerima objek literal inline pada prop value.
+func isInlineContextObjectValue(tag string, attrs map[string]string) (string, bool) {
+	if attrs == nil {
+		return "", false
+	}
+	if tag != "Context.Provider" && !strings.HasSuffix(tag, ".Provider") {
+		return "", false
+	}
+
+	val, hasVal := attrs["value"]
+	if !hasVal {
+		return "", false
+	}
+
+	trimmed := strings.TrimSpace(val)
+	if strings.HasPrefix(trimmed, "{{") {
+		if strings.Contains(trimmed, "useMemo") {
+			return "", false
+		}
+		return tag, true
+	}
+	if strings.HasPrefix(trimmed, "{") {
+		rest := strings.TrimSpace(trimmed[1:])
+		if strings.HasPrefix(rest, "{") && !strings.Contains(trimmed, "useMemo") {
+			return tag, true
+		}
+	}
+
+	return "", false
+}
+
+// hasExpensiveRenderComputation mendeteksi operasi komputasi berat (seperti chained .filter().sort())
+// yang dieksekusi langsung di jalur render tanpa useMemo.
+func hasExpensiveRenderComputation(code string) (string, bool) {
+	if len(code) == 0 {
+		return "", false
+	}
+	if !strings.Contains(code, ".filter") && !strings.Contains(code, ".sort") {
+		return "", false
+	}
+	if strings.Contains(code, "useMemo") {
+		return "", false
+	}
+
+	filterPos := strings.Index(code, ".filter(")
+	if filterPos != -1 && strings.Contains(code[filterPos:], ".sort(") {
+		return ".filter().sort()", true
+	}
+	sortPos := strings.Index(code, ".sort(")
+	if sortPos != -1 && strings.Contains(code[sortPos:], ".filter(") {
+		return ".sort().filter()", true
+	}
+
+	return "", false
+}
