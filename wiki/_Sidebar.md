@@ -72,6 +72,17 @@
 </details>
 
 <details open>
+<summary><b>Pwa</b> (4 rules)</summary>
+
+* [**Pwa Overview**](pwa)
+* [`pwa.icon-maskable-missing`](pwa.icon-maskable-missing)
+* [`pwa.manifest-missing`](pwa.manifest-missing)
+* [`pwa.manifest-required-fields-missing`](pwa.manifest-required-fields-missing)
+* [`pwa.start-url-inconsistency`](pwa.start-url-inconsistency)
+
+</details>
+
+<details open>
 <summary><b>Theme</b> (32 rules)</summary>
 
 * [**Theme Overview**](theme)

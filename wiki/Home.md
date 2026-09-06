@@ -62,6 +62,7 @@ flowchart TD
 | `browser` | 12 | [`browser`](browser) |
 | `ergonomy` | 4 | [`ergonomy`](ergonomy) |
 | `mobile` | 5 | [`mobile`](mobile) |
+| `pwa` | 4 | [`pwa`](pwa) |
 | `theme` | 32 | [`theme`](theme) |
 
 ---
@@ -107,6 +108,10 @@ flowchart TD
 | `mobile.modal-viewport-lock` | `mobile` | `ERROR` | Detects modal dialog containers locked with overflow-hidden without an internal scrollable region on mobile viewports | [`mobile.modal-viewport-lock`](mobile.modal-viewport-lock) |
 | `mobile.orientation-lock-risk` | `mobile` | `INFO` | Advises against rigid screen orientation locking which restricts accessibility for mounted or assistive mobile setups (WCAG 2.2 SC 1.3.4) | [`mobile.orientation-lock-risk`](mobile.orientation-lock-risk) |
 | `mobile.pointer-events-block` | `mobile` | `WARN` | Warns when an ancestor declares pointer-events-none over interactive children without restoring pointer-events-auto on mobile | [`mobile.pointer-events-block`](mobile.pointer-events-block) |
+| `pwa.icon-maskable-missing` | `pwa` | `WARN` | Warns when a Web App Manifest defines icons but none has purpose: 'maskable' for Android adaptive launcher icons | [`pwa.icon-maskable-missing`](pwa.icon-maskable-missing) |
+| `pwa.manifest-missing` | `pwa` | `WARN` | Warns when the HTML document <head> is missing a <link rel="manifest" href="..."> declaration | [`pwa.manifest-missing`](pwa.manifest-missing) |
+| `pwa.manifest-required-fields-missing` | `pwa` | `ERROR` | Errors when a Web App Manifest definition is missing required fields (name/short_name, start_url, display, icons) | [`pwa.manifest-required-fields-missing`](pwa.manifest-required-fields-missing) |
+| `pwa.start-url-inconsistency` | `pwa` | `ERROR` | Errors when a Web App Manifest start_url uses an insecure protocol (http://), script scheme (javascript:), or path traversal (../) | [`pwa.start-url-inconsistency`](pwa.start-url-inconsistency) |
 | `theme.apply-bloat` | `theme` | `WARN` | Detects excessive use of @apply with more than 8 utility classes in CSS or style blocks | [`theme.apply-bloat`](theme.apply-bloat) |
 | `theme.backdrop-blur-hardcode` | `theme` | `WARN` | Detects hardcoded arbitrary blur and backdrop-blur scalars in Tailwind utility classes | [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode) |
 | `theme.chart-color-hardcode` | `theme` | `ERROR` | Detects hardcoded color values on chart visualization components | [`theme.chart-color-hardcode`](theme.chart-color-hardcode) |

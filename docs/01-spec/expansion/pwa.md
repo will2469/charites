@@ -40,133 +40,242 @@ flowchart TD
 
 ---
 
-## 2. Spesifikasi Detail Rule `pwa.*`
+## 2. Spesifikasi Detail Rule Wave 1: Web App Manifest & Branding (4 Rules)
+
+---
 
 ### 2.1. `pwa.manifest-required-fields-missing`
-- **Tujuan:** Memastikan `manifest.json`/`manifest.webmanifest` memiliki field wajib agar prompt "Add to Home Screen" tervalidasi di Chrome/Android, dan agar Safari iOS tidak fallback ke nama dan ikon default.
-- **Mengapa Lolos Linter Standar:** Berkas `manifest.json` adalah file JSON terpisah di luar jangkauan ESLint JSX. Linter kode biasa tidak memvalidasi skema Web App Manifest W3C.
-- **In-Scope:** File manifest tanpa `name`/`short_name`, `start_url`, `display`, atau array `icons` dengan minimal satu entri.
-- **Bad:** `{ "name": "MyApp" }`
-- **Good:** `{ "name": "MyApp", "short_name": "MyApp", "start_url": "/", "display": "standalone", "background_color": "#ffffff", "theme_color": "#111827", "icons": [ ... ] }`
-- **Engine:** JSON/Manifest AST.
-- **Severity:** Error.
+- **Design Rationale:** W3C Web App Manifest Specification & Google Chrome Web App Installability Criteria.
+- **Konteks Realitas Mobile:**
+  Agar sebuah web app memenuhi syarat instalasi PWA (*Add to Home Screen*) pada Android dan iOS, berkas manifest harus mendefinisikan field wajib minimum: `name` (atau `short_name`), `start_url`, `display` (seperti `standalone` atau `fullscreen`), dan array `icons` yang memuat minimal satu ikon. Jika salah satu field hilang, browser menolak memunculkan prompt instalasi atau menampilkan aplikasi dengan nama placeholder kosong dan ikon default yang rusak.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen deklarasi manifest web app $M \in \text{ManifestDeclarations}$:
+  $$\neg \text{hasName}(M) \lor \neg \text{hasStartUrl}(M) \lor \neg \text{hasDisplay}(M) \lor \neg \text{hasIcons}(M) \implies \text{Violation (Error)}$$
+  di mana $\text{ManifestDeclarations}$ mencakup elemen `<script type="application/manifest+json">` atau komponen konfigurasi manifest.
+- **Mengapa Lolos Linter Standar:**
+  Berkas atau blok manifest valid secara sintaksis JSON. Linter bahasa umum tidak memvalidasi skema field wajib W3C Web App Manifest.
+- **Suspicious (Manifest Kehilangan Field Wajib):**
+  ```tsx
+  {/* Hilang: start_url, display, dan icons */}
+  <script type="application/manifest+json">
+    {JSON.stringify({
+      name: "Desa Digital"
+    })}
+  </script>
+  ```
+- **Compliant (Seluruh Field Wajib Didefinisikan):**
+  ```tsx
+  {/* Seluruh field wajib terpenuhi */}
+  <script type="application/manifest+json">
+    {JSON.stringify({
+      name: "Desa Digital",
+      short_name: "Desa",
+      start_url: "/",
+      display: "standalone",
+      icons: [
+        { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+        { src: "/icon-512-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+      ]
+    })}
+  </script>
+  ```
+- **Engine:** L1 Syntax + L2 JSON Manifest AST (`internal/rules/pwa/manifest_required_fields_missing.go`).
+- **Severity:** `error`.
+- **Autofix:** No.
+
+---
 
 ### 2.2. `pwa.icon-maskable-missing`
-- **Tujuan:** Mencegah ikon aplikasi terpotong dengan latar belakang putih janggal pada launcher adaptif Android modern yang mensyaratkan ikon varian `purpose: "maskable"`.
-- **Mengapa Lolos Linter Standar:** File manifest valid secara sintaksis JSON. Schema validator umum tidak mewajibkan entri maskable, sehingga masalah baru disadari saat aplikasi diinstall di ponsel Android.
-- **In-Scope:** Array `icons` pada manifest yang seluruh entrinya `purpose: "any"` atau tanpa `purpose`, tanpa satupun `purpose: "maskable"`.
-- **Bad:** `"icons": [{ "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }]`
-- **Good:** Menyediakan entri maskable terpisah: `{ "src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }`
-- **Engine:** JSON/Manifest AST.
-- **Severity:** Warning.
-
-### 2.3. `pwa.apple-meta-missing`
-- **Tujuan:** Safari iOS tidak sepenuhnya membaca `manifest.json` untuk mode standalone - memerlukan meta tag khusus WebKit agar tampil tanpa address bar dan memakai ikon custom saat ditambahkan ke Home Screen.
-- **Mengapa Lolos Linter Standar:** Menaruh `<link rel="manifest">` tanpa meta tag Apple adalah HTML yang sah. ESLint tidak mengetahui dependensi WebKit iOS untuk mode PWA standalone.
-- **In-Scope:** Root layout (`<head>` / Astro Layout / Next.js metadata) yang memasang `<link rel="manifest">` tapi tidak menyertakan `<meta name="apple-mobile-web-app-capable">`, `<meta name="apple-mobile-web-app-status-bar-style">`, dan `<link rel="apple-touch-icon">`.
-- **Bad:** `<link rel="manifest" href="/manifest.json" />`
-- **Good:** Menyertakan `<link rel="apple-touch-icon" href="/apple-touch-icon.png" />`, `<meta name="apple-mobile-web-app-capable" content="yes" />`, dan `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />`.
-- **Engine:** JSX/HTML Head AST.
-- **Severity:** Warning.
-
-### 2.4. `pwa.service-worker-no-offline-fallback`
-- **Tujuan:** Memastikan Service Worker memiliki strategi penanganan saat offline (bukan sekadar pass-through fetch), agar aplikasi tidak menampilkan layar dinosaurus putus koneksi di Chrome, Firefox, atau Safari.
-- **Mengapa Lolos Linter Standar:** `e.respondWith(fetch(e.request))` adalah kode JavaScript yang sah secara tipe dan sintaksis. Linter biasa tidak menganalisis skenario saat `fetch()` melempar NetworkError saat offline.
-- **In-Scope:** File `sw.js` dengan listener `fetch` yang memanggil `fetch()` tanpa blok `.catch()` atau fallback ke cache/halaman offline.
-- **Bad:** `self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request)); });`
-- **Good:**
-  ```js
-  self.addEventListener('fetch', (e) => {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match(e.request).then((r) => r || caches.match('/offline.html')))
-    );
-  });
+- **Design Rationale:** W3C Web App Manifest (Adaptive Icon Masking) & Google Android Maskable Icons Specification.
+- **Konteks Realitas Mobile:**
+  Mulai Android 8.0 Oreo, peluncur (*launcher*) perangkat Android memotong ikon aplikasi mengikuti bentuk sistem adaptif (lingkaran, *squircle*, atau persegi membulat). Jika manifest PWA hanya menyediakan ikon standar (`purpose: "any"` atau tanpa atribut `purpose`), Android membungkus ikon di dalam kotak putih kaku berukuran kecil (*letterboxing*) yang merusak estetika antarmuka native. Menyediakan ikon dengan `purpose: "maskable"` menjamin ikon ditampilkan penuh secara mulus tanpa batas putih.
+- **Invariant (Predikat AST):**
+  Untuk setiap deklarasi manifest yang memiliki koleksi `icons`:
+  $$\text{hasIcons}(M) \land \neg \text{hasMaskableIcon}(M) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasMaskableIcon}$ memeriksa keberadaan entri ikon dengan properti `purpose` yang memuat nilai `"maskable"`.
+- **Mengapa Lolos Linter Standar:**
+  Ikon dengan `purpose: "any"` adalah sah secara W3C manifest schema. Schema validator umum tidak mewajibkan entri maskable, sehingga masalah baru disadari saat aplikasi diinstal di ponsel Android.
+- **Suspicious (Hanya Ikon Biasa Tanpa Maskable):**
+  ```tsx
+  {/* Menghasilkan kotak putih jelek di launcher Android adaptif */}
+  <script type="application/manifest+json">
+    {JSON.stringify({
+      name: "Desa Digital",
+      start_url: "/",
+      display: "standalone",
+      icons: [
+        { src: "/icon-512.png", sizes: "512x512", type: "image/png" }
+      ]
+    })}
+  </script>
   ```
-- **Engine:** Call Expression AST.
-- **Severity:** Warning.
-
-### 2.5. `pwa.insecure-context-resource`
-- **Tujuan:** Fitur inti PWA (Service Worker, Web Push, Persistent Storage) hanya berjalan pada *secure context* (HTTPS). Resource campuran HTTP diblokir secara diam-diam dan membuat fitur offline gagal.
-- **Mengapa Lolos Linter Standar:** String URL absolut `"http://api.example.com"` adalah string biasa yang legal di JavaScript. Linter biasa tidak memeriksa skema protokol pada pemanggilan `fetch` atau asset loading.
-- **In-Scope:** Literal string URL berskema `http://` (bukan localhost) yang dipakai sebagai `src`, `href`, atau endpoint `fetch`.
-- **Bad:** `fetch('http://api.domain.com/data')`
-- **Good:** `fetch('https://api.domain.com/data')`
-- **Engine:** String Literal AST.
-- **Severity:** Error.
-
-### 2.6. `pwa.manifest-missing`
-- **Tujuan:** Memastikan aplikasi web yang menargetkan mode PWA memiliki tag link manifest pada dokumen root.
-- **Mengapa Lolos Linter Standar:** Tidak ada linter HTML default yang mewajibkan `<link rel="manifest">`.
-- **In-Scope:** Root layout / `<head>` tanpa tag manifest ketika project memiliki berkas `manifest.json`.
-- **Engine:** JSX/HTML Head AST.
-- **Severity:** Warning.
-
-### 2.7. `pwa.service-worker-missing`
-- **Tujuan:** Memastikan proyek PWA mendaftarkan service worker untuk mengelola offline caching dan network resilience.
-- **Mengapa Lolos Linter Standar:** Linter kode hanya memindai per-file, tidak menghubungkan konfigurasi manifest dengan registrasi worker di berkas entry client.
-- **In-Scope:** Proyek dengan manifest PWA tetapi tanpa registrasi service worker di client entry.
-- **Engine:** Project Scanner.
-- **Severity:** Warning.
-
-### 2.8. `pwa.service-worker-registration`
-- **Tujuan:** Mendeteksi registrasi Service Worker yang tidak aman atau tanpa penanganan kegagalan (*error handling*).
-- **Mengapa Lolos Linter Standar:** `navigator.serviceWorker.register(...)` tanpa `.catch()` sah secara Promise, namun unhandled rejection dapat mengganggu error monitoring.
-- **In-Scope:** Pemanggilan `navigator.serviceWorker.register()` tanpa pengecekan `'serviceWorker' in navigator` atau tanpa `.catch()`.
-- **Bad:** `navigator.serviceWorker.register('/sw.js');`
-- **Good:**
-  ```ts
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(console.error);
-  }
+- **Compliant (Ikon Maskable Adaptif Disediakan):**
+  ```tsx
+  {/* Ikon maskable adaptif menyesuaikan bentuk launcher Android */}
+  <script type="application/manifest+json">
+    {JSON.stringify({
+      name: "Desa Digital",
+      start_url: "/",
+      display: "standalone",
+      icons: [
+        { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
+        { src: "/icon-512-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+      ]
+    })}
+  </script>
   ```
-- **Engine:** Call Expression AST.
+- **Engine:** L1 Syntax + L2 JSON Manifest AST (`internal/rules/pwa/icon_maskable_missing.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
+
+### 2.3. `pwa.manifest-missing`
+- **Design Rationale:** W3C Web App Manifest Section 4 (Linking to a Manifest) & HTML Living Standard.
+- **Konteks Realitas Mobile:**
+  Browser mobile hanya dapat mengenali aplikasi sebagai Progressive Web App jika dokumen HTML dasar memuat tag `<link rel="manifest" href="...">` di dalam elemen `<head>`. Tanpa tag ini, browser memperlakukan web sebagai situs desktop biasa dan tidak pernah memicu prompt penginstalan web app.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen `<head>` atau root layout dokumen:
+  $$\neg \text{hasManifestLink}(Head) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasManifestLink}$ memeriksa keberadaan tag `<link rel="manifest">` dengan atribut `href` yang tidak kosong.
+- **Mengapa Lolos Linter Standar:**
+  Dokumen HTML tanpa link manifest adalah valid secara sintaksis. Tidak ada linter HTML default yang memeriksa ketersediaan manifest PWA.
+- **Suspicious (Dokumen Root Tanpa Link Manifest):**
+  ```tsx
+  <head>
+    <title>Layanan Surat Desa</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  ```
+- **Compliant (Link Manifest Dideklarasikan di Head):**
+  ```tsx
+  <head>
+    <title>Layanan Surat Desa</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+  </head>
+  ```
+- **Engine:** L1 Syntax + L2 HTML Head AST (`internal/rules/pwa/manifest_missing.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
+
+### 2.4. `pwa.start-url-inconsistency`
+- **Design Rationale:** W3C Web App Manifest Section 5.2 (The start_url member) & W3C Secure Contexts.
+- **Konteks Realitas Mobile:**
+  Field `start_url` menentukan halaman awal yang dimuat ketika pengguna meluncurkan PWA dari homescreen ponsel. Spesifikasi W3C mewajibkan `start_url` berada dalam cakupan (*navigation scope*) aplikasi. Menetapkan `start_url` ke protokol tidak aman (`http://`), domain luar (*cross-origin*), atau jalur traversal (`../`) menyebabkan peluncuran PWA gagal dan dibatalkan oleh browser mobile.
+- **Invariant (Predikat AST):**
+  Untuk setiap deklarasi manifest dengan field `start_url`:
+  $$\text{isInsecureProtocol}(\text{start\_url}) \lor \text{isPathTraversal}(\text{start\_url}) \lor \text{isScriptURL}(\text{start\_url}) \implies \text{Violation (Error)}$$
+- **Mengapa Lolos Linter Standar:**
+  Nilai `start_url` adalah string biasa di dalam JSON. Linter standar tidak memvalidasi keamanan protokol dan cakupan navigasi URL.
+- **Suspicious (start_url Tidak Aman atau Melampaui Scope):**
+  ```tsx
+  {/* Protokol http tidak aman melanggar standar Secure Contexts PWA */}
+  <script type="application/manifest+json">
+    {JSON.stringify({
+      name: "Desa Digital",
+      start_url: "http://desa-insecure.org/app",
+      display: "standalone",
+      icons: [{ src: "/icon.png", sizes: "192x192", type: "image/png", purpose: "maskable" }]
+    })}
+  </script>
+  ```
+- **Compliant (start_url Valid Terhadap Root Scope):**
+  ```tsx
+  {/* start_url relatif terhadap root scope yang aman */}
+  <script type="application/manifest+json">
+    {JSON.stringify({
+      name: "Desa Digital",
+      start_url: "/",
+      display: "standalone",
+      icons: [{ src: "/icon.png", sizes: "192x192", type: "image/png", purpose: "maskable" }]
+    })}
+  </script>
+  ```
+- **Engine:** L1 Syntax + L2 JSON Manifest AST (`internal/rules/pwa/start_url_inconsistency.go`).
+- **Severity:** `error`.
+- **Autofix:** No.
+
+---
+
+## 3. Spesifikasi Detail Rule Wave 2: Apple Standalone & Security (2 Rules)
+
+### 3.1. `pwa.apple-meta-missing`
+- **Tujuan:** Safari iOS memerlukan meta tag WebKit khusus agar tampil tanpa bilah alamat dan memakai ikon kustom saat ditambahkan ke Home Screen.
+- **In-Scope:** Root layout (`<head>`) yang memasang manifest tapi tidak menyertakan `<meta name="apple-mobile-web-app-capable">` dan `<link rel="apple-touch-icon">`.
 - **Severity:** Warning.
 
-### 2.9. `pwa.start-url-inconsistency`
-- **Tujuan:** Mencegah `start_url` pada manifest mengarah ke rute yang tidak valid atau berada di luar cakupan (*scope*) aplikasi.
-- **Mengapa Lolos Linter Standar:** Linter tidak membandingkan nilai string di `manifest.json` dengan konfigurasi `base` URL aplikasi.
-- **In-Scope:** Nilai `start_url` yang tidak konsisten dengan `base` path routing aplikasi.
-- **Engine:** JSON/Manifest AST.
-- **Severity:** Error.
-
-### 2.10. `pwa.pwa-cache-runtime-api-risk`
-- **Tujuan:** Mencegah penggunaan API non-worker (seperti akses DOM langsung `document.*` atau `window.*`) di dalam thread Service Worker yang menyebabkan runtime crash seketika.
-- **Mengapa Lolos Linter Standar:** Jika project tidak memiliki konfigurasi `tsconfig.worker.json` terpisah, TypeScript sering kali menyertakan `DOM` lib di global scope sehingga `window` atau `localStorage` dianggap legal oleh type-checker.
-- **In-Scope:** Penggunaan `window`, `document`, atau `localStorage` di dalam file Service Worker (`sw.js`).
-- **Bad:**
-  ```ts
-  self.addEventListener('fetch', () => {
-    const token = window.localStorage.getItem('token');
-  });
-  ```
-- **Good:** Menggunakan Cache Storage API atau IndexedDB yang valid pada Web Worker scope.
-- **Engine:** Worker Scope AST.
+### 3.2. `pwa.insecure-context-resource`
+- **Tujuan:** Memastikan seluruh resource dalam PWA tidak menggunakan protokol HTTP yang tidak aman (`http://`), sesuai standar W3C Secure Contexts.
+- **In-Scope:** URL literal berskema `http://` (bukan localhost) pada atribut atau pemanggilan resource.
 - **Severity:** Error.
 
 ---
 
-## 3. Ringkasan Matriks Rule `pwa.*` (10 Aturan Non-Redundan)
+## 4. Spesifikasi Detail Rule Wave 3: Service Worker Lifecycle & Offline Cache (4 Rules)
 
-| Rule ID | Fokus Invarian | Mengapa Tidak Tertangkap Linter Biasa | Severity | Engine Target |
-|---|---|---|---|---|
-| `pwa.manifest-required-fields-missing` | Field wajib manifest PWA | Linter kode biasa tidak memindai skema file manifest | error | JSON/Manifest AST |
-| `pwa.icon-maskable-missing` | Ikon launcher adaptif Android | Schema validator umum tidak mewajibkan purpose maskable | warning | JSON/Manifest AST |
-| `pwa.apple-meta-missing` | Standalone mode Safari iOS | ESLint tidak mengetahui dependensi WebKit Apple meta | warning | JSX/HTML Head AST |
-| `pwa.service-worker-no-offline-fallback` | Fallback fetch handler offline | `fetch()` pass-through tanpa catch sah secara sintaksis | warning | Call Expression AST |
-| `pwa.insecure-context-resource` | Cegah mixed-content HTTP | Linter biasa tidak memeriksa skema URL di fetch | error | String Literal AST |
-| `pwa.manifest-missing` | Link manifest pada root layout | Tidak ada rule HTML bawaan yang mewajibkan manifest | warning | JSX/HTML Head AST |
-| `pwa.service-worker-missing` | Service worker pada project PWA | Analisis lintas berkas antara manifest dan entry script | warning | Project Scanner |
-| `pwa.service-worker-registration` | Feature detect registrasi SW | Unhandled rejection pada Promise registrasi diabaikan | warning | Call Expression AST |
-| `pwa.start-url-inconsistency` | Validitas URL awal aplikasi | Linter tidak membandingkan manifest dengan base path | error | JSON/Manifest AST |
-| `pwa.pwa-cache-runtime-api-risk` | Cegah akses DOM di SW thread | TypeScript global DOM lib meloloskan window/document | error | Worker Scope AST |
+### 4.1. `pwa.service-worker-no-offline-fallback`
+- **Tujuan:** Memastikan Service Worker memiliki strategi offline fallback (bukan pass-through fetch kosong) agar tidak memunculkan layar dinosaurus putus koneksi.
+- **Severity:** Warning.
+
+### 4.2. `pwa.service-worker-missing`
+- **Tujuan:** Memastikan proyek PWA mendaftarkan service worker untuk mengelola offline caching.
+- **Severity:** Warning.
+
+### 4.3. `pwa.service-worker-registration`
+- **Tujuan:** Mendeteksi registrasi Service Worker tanpa feature detect `'serviceWorker' in navigator` atau tanpa penanganan error `.catch()`.
+- **Severity:** Warning.
+
+### 4.4. `pwa.pwa-cache-runtime-api-risk`
+- **Tujuan:** Mencegah akses API DOM (`window`, `document`, `localStorage`) di dalam thread Service Worker yang memicu crash seketika.
+- **Severity:** Error.
 
 ---
 
-## 4. Rule Classification & Execution Boundary
+## 5. Ringkasan Matriks Rule `pwa.*` (10 Aturan Non-Redundan)
+
+| Rule ID | Fokus Invarian | Wave | Severity | Engine Target |
+|---|---|:---:|---|---|
+| `pwa.manifest-required-fields-missing` | Field wajib manifest PWA (name, start_url, display, icons) | **W1** | error | JSON/Manifest AST |
+| `pwa.icon-maskable-missing` | Ikon launcher adaptif Android (purpose: maskable) | **W1** | warning | JSON/Manifest AST |
+| `pwa.manifest-missing` | Tag link manifest pada root layout (<head>) | **W1** | warning | JSX/HTML Head AST |
+| `pwa.start-url-inconsistency` | Validitas URL awal aplikasi terhadap navigation scope | **W1** | error | JSON/Manifest AST |
+| `pwa.apple-meta-missing` | Standalone mode Safari iOS (apple-touch-icon & meta) | **W2** | warning | JSX/HTML Head AST |
+| `pwa.insecure-context-resource` | Pencegahan mixed-content HTTP di secure context | **W2** | error | String Literal AST |
+| `pwa.service-worker-no-offline-fallback` | Fallback fetch handler saat koneksi terputus | **W3** | warning | Call Expression AST |
+| `pwa.service-worker-missing` | Ketersediaan service worker pada proyek PWA | **W3** | warning | Project Scanner |
+| `pwa.service-worker-registration` | Feature detect dan penanganan error registrasi SW | **W3** | warning | Call Expression AST |
+| `pwa.pwa-cache-runtime-api-risk` | Pencegahan akses DOM/window di thread Web Worker | **W3** | error | Worker Scope AST |
+
+---
+
+## 6. Rule Classification & Execution Boundary
 
 1. **Deterministic AST Rules (< 50ms pre-commit gate):**
-   - `pwa.manifest-required-fields-missing`, `pwa.icon-maskable-missing`, `pwa.apple-meta-missing`, `pwa.service-worker-no-offline-fallback`, `pwa.insecure-context-resource`, `pwa.manifest-missing`, `pwa.service-worker-registration`, `pwa.pwa-cache-runtime-api-risk`.
-2. **Project / Routing Analysis Rules:**
-   - `pwa.service-worker-missing`, `pwa.start-url-inconsistency`.
+   - `pwa.manifest-required-fields-missing`, `pwa.icon-maskable-missing`, `pwa.manifest-missing`, `pwa.start-url-inconsistency`, `pwa.apple-meta-missing`, `pwa.insecure-context-resource`, `pwa.service-worker-no-offline-fallback`, `pwa.service-worker-registration`, `pwa.pwa-cache-runtime-api-risk`.
+2. **Project Scanner Layer:**
+   - `pwa.service-worker-missing`.
 3. **Runtime Validation Layer:**
-   - Verifikasi audit Lighthouse PWA dan install prompt sesungguhnya di Android/iOS.
+   - Audit Lighthouse PWA dan pengujian prompt instalasi browser mobile sesungguhnya.
+
+---
+
+## 7. Struktur Modul Kode & Roadmap Eksekusi Wave 1
+
+Implementasi aturan `pwa.*` ditempatkan secara modular di `internal/rules/pwa/`:
+
+```text
+internal/rules/pwa/
+├── util.go                                 # Parser manifest JSON & AST helpers
+├── manifest_required_fields_missing.go     # Wave 1: Required manifest fields validator
+├── icon_maskable_missing.go                # Wave 1: Adaptive Android maskable icon check
+├── manifest_missing.go                     # Wave 1: Head manifest link presence check
+├── start_url_inconsistency.go              # Wave 1: Navigation scope & protocol safety
+├── contract_test.go                        # 8-Pillars Canonical Contract Validator
+└── benchmark_test.go                       # QUAL-03 Zero Allocation Benchmarks
+```
+
+Setiap rule divalidasi dengan **1-SSOT Golden Tri-Corpus** di `tests/correctness/pwa/<slug>/` yang mencakup kasus uji positif, negatif, dan adversarial untuk menjamin **nol regresi dan nol false-positive**.
+

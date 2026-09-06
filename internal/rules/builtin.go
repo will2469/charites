@@ -5,6 +5,7 @@ import (
 	"github.com/will2469/charites/internal/rules/browser"
 	"github.com/will2469/charites/internal/rules/ergonomy"
 	"github.com/will2469/charites/internal/rules/mobile"
+	"github.com/will2469/charites/internal/rules/pwa"
 	"github.com/will2469/charites/internal/rules/theme"
 )
 
@@ -58,6 +59,12 @@ var (
 	_ Rule = (*browser.ExperimentalAPINoFeaturedetectRule)(nil)
 	_ Rule = (*browser.DateInputFormatAssumptionRule)(nil)
 	_ Rule = (*browser.NonPassiveScrollListenerRule)(nil)
+
+	// pwa Wave 1 (Web App Manifest & Branding)
+	_ Rule = (*pwa.ManifestRequiredFieldsMissingRule)(nil)
+	_ Rule = (*pwa.IconMaskableMissingRule)(nil)
+	_ Rule = (*pwa.ManifestMissingRule)(nil)
+	_ Rule = (*pwa.StartURLInconsistencyRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -151,6 +158,12 @@ func builtinRules() []Rule {
 		mobile.NewModalViewportLockRule(),
 		mobile.NewOrientationLockRiskRule(),
 		mobile.NewPointerEventsBlockRule(),
+
+		// pwa Wave 1 (Web App Manifest & Branding)
+		pwa.NewManifestRequiredFieldsMissingRule(),
+		pwa.NewIconMaskableMissingRule(),
+		pwa.NewManifestMissingRule(),
+		pwa.NewStartURLInconsistencyRule(),
 	}
 }
 
