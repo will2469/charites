@@ -30,11 +30,14 @@
 </details>
 
 <details open>
-<summary><b>Browser</b> (4 rules)</summary>
+<summary><b>Browser</b> (7 rules)</summary>
 
 * [**Browser Overview**](browser)
 * [`browser.appearance-native-override`](browser.appearance-native-override)
+* [`browser.date-input-format-assumption`](browser.date-input-format-assumption)
+* [`browser.experimental-api-no-featuredetect`](browser.experimental-api-no-featuredetect)
 * [`browser.hover-only-interaction`](browser.hover-only-interaction)
+* [`browser.non-passive-scroll-listener`](browser.non-passive-scroll-listener)
 * [`browser.obsolete-vendor-prefix`](browser.obsolete-vendor-prefix)
 * [`browser.scrollbar-vendor-incomplete`](browser.scrollbar-vendor-incomplete)
 

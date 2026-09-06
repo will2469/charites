@@ -1,0 +1,14 @@
+---
+// A1: Optional chaining on experimental API call is safe
+---
+<button id="theme-btn">Toggle View</button>
+
+<script>
+  function switchTheme(updateDOM) {
+    if (document.startViewTransition) {
+      document.startViewTransition(updateDOM);
+    } else {
+      updateDOM();
+    }
+  }
+</script>

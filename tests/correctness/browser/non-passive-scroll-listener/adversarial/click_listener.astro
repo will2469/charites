@@ -1,0 +1,11 @@
+---
+// A1: Non-scroll events like click or keydown do not require passive listeners
+---
+<button id="action-btn">Click Action</button>
+
+<script>
+  const btn = document.getElementById("action-btn");
+  btn?.addEventListener("click", () => {
+    console.log("Clicked!");
+  });
+</script>

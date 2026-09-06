@@ -1,0 +1,15 @@
+---
+// N1: navigator.share guarded with 'if (navigator.share)'
+---
+<button id="share-btn">Share</button>
+
+<script>
+  const btn = document.getElementById("share-btn");
+  btn?.addEventListener("click", async () => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      await navigator.share({ title: "Charites", url: window.location.href });
+    } else {
+      console.log("Web Share not supported on this browser.");
+    }
+  });
+</script>

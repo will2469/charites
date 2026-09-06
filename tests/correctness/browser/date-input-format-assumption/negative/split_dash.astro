@@ -1,0 +1,13 @@
+---
+// N1: Parsing date input with normative ISO 8601 dash delimiter
+---
+<input id="booking-date" type="date" />
+
+<script>
+  const input = document.getElementById("booking-date");
+  input?.addEventListener("change", (e) => {
+    // Compliant: HTML5 guarantees ISO 8601 format YYYY-MM-DD
+    const [year, month, day] = e.target.value.split('-');
+    console.log(year, month, day);
+  });
+</script>

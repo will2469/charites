@@ -1,0 +1,11 @@
+---
+// P1: Direct invocation of navigator.share without runtime feature guard
+---
+<button id="share-btn">Share Page</button>
+
+<script>
+  const btn = document.getElementById("share-btn");
+  btn?.addEventListener("click", () => {
+    navigator.share({ title: "Charites", url: window.location.href });
+  });
+</script>

@@ -51,6 +51,11 @@ var (
 	_ Rule = (*browser.ScrollbarVendorIncompleteRule)(nil)
 	_ Rule = (*browser.ObsoleteVendorPrefixRule)(nil)
 	_ Rule = (*browser.HoverOnlyInteractionRule)(nil)
+
+	// browser Wave 2 (Runtime Safety & Event Performance)
+	_ Rule = (*browser.ExperimentalAPINoFeaturedetectRule)(nil)
+	_ Rule = (*browser.DateInputFormatAssumptionRule)(nil)
+	_ Rule = (*browser.NonPassiveScrollListenerRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -117,6 +122,11 @@ func builtinRules() []Rule {
 		browser.NewScrollbarVendorIncompleteRule(),
 		browser.NewObsoleteVendorPrefixRule(),
 		browser.NewHoverOnlyInteractionRule(),
+
+		// browser Wave 2 (Runtime Safety & Event Performance)
+		browser.NewExperimentalAPINoFeaturedetectRule(),
+		browser.NewDateInputFormatAssumptionRule(),
+		browser.NewNonPassiveScrollListenerRule(),
 	}
 }
 

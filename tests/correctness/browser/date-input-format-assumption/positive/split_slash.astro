@@ -1,0 +1,13 @@
+---
+// P1: Splitting date input value by slash in Astro script
+---
+<input id="birth-date" type="date" />
+
+<script>
+  const input = document.getElementById("birth-date");
+  input?.addEventListener("change", (e) => {
+    // Violation: assuming localized DD/MM/YYYY formatting on date input value
+    const parts = e.target.value.split('/');
+    console.log(parts);
+  });
+</script>

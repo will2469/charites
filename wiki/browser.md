@@ -9,7 +9,10 @@ The `browser` category contains static analysis rules for code quality, architec
 | Rule ID | Severity | Summary | Full Specification | Status |
 | :--- | :---: | :--- | :--- | :---: |
 | `browser.appearance-native-override` | `WARN` | Enforces explicit appearance-none on form controls with custom styling to prevent WebKit/Safari native UI clashes | [`browser.appearance-native-override`](browser.appearance-native-override) | `enabled` |
+| `browser.date-input-format-assumption` | `ERROR` | Prohibits localized string splitting assumptions on HTML5 date input values in favor of normative ISO 8601 parsing | [`browser.date-input-format-assumption`](browser.date-input-format-assumption) | `enabled` |
+| `browser.experimental-api-no-featuredetect` | `ERROR` | Detects invocation of experimental Web APIs without runtime feature detection guards | [`browser.experimental-api-no-featuredetect`](browser.experimental-api-no-featuredetect) | `enabled` |
 | `browser.hover-only-interaction` | `ERROR` | Ensures interactive actions and state reveals have keyboard and touch counterparts instead of relying solely on hover | [`browser.hover-only-interaction`](browser.hover-only-interaction) | `enabled` |
+| `browser.non-passive-scroll-listener` | `WARN` | Enforces { passive: true } option on touch and wheel event listeners to prevent main thread scroll blocking | [`browser.non-passive-scroll-listener`](browser.non-passive-scroll-listener) | `enabled` |
 | `browser.obsolete-vendor-prefix` | `WARN` | Detects obsolete CSS vendor prefixes and incomplete -webkit-line-clamp multi-line truncation triads | [`browser.obsolete-vendor-prefix`](browser.obsolete-vendor-prefix) | `enabled` |
 | `browser.scrollbar-vendor-incomplete` | `WARN` | Enforces bidirectional cross-engine scrollbar styling pairing between WebKit pseudo-elements and W3C standard properties | [`browser.scrollbar-vendor-incomplete`](browser.scrollbar-vendor-incomplete) | `enabled` |
 

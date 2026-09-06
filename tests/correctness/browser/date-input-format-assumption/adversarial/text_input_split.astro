@@ -1,0 +1,17 @@
+---
+// A1: Splitting text input values by slash for filepaths or slugs is legitimate
+---
+<input
+  id="path-input"
+  type="text"
+  placeholder="folder/subfolder/file.txt"
+/>
+
+<script>
+  const pathInput = document.getElementById("path-input");
+  pathInput?.addEventListener("change", (e) => {
+    // Legitimate path splitting for text input
+    const segments = e.target.value.split('/');
+    console.log(segments);
+  });
+</script>

@@ -1,0 +1,10 @@
+---
+// N1: Event listener declaring explicit { passive: true }
+---
+<div id="touch-area">Swipe Area</div>
+
+<script>
+  window.addEventListener("touchmove", (e) => {
+    console.log("Touch move coords:", e.touches[0].clientX);
+  }, { passive: true });
+</script>

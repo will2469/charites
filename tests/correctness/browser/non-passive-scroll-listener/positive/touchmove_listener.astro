@@ -1,0 +1,10 @@
+---
+// P1: Non-passive touchmove event listener causes compositor thread jank
+---
+<div id="touch-area">Swipe Area</div>
+
+<script>
+  window.addEventListener("touchmove", (e) => {
+    console.log("Touch move coords:", e.touches[0].clientX);
+  });
+</script>

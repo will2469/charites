@@ -273,14 +273,128 @@ Wave 1 berfokus pada **kesetaraan tampilan visual murni di level CSS dan JSX**. 
 
 ---
 
-## 5. Gambaran Ringkas Wave 2 & Wave 3
+## 5. Spesifikasi Detail Wave 2: Runtime Safety & Event Performance (3 Rules)
 
-### 5.1. Wave 2: Runtime Safety & Event Performance (3 Rules)
-- **`browser.experimental-api-no-featuredetect` (L5):** Memeriksa pemanggilan Web API modern (`navigator.share`, `navigator.bluetooth`, `document.startViewTransition`) agar selalu dibungkus pengecekan ketersediaan runtime untuk mencegah `TypeError: undefined is not a function` di browser non-pendukung.
-- **`browser.date-input-format-assumption` (L5):** Memastikan pembacaan input tanggal native tidak menggunakan asumsi pemecahan string lokal (`.split('/')`), melainkan mematuhi jaminan spesifikasi W3C ISO 8601 (`YYYY-MM-DD`).
-- **`browser.non-passive-scroll-listener` (L5):** Menegakkan opsi `{ passive: true }` pada listener sentuh (`touchstart`, `touchmove`, `wheel`) untuk mencegah compositor thread browser terblokir yang menyebabkan patah-patah (*scroll jank*).
+Wave 2 berfokus pada **keamanan eksekusi runtime JavaScript dan performa scrolling antar mesin browser**. Cacat pada Wave 2 umumnya tidak terdeteksi saat compile-time TypeScript standar tetapi meledakkan runtime exception (`TypeError: undefined is not a function`) atau menyebabkan frame rate drop di perangkat mobile nyata.
 
-### 5.2. Wave 3: Browser Capability & Vendor API Isolation (5 Rules)
+---
+
+### 5.1. `browser.experimental-api-no-featuredetect`
+- **Design Rationale:** WICG & W3C Web Platform Incubator Community Group Specifications & Defensive Feature Detection.
+- **Konteks Realitas Lintas-Engine:**
+  API Web modern seperti Web Share (`navigator.share`), File System Access (`window.showOpenFilePicker`), EyeDropper (`window.EyeDropper`), dan View Transitions (`document.startViewTransition`) diadopsi secara asinkron lintas engine.
+  Sebagai contoh:
+  - `navigator.share` hanya didukung di mobile atau secure context dengan hardware pendukung; pemanggilan di Firefox desktop atau iframe tidak berizin melempar exception fatal.
+  - `showOpenFilePicker` adalah API eksklusif Chromium; memanggilnya langsung di Firefox atau Safari menyebabkan aplikasi crash seketika.
+- **Invariant (Predikat AST):**
+  Untuk setiap pemanggilan API eksperimental $A \in \{ \text{navigator.share}, \text{showOpenFilePicker}, \text{showSaveFilePicker}, \text{document.startViewTransition}, \text{window.EyeDropper}, \text{navigator.virtualKeyboard}, \text{navigator.bluetooth}, \text{navigator.usb}, \text{navigator.serial} \}$:
+  $$\text{invokes}(A) \land \neg \text{hasFeatureGuard}(A) \implies \text{Violation (Error)}$$
+  di mana $\text{hasFeatureGuard}(A)$ mencakup guard runtime eksplisit seperti `if ('api' in obj)`, `if (obj.api)`, optional chaining `obj.api?.()`, atau blok `try/catch`.
+- **Mengapa Lolos Linter Standar:**
+  TypeScript declaration file (`lib.dom.d.ts`) sering kali memasukkan API ini sebagai properti opsional atau global jika target lingkungan modern disetel, tanpa memaksa runtime guard saat runtime engine target bervariasi.
+- **Suspicious (Crash di Firefox & Safari):**
+  ```tsx
+  <button
+    type="button"
+    onClick={() => {
+      // Crash instan di Firefox desktop: TypeError: navigator.share is not a function
+      navigator.share({ title: "Surat Domisili", url: window.location.href });
+    }}
+  >
+    Bagikan Dokumen
+  </button>
+  ```
+- **Compliant (Feature Guard Graceful Fallback):**
+  ```tsx
+  <button
+    type="button"
+    onClick={async () => {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: "Surat Domisili", url: window.location.href });
+      } else {
+        await navigator.clipboard?.writeText(window.location.href);
+      }
+    }}
+  >
+    Bagikan Dokumen
+  </button>
+  ```
+- **Engine:** L5 Scope, Data-Flow & Call-Graph (`internal/rules/browser/experimental_api_no_featuredetect.go`).
+- **Severity:** `error`.
+- **Autofix:** No (memerlukan penentuan UX fallback kontekstual oleh developer).
+
+---
+
+### 5.2. `browser.date-input-format-assumption`
+- **Design Rationale:** HTML Living Standard Section 4.10.5.1.7 (Date State) & ISO 8601 Normative Formatting.
+- **Konteks Realitas Lintas-Engine:**
+  Spesifikasi W3C menjamin bahwa atribut `.value` dari `<input type="date">` **selalu dan tanpa kecuali** diformat dalam string ISO 8601 (`YYYY-MM-DD`, dipisahkan tanda strip `-`), terlepas dari bagaimana OS atau browser menampilkannya kepada pengguna (misal display `DD/MM/YYYY` di Indonesia/Inggris atau `MM/DD/YYYY` di AS).
+  Developer pemula sering melihat tampilan visual di layar dan salah berasumsi bahwa `.value` berisi tanda garis miring (`/`) atau titik (`.`). Ketika mereka memanggil `.split('/')` pada nilai input tanggal native, kode mengalami bug senyap: array hasil split hanya memiliki panjang 1 (`["2026-09-06"]`), sehingga parsing tanggal gagal total.
+- **Invariant (Predikat AST):**
+  Pada penanganan nilai elemen `<input type="date">`:
+  $$\text{parsesDateInputValue}(V) \land \text{splitsByNonStandardDelimiter}(V, ['/', '.']) \implies \text{Violation (Error)}$$
+- **Mengapa Lolos Linter Standar:**
+  Metode `.split('/')` adalah metode string JavaScript standar yang sah secara tipe. Linter umum tidak mengetahui bahwa string tersebut bersumber dari kontrol tanggal native HTML5.
+- **Suspicious (Gagal Parsing Tanggal di Seluruh Browser):**
+  ```tsx
+  <input
+    type="date"
+    onChange={(e) => {
+      // Nilai e.target.value SELALU "2026-09-06" (ISO 8601)
+      // Pemisahan dengan "/" menghasilkan array rusak [ "2026-09-06" ]
+      const [day, month, year] = e.target.value.split('/');
+      processDate(day, month, year);
+    }}
+  />
+  ```
+- **Compliant (Parsing Standar ISO 8601 atau valueAsDate):**
+  ```tsx
+  <input
+    type="date"
+    onChange={(e) => {
+      // Menggunakan ISO 8601 standar atau valueAsDate native
+      const [year, month, day] = e.target.value.split('-');
+      processDate(day, month, year);
+    }}
+  />
+  ```
+- **Engine:** L5 Scope, Data-Flow & Call-Graph (`internal/rules/browser/date_input_format_assumption.go`).
+- **Severity:** `error`.
+- **Autofix:** No.
+
+---
+
+### 5.3. `browser.non-passive-scroll-listener`
+- **Design Rationale:** W3C DOM Level 4 Events & Compositor Thread Jank Prevention (Lighthouse Best Practice).
+- **Konteks Realitas Lintas-Engine:**
+  Saat pengguna melakukan gestur sentuh atau memutar roda mouse, browser modern (Chromium, Safari WebKit, Firefox Gecko) memproses scrolling pada thread terpisah (*compositor thread*) untuk menjamin 60fps/120fps yang mulus.
+  Jika developer menambahkan event listener untuk `touchstart`, `touchmove`, `wheel`, atau `mousewheel` tanpa opsi `{ passive: true }`, browser terpaksa menunda rendering scroll dan menunggu eksekusi JavaScript selesai guna memeriksa apakah script memanggil `preventDefault()`. Hal ini menyebabkan *scroll stutter* yang parah pada perangkat mobile.
+- **Invariant (Predikat AST):**
+  Untuk setiap pemanggilan `addEventListener(E, handler)` di mana $E \in \{ \text{"touchstart"}, \text{"touchmove"}, \text{"wheel"}, \text{"mousewheel"} \}$:
+  $$\neg \text{hasPassiveOption} \land \neg \text{callsPreventDefault} \implies \text{Violation (Warning)}$$
+- **Mengapa Lolos Linter Standar:**
+  Signature `addEventListener(type, listener)` dua argumen adalah API DOM valid sejak DOM Level 2. Linter sintaks tidak memiliki konteks arsitektur compositor thread browser.
+- **Suspicious (Memblokir Compositor Thread & Scroll Macet di HP):**
+  ```javascript
+  // Mengunci main thread browser pada setiap gestur sentuh
+  window.addEventListener("touchstart", (e) => {
+    trackTouchMetrics(e);
+  });
+  ```
+- **Compliant (Non-blocking Smooth Scrolling):**
+  ```javascript
+  // Memberi tahu browser bahwa listener tidak akan membatalkan scrolling
+  window.addEventListener("touchstart", (e) => {
+    trackTouchMetrics(e);
+  }, { passive: true });
+  ```
+- **Engine:** L5 Scope & Call-Graph AST (`internal/rules/browser/non_passive_scroll_listener.go`).
+- **Severity:** `warning`.
+- **Autofix:** Otomatis menambahkan `{ passive: true }` sebagai argumen ketiga.
+
+---
+
+## 6. Gambaran Ringkas Wave 3 (Vendor API Isolation)
 - **`browser.user-agent-sniffing` (L5):** Mengeliminasi deteksi browser rapuh berbasis `navigator.userAgent.includes(...)` dan mengarahkan ke feature detection modern via `CSS.supports` atau `'feature' in window`.
 - **`browser.webkit-only-api`, `browser.chrome-only-api`, `browser.firefox-only-api`, `browser.safari-only-api` (L5):** Mengisolasi pemanggilan API spesifik vendor agar selalu memiliki jalur fallback universal.
 
@@ -306,9 +420,9 @@ Untuk skenario desain khusus di mana developer sengaja mempertahankan perilaku b
 
 ---
 
-## 8. Struktur Modul Kode & Roadmap Eksekusi Wave 1
+## 8. Struktur Modul Kode & Roadmap Eksekusi Wave 1 & Wave 2
 
-Implementasi aturan Wave 1 ditempatkan secara modular di `internal/rules/browser/`:
+Implementasi aturan `browser.*` ditempatkan secara modular di `internal/rules/browser/`:
 
 ```text
 internal/rules/browser/
@@ -316,8 +430,12 @@ internal/rules/browser/
 ├── scrollbar_vendor_incomplete.go    # Wave 1: Two-way scrollbar pairing
 ├── obsolete_vendor_prefix.go         # Wave 1: Clean dead prefixes & line-clamp triad
 ├── hover_only_interaction.go         # Wave 1: Touch vs hover parity
+├── experimental_api_no_featuredetect.go # Wave 2: Unguarded experimental APIs
+├── date_input_format_assumption.go   # Wave 2: ISO 8601 vs local date splitting
+├── non_passive_scroll_listener.go    # Wave 2: Passive event listener enforcement
+├── util.go                           # Shared AST text extraction & parsing helpers
 ├── contract_test.go                  # 8-Pillars Canonical Contract Validator
 └── benchmark_test.go                 # QUAL-03 Zero Allocation Benchmarks
 ```
 
-Setiap rule Wave 1 akan divalidasi dengan **1-SSOT Golden Tri-Corpus** di `tests/correctness/browser/<slug>/` yang mencakup kasus uji positif, negatif, dan adversarial untuk menjamin **nol regresi dan nol false-positive**.
+Setiap rule akan divalidasi dengan **1-SSOT Golden Tri-Corpus** di `tests/correctness/browser/<slug>/` yang mencakup kasus uji positif, negatif, dan adversarial untuk menjamin **nol regresi dan nol false-positive**.
