@@ -89,6 +89,19 @@
 </details>
 
 <details open>
+<summary><b>Responsive</b> (6 rules)</summary>
+
+* [**Responsive Overview**](responsive)
+* [`responsive.fixed-width-overflow`](responsive.fixed-width-overflow)
+* [`responsive.missing-breakpoint`](responsive.missing-breakpoint)
+* [`responsive.safe-area-missing`](responsive.safe-area-missing)
+* [`responsive.unwrapped-table-overflow`](responsive.unwrapped-table-overflow)
+* [`responsive.viewport-meta-missing`](responsive.viewport-meta-missing)
+* [`responsive.viewport-unit-leak`](responsive.viewport-unit-leak)
+
+</details>
+
+<details open>
 <summary><b>Theme</b> (32 rules)</summary>
 
 * [**Theme Overview**](theme)

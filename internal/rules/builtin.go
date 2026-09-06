@@ -6,6 +6,7 @@ import (
 	"github.com/will2469/charites/internal/rules/ergonomy"
 	"github.com/will2469/charites/internal/rules/mobile"
 	"github.com/will2469/charites/internal/rules/pwa"
+	"github.com/will2469/charites/internal/rules/responsive"
 	"github.com/will2469/charites/internal/rules/theme"
 )
 
@@ -75,6 +76,14 @@ var (
 	_ Rule = (*pwa.ServiceWorkerMissingRule)(nil)
 	_ Rule = (*pwa.ServiceWorkerRegistrationRule)(nil)
 	_ Rule = (*pwa.CacheRuntimeAPIRiskRule)(nil)
+
+	// responsive Wave 1 (Layout Core & Viewport Deterministic)
+	_ Rule = (*responsive.MissingBreakpointRule)(nil)
+	_ Rule = (*responsive.UnwrappedTableOverflowRule)(nil)
+	_ Rule = (*responsive.FixedWidthOverflowRule)(nil)
+	_ Rule = (*responsive.ViewportUnitLeakRule)(nil)
+	_ Rule = (*responsive.SafeAreaMissingRule)(nil)
+	_ Rule = (*responsive.ViewportMetaMissingRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -184,6 +193,14 @@ func builtinRules() []Rule {
 		pwa.NewServiceWorkerMissingRule(),
 		pwa.NewServiceWorkerRegistrationRule(),
 		pwa.NewCacheRuntimeAPIRiskRule(),
+
+		// responsive Wave 1 (Layout Core & Viewport Deterministic)
+		responsive.NewMissingBreakpointRule(),
+		responsive.NewUnwrappedTableOverflowRule(),
+		responsive.NewFixedWidthOverflowRule(),
+		responsive.NewViewportUnitLeakRule(),
+		responsive.NewSafeAreaMissingRule(),
+		responsive.NewViewportMetaMissingRule(),
 	}
 }
 

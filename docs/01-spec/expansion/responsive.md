@@ -22,7 +22,7 @@
 flowchart TD
     subgraph W1 ["Wave 1: Layout Core & Viewport Deterministic (6 Rules)"]
         R1["responsive.missing-breakpoint (Multi-kolom/giant font tanpa breakpoint)"]
-        R2["responsive.redundant-classes (Konflik utility ukuran pada breakpoint sama)"]
+        R2["responsive.unwrapped-table-overflow (Tabel tanpa wrapper overflow-x-auto)"]
         R3["responsive.fixed-width-overflow (Lebar statis > 320px tanpa max-w-full)"]
         R4["responsive.viewport-unit-leak (100vh tanpa dvh/svh dynamic units)"]
         R5["responsive.safe-area-missing (Bottom bar tanpa safe-area-inset-bottom)"]
@@ -56,68 +56,222 @@ flowchart TD
 
 ---
 
-## 2. Spesifikasi Detail Rule `responsive.*`
+## 2. Spesifikasi Detail Rule Wave 1: Layout Core & Viewport Deterministic (6 Rules)
+
+---
 
 ### 2.1. `responsive.missing-breakpoint`
-- **Asal Usul:** Warisan Legacy `charites-legacy/tailwind-checker.ts` (R4).
-- **Tujuan:** Mendeteksi layout multi-kolom atau tipografi raksasa yang dideklarasikan sebagai baseline mobile tanpa breakpoint responsif.
-- **Mengapa Lolos Linter Standar:** `className="grid grid-cols-4"` adalah string yang 100% valid secara sintaksis. ESLint tidak memahami bahwa kolom 4-grid pada layar 360px akan memeras konten menjadi 80px per kolom.
-- **In-Scope:** Deklarasi kelas `grid-cols-3` s/d `grid-cols-12` atau heading `text-5xl` s/d `text-8xl` tanpa awalan modifier breakpoint (`sm:`, `md:`, `lg:`).
-- **Bad:** `<div className="grid grid-cols-4 gap-4">`
-- **Good:** `<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">`
-- **Engine:** JSX/TSX AST + Tailwind Class AST.
-- **Severity:** Warning.
-
-### 2.2. `responsive.redundant-classes`
-- **Asal Usul:** Warisan Legacy `charites-legacy/tailwind-checker.ts` (R3).
-- **Tujuan:** Mendeteksi instruksi ukuran bertabrakan dari famili properti CSS yang sama pada breakpoint yang sama.
-- **Mengapa Lolos Linter Standar:** ESLint biasa tidak memahami mapping utility Tailwind ke properti CSS. Ekstensi IDE Tailwind hanya menyorot di editor tetapi tidak menjadi pre-commit blocker di CI/CD CLI.
-- **In-Scope:** Dua atau lebih utility dari family yang sama pada breakpoint yang sama (mis. padding ganda atau font-size ganda).
-- **Bad:**
+- **Design Rationale:** Mobile-First CSS Grid Architecture & Responsive Typography Scaling.
+- **Konteks Realitas Mobile:**
+  Pada layar smartphone berukuran sempit (360px-390px), mendefinisikan layout multi-kolom (`grid-cols-3` s/d `grid-cols-12`) atau ukuran font raksasa (`text-5xl` s/d `text-9xl`) langsung pada baseline mobile tanpa modifier breakpoint (`sm:`, `md:`, `lg:`) akan memeras lebar setiap kolom menjadi kurang dari 100px. Hal ini merusak tata letak kartu, memotong teks, atau menyebabkan konten bertumpuk tak terbaca. Pendekatan mobile-first mewajibkan baseline mobile dimulai dari 1 kolom (`grid-cols-1`) dan diperluas secara bertahap menggunakan breakpoint modifier.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen dengan kelas Tailwind $C \in \text{Classes}(E)$:
+  $$\text{isUnprefixedMultiColGrid}(C) \lor \text{isUnprefixedGiantFont}(C) \implies \text{Violation (Warn)}$$
+  di mana $\text{isUnprefixedMultiColGrid}$ mendeteksi `grid-cols-[3-9]` atau `grid-cols-1[0-2]` tanpa prefix breakpoint responsif, dan $\text{isUnprefixedGiantFont}$ mendeteksi `text-[5-9]xl` tanpa prefix breakpoint dan tanpa baseline responsif.
+- **Mengapa Lolos Linter Standar:**
+  String kelas `grid-cols-4` valid secara sintaksis HTML/JSX. Linter standar tidak memahami kalkulasi box model per kolom pada lebar fisik viewport mobile 360px.
+- **Suspicious (Multi-Kolom Dideklarasikan Sebagai Baseline Mobile):**
   ```tsx
-  <div className={clsx("p-2", "p-6", "text-sm", "text-lg")}>
+  {/* Memeras 4 kolom pada layar ponsel sempit 360px */}
+  <div className="grid grid-cols-4 gap-4">
+    <div className="bg-card p-4">Item 1</div>
+    <div className="bg-card p-4">Item 2</div>
+  </div>
   ```
-- **Good:** `<div className="p-6 text-lg">`
-- **Engine:** Token Geometry AST.
-- **Severity:** Warning.
+- **Compliant (Mobile-First dengan Breakpoint Responsif):**
+  ```tsx
+  {/* Baseline mobile 1 kolom, melebar menjadi 2 kolom di tablet dan 4 di desktop */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="bg-card p-4">Item 1</div>
+    <div className="bg-card p-4">Item 2</div>
+  </div>
+  ```
+- **Engine:** L1 Syntax + L2 Class Token AST (`internal/rules/responsive/missing_breakpoint.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
+
+### 2.2. `responsive.unwrapped-table-overflow`
+- **Design Rationale:** W3C HTML Living Standard Table Layout & Responsive Data Table Ergonomics.
+- **Konteks Realitas Mobile:**
+  Di layar smartphone compact (360px-390px), tabel data (`<table>`) memiliki algoritma layout intrinsik (`table-layout: auto`) yang memaksa lebar tabel menyesuaikan konten terlebar di setiap kolomnya. Menempatkan elemen `<table>` secara langsung di dalam dokumen tanpa pembungkus kontainer yang mengizinkan pengguliran horizontal (`overflow-x-auto`, `overflow-x-scroll`) atau tanpa transformasi responsif (`block md:table`, `hidden md:table`) akan membuat tabel merobek batas horizontal layar. Hal ini memicu *horizontal page sway* di seluruh dokumen, merusak gestur navigasi usap (*swipe*), dan membuat kolom di sisi kanan terpotong tanpa indikator gulir.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen `<table>` $T$:
+  $$\neg \text{hasResponsiveDisplay}(T) \land \neg \text{hasScrollWrapper}(T) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasResponsiveDisplay}$ memeriksa apakah `<table>` memiliki kelas `hidden md:table`, `block md:table`, atau transformasi kartu mobile, dan $\text{hasScrollWrapper}$ memeriksa apakah *parent* atau *ancestor* terdekat memiliki kelas `overflow-x-auto`, `overflow-x-scroll`, `overflow-auto`, atau `overflow-scroll`.
+- **Mengapa Lolos Linter Standar:**
+  Elemen `<table>` adalah sintaks HTML semantik standar. Linter konvensional (ESLint, Tailwind LSP) tidak pernah memeriksa hubungan geometris kontainer pembungkus terhadap elemen tabel.
+- **Suspicious (Tabel Data Tanpa Wrapper Scroll):**
+  ```tsx
+  {/* Tabel telanjang langsung merobek viewport layar 360px */}
+  <table className="w-full border">
+    <thead>
+      <tr>
+        <th>Nama</th>
+        <th>NIK</th>
+        <th>Alamat</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Warga 1</td>
+        <td>3201...</td>
+        <td>Dusun Krajan RT 01 RW 02</td>
+        <td>Aktif</td>
+      </tr>
+    </tbody>
+  </table>
+  ```
+- **Compliant (Tabel Dibungkus Kontainer Scroll Responsif):**
+  ```tsx
+  {/* Dibungkus kontainer overflow-x-auto sehingga tabel dapat digeser mulus di mobile */}
+  <div className="w-full overflow-x-auto">
+    <table className="w-full border">
+      <thead>
+        <tr>
+          <th>Nama</th>
+          <th>NIK</th>
+          <th>Alamat</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Warga 1</td>
+          <td>3201...</td>
+          <td>Dusun Krajan RT 01 RW 02</td>
+          <td>Aktif</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  ```
+- **Engine:** L1 Syntax + L2 HTML/JSX Element AST (`internal/rules/responsive/unwrapped_table_overflow.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 2.3. `responsive.fixed-width-overflow`
-- **Tujuan:** Mencegah kebocoran horizontal pada layar smartphone sempit (320px-390px) akibat lebar kontainer statis.
-- **Mengapa Lolos Linter Standar:** `w-[500px]` adalah arbitrary value yang sah di Tailwind. Linter tidak mengetahui lebar rata-rata layar smartphone dan tidak tahu apakah kontainer memiliki pembatas `max-w-full`.
-- **In-Scope:** Elemen kontainer dengan lebar statis `w-[...px]` atau `min-w-[...px]` dengan nilai > 320px tanpa pembatas `max-w-full`.
-- **Bad:** `<div className="w-[500px] bg-card">`
-- **Good (Tailwind v4 Token):** `<div className="w-full max-w-lg bg-card">`
-- **Good (Responsive Modifier):** `<div className="w-full md:max-w-xl bg-card">`
-- **Engine:** Token Geometry AST.
-- **Severity:** Error.
+- **Design Rationale:** Responsive Viewport Fluidity & Prevention of Horizontal Overflow.
+- **Konteks Realitas Mobile:**
+  Layar smartphone entry-level dan compact beroperasi pada rentang lebar fisik 320px (iPhone SE generasi awal, Galaxy Fold tertutup) hingga 390px (iPhone 14/15/16). Menetapkan lebar kontainer statis arbitrer melebihi 320px (`w-[500px]`, `w-[400px]`, `min-w-[360px]`) tanpa pembatas fleksibel (`max-w-full`) secara mekanis memecahkan batas horizontal layar, memunculkan bilah gulir samping (*horizontal scrollbar*) dan merusak gestur navigasi usap (*swipe*).
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen dengan kelas lebar $c \in C$:
+  $$\text{isUnprefixedStaticWidth}(c) \land \text{WidthValue}(c) > 320 \land \neg \text{hasFluidBoundary}(C) \implies \text{Violation (Error)}$$
+  di mana $\text{hasFluidBoundary}$ memeriksa keberadaan `max-w-full`, `max-w-[100%]`, `w-full`, atau modifier breakpoint desktop (`md:`, `lg:`).
+- **Mengapa Lolos Linter Standar:**
+  `w-[500px]` adalah arbitrary value valid pada Tailwind CSS. Linter standar tidak mengetahui batas fisik lebar perangkat seluler.
+- **Suspicious (Lebar Statis > 320px Tanpa Pembatas Fluida):**
+  ```tsx
+  {/* Merobek viewport mobile 360px */}
+  <div className="w-[500px] bg-card p-4">
+    <p>Kartu Informasi Desa</p>
+  </div>
+  ```
+- **Compliant (Lebar Fleksibel dengan Batas Maksimum):**
+  ```tsx
+  {/* Fleksibel di mobile, dibatasi maksimal pada layar lebar */}
+  <div className="w-full max-w-lg bg-card p-4">
+    <p>Kartu Informasi Desa</p>
+  </div>
+  ```
+- **Engine:** L1 Syntax + L2 Token Geometry AST (`internal/rules/responsive/fixed_width_overflow.go`).
+- **Severity:** `error`.
+- **Autofix:** No.
+
+---
 
 ### 2.4. `responsive.viewport-unit-leak`
-- **Tujuan:** Mengurangi layout jump pada browser mobile ketika address bar atau toolbar muncul/menghilang saat layar digulir.
-- **Mengapa Lolos Linter Standar:** `h-screen` (`100vh`) adalah utility standar Tailwind yang valid secara CSS spec level 3. Linter biasa tidak mengetahui standar CSS Values Level 4 (`100dvh` / `100svh`).
-- **In-Scope:** Elemen layout utama yang menggunakan `h-screen`, `min-h-screen`, `h-[100vh]`, atau `min-h-[100vh]` tanpa dynamic units (`dvh`/`svh`).
-- **Bad:** `<main className="min-h-screen">`
-- **Good (Tailwind v4):** `<main className="min-h-dvh">`
-- **Good (Fallback SVH):** `<main className="min-h-svh">`
-- **Engine:** JSX/TSX AST + CSS AST.
-- **Severity:** Warning.
+- **Design Rationale:** W3C CSS Values and Units Module Level 4 (Dynamic & Small Viewport Units: `dvh`, `svh`).
+- **Konteks Realitas Mobile:**
+  Di peramban seluler (Safari iOS dan Chrome Android), bilah alamat (*URL bar*) dan bilah navigasi bawah secara dinamis menciut saat pengguna menggulir halaman ke bawah dan mengembang kembali saat menggulir ke atas. Unit viewport klasik `100vh` dihitung berdasarkan ukuran viewport terbesar (*Large Viewport Height*). Akibatnya, tombol penting di bagian bawah kontainer `100vh` terpotong di balik bilah peramban, dan halaman mengalami lonjakan tata letak (*layout shift*) mendadak saat bilah peramban muncul/hilang. Spesifikasi CSS Level 4 memperkenalkan `dvh` (*Dynamic Viewport Height*) dan `svh` (*Small Viewport Height*) untuk mengatasi masalah ini.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen dengan kelas tinggi viewport $c \in C$:
+  $$c \in \{ \text{"h-screen"}, \text{"min-h-screen"}, \text{"max-h-screen"}, \text{"h-[100vh]"}, \text{"min-h-[100vh]"} \} \implies \text{Violation (Warn)}$$
+- **Mengapa Lolos Linter Standar:**
+  `h-screen` dan `100vh` adalah utilitas resmi standar CSS Level 3 yang valid secara sintaksis.
+- **Suspicious (Menggunakan Unit Viewport Statis 100vh):**
+  ```tsx
+  {/* Memicu layout jump dan tombol bawah terpotong bilah alamat Safari */}
+  <main className="min-h-screen bg-background flex flex-col justify-between">
+    <h1>Beranda Desa</h1>
+    <button className="h-11 px-4 bg-primary text-primary-foreground">Lanjutkan</button>
+  </main>
+  ```
+- **Compliant (Menggunakan Unit Dynamic Viewport dvh):**
+  ```tsx
+  {/* Menyesuaikan tinggi secara mulus dengan pergerakan bilah peramban mobile */}
+  <main className="min-h-dvh bg-background flex flex-col justify-between">
+    <h1>Beranda Desa</h1>
+    <button className="h-11 px-4 bg-primary text-primary-foreground">Lanjutkan</button>
+  </main>
+  ```
+- **Engine:** L1 Syntax + L2 CSS Class Token AST (`internal/rules/responsive/viewport_unit_leak.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 2.5. `responsive.safe-area-missing`
-- **Tujuan:** Mencegah bilah navigasi bawah (*bottom bar*) atau floating action button tertutup oleh Home Indicator perangkat iOS iPhone.
-- **Mengapa Lolos Linter Standar:** `fixed bottom-0` sah di CSS. Linter biasa tidak tahu bahwa perangkat ber-notch/home-bar membutuhkan deklarasi safe area inset.
-- **In-Scope:** Elemen `fixed`/`sticky` dengan posisi `bottom-0` yang tidak mempunyai deklarasi padding safe-area inset bottom (`env(safe-area-inset-bottom)`).
-- **Bad:** `<nav className="fixed bottom-0 left-0 right-0 h-16">`
-- **Good:** `<nav className="fixed bottom-0 left-0 right-0 pb-[env(safe-area-inset-bottom)]">`
-- **Engine:** JSX/TSX AST.
-- **Severity:** Warning.
+- **Design Rationale:** W3C CSS Mobile Safe Area Insets (`env(safe-area-inset-bottom)`) & Apple Human Interface Guidelines.
+- **Konteks Realitas Mobile:**
+  Perangkat smartphone modern tanpa tombol fisik (seperti iPhone dengan Home Indicator atau Android gestur layar penuh) memiliki bilah gestur navigasi sistem di bagian bawah layar. Komponen navigasi yang diposisikan menempel di dasar viewport (`fixed bottom-0` atau `sticky bottom-0`) tanpa bantalan safe area (*padding bottom*) akan tertimpa oleh Home Indicator. Hal ini menyebabkan tombol navigasi bawah sulit ditekan atau memicu salah sentuh (*mis-tap*) pada navigasi sistem operasi.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen yang diposisikan di bawah layar:
+  $$\text{isBottomDocked}(E) \land \neg \text{hasSafeAreaPadding}(E) \implies \text{Violation (Warn)}$$
+  di mana $\text{isBottomDocked}$ mendeteksi `fixed` atau `sticky` berkombinasi dengan `bottom-0` pada baseline mobile, dan $\text{hasSafeAreaPadding}$ mendeteksi keberadaan `pb-[env(safe-area-inset-bottom)]`, `pb-safe`, atau utilitas safe-area bottom.
+- **Mengapa Lolos Linter Standar:**
+  Kombinasi `fixed bottom-0` sah di CSS standar. Linter biasa buta terhadap kehadiran bilah Home Indicator perangkat keras mobile.
+- **Suspicious (Bilah Bawah Fixed Tanpa Safe Area Padding):**
+  ```tsx
+  {/* Tertimpa oleh Home Indicator iPhone */}
+  <nav className="fixed bottom-0 left-0 right-0 h-16 bg-surface flex items-center justify-around">
+    <a href="/home">Beranda</a>
+    <a href="/layanan">Layanan</a>
+  </nav>
+  ```
+- **Compliant (Dilengkapi Padding Safe Area Bawah):**
+  ```tsx
+  {/* Diberi bantalan aman agar terangkat di atas Home Indicator */}
+  <nav className="fixed bottom-0 left-0 right-0 pb-[env(safe-area-inset-bottom)] bg-surface flex items-center justify-around">
+    <a href="/home">Beranda</a>
+    <a href="/layanan">Layanan</a>
+  </nav>
+  ```
+- **Engine:** L1 Syntax + L2 Element Class AST (`internal/rules/responsive/safe_area_missing.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 2.6. `responsive.viewport-meta-missing`
-- **Tujuan:** Memastikan root document mempunyai konfigurasi viewport yang sesuai untuk perangkat mobile dan safe-area.
-- **Mengapa Lolos Linter Standar:** Linter HTML dasar hanya memeriksa ada/tidaknya tag `<meta name="viewport">`, tetapi tidak memvalidasi kehadiran token `viewport-fit=cover` untuk aplikasi modern.
-- **In-Scope:** Tag meta viewport tanpa `viewport-fit=cover` atau tanpa `width=device-width`.
-- **Bad:** `<meta name="viewport" content="initial-scale=1.0">`
-- **Good:** `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">`
-- **Engine:** HTML/JSX AST.
-- **Severity:** Warning.
+- **Design Rationale:** HTML Living Standard (Viewport Meta Element) & Apple WebKit Safe Area Viewport Expansion.
+- **Konteks Realitas Mobile:**
+  Agar halaman web dapat dirender secara proporsional di layar ponsel dan memanfaatkan seluruh area layar termasuk safe-area tanpa bilah putih (*letterboxing*), tag meta viewport wajib mendeklarasikan `width=device-width` dan `viewport-fit=cover`. Melewatkan `width=device-width` menyebabkan browser merender halaman pada kanvas virtual desktop 980px dengan teks mikro. Melewatkan `viewport-fit=cover` menyebabkan fungsi CSS `env(safe-area-inset-*)` bernilai `0px`, menggagalkan seluruh mitigasi safe area di perangkat iOS.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen `<meta name="viewport">`:
+  $$\neg \text{hasDeviceWidth}(M) \lor \neg \text{hasViewportFitCover}(M) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasDeviceWidth}$ memeriksa keberadaan token `width=device-width` dan $\text{hasViewportFitCover}$ memeriksa `viewport-fit=cover` di dalam atribut `content`.
+- **Mengapa Lolos Linter Standar:**
+  Linter HTML umum hanya memverifikasi keberadaan tag `<meta name="viewport">` secara dangkal, tanpa memeriksa parameter konfigurasi safe-area `viewport-fit=cover`.
+- **Suspicious (Tag Meta Viewport Tanpa viewport-fit=cover):**
+  ```tsx
+  {/* env(safe-area-inset-*) akan bernilai 0px di iOS Safari */}
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  ```
+- **Compliant (Mendeklarasikan Konfigurasi Viewport Mobile Lengkap):**
+  ```tsx
+  {/* Mengaktifkan skalabilitas proporsional dan ekspansi safe area */}
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  ```
+- **Engine:** L1 Syntax + L2 HTML/JSX Meta AST (`internal/rules/responsive/viewport_meta_missing.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 2.7. `responsive.horizontal-overflow`
 - **Tujuan:** Mendeteksi layout yang secara CSS valid tetapi berpotensi memicu horizontal scrolling yang merusak gestur swipe mobile.
@@ -228,7 +382,7 @@ flowchart TD
 | Rule ID | Fokus Invarian | Mengapa Tidak Tertangkap Linter Biasa | Severity | Engine Target |
 |---|---|---|---|---|
 | `responsive.missing-breakpoint` | Multi-kolom tanpa breakpoint | ESLint tidak tahu kolom grid memeras layar 360px | warning | JSX/TSX + Tailwind AST |
-| `responsive.redundant-classes` | Konflik ukuran di breakpoint sama | CLI CI/CD blocker tanpa perlu Node IDE extension | warning | Token Geometry AST |
+| `responsive.unwrapped-table-overflow` | Tabel data tanpa wrapper scroll | Linter biasa tidak memeriksa hubungan parent scroll container | warning | HTML/JSX + Class AST |
 | `responsive.fixed-width-overflow` | Lebar statis > 320px tanpa pembatas | Linter biasa tidak menghitung ambang layar HP | error | Token Geometry AST |
 | `responsive.viewport-unit-leak` | 100vh layout jump di mobile | Linter biasa tidak paham spesifikasi dvh/svh CSS Level 4 | warning | JSX/TSX + CSS AST |
 | `responsive.safe-area-missing` | Proteksi Home Bar iPhone | Linter biasa buta terhadap notch/safe-area hardware | warning | JSX/TSX AST |

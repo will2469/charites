@@ -63,6 +63,7 @@ flowchart TD
 | `ergonomy` | 4 | [`ergonomy`](ergonomy) |
 | `mobile` | 5 | [`mobile`](mobile) |
 | `pwa` | 10 | [`pwa`](pwa) |
+| `responsive` | 6 | [`responsive`](responsive) |
 | `theme` | 32 | [`theme`](theme) |
 
 ---
@@ -118,6 +119,12 @@ flowchart TD
 | `pwa.service-worker-no-offline-fallback` | `pwa` | `WARN` | Warns when a Service Worker intercepts fetch events without providing an offline cache fallback or failure handler | [`pwa.service-worker-no-offline-fallback`](pwa.service-worker-no-offline-fallback) |
 | `pwa.service-worker-registration` | `pwa` | `WARN` | Warns when Service Worker registration lacks feature detection ('serviceWorker' in navigator) or error handling (.catch) | [`pwa.service-worker-registration`](pwa.service-worker-registration) |
 | `pwa.start-url-inconsistency` | `pwa` | `ERROR` | Errors when a Web App Manifest start_url uses an insecure protocol (http://), script scheme (javascript:), or path traversal (../) | [`pwa.start-url-inconsistency`](pwa.start-url-inconsistency) |
+| `responsive.fixed-width-overflow` | `responsive` | `ERROR` | Detects static fixed container widths exceeding 320px that cause horizontal overflow on mobile viewports | [`responsive.fixed-width-overflow`](responsive.fixed-width-overflow) |
+| `responsive.missing-breakpoint` | `responsive` | `WARN` | Warns when multi-column grids or giant font sizes are declared on mobile baseline without responsive breakpoint modifiers | [`responsive.missing-breakpoint`](responsive.missing-breakpoint) |
+| `responsive.safe-area-missing` | `responsive` | `WARN` | Warns when bottom-docked fixed or sticky elements lack safe-area-inset-bottom padding for modern mobile home indicators | [`responsive.safe-area-missing`](responsive.safe-area-missing) |
+| `responsive.unwrapped-table-overflow` | `responsive` | `WARN` | Warns when an HTML table element lacks a responsive horizontal scroll wrapper (overflow-x-auto) or responsive display transformation | [`responsive.unwrapped-table-overflow`](responsive.unwrapped-table-overflow) |
+| `responsive.viewport-meta-missing` | `responsive` | `WARN` | Warns when <meta name="viewport"> is missing width=device-width or viewport-fit=cover | [`responsive.viewport-meta-missing`](responsive.viewport-meta-missing) |
+| `responsive.viewport-unit-leak` | `responsive` | `WARN` | Warns when viewport height relies on static 100vh instead of modern dynamic dvh or svh units | [`responsive.viewport-unit-leak`](responsive.viewport-unit-leak) |
 | `theme.apply-bloat` | `theme` | `WARN` | Detects excessive use of @apply with more than 8 utility classes in CSS or style blocks | [`theme.apply-bloat`](theme.apply-bloat) |
 | `theme.backdrop-blur-hardcode` | `theme` | `WARN` | Detects hardcoded arbitrary blur and backdrop-blur scalars in Tailwind utility classes | [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode) |
 | `theme.chart-color-hardcode` | `theme` | `ERROR` | Detects hardcoded color values on chart visualization components | [`theme.chart-color-hardcode`](theme.chart-color-hardcode) |
