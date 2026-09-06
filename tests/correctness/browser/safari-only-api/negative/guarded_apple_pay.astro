@@ -1,0 +1,14 @@
+---
+// Astro Component checking window.ApplePaySession first
+---
+
+<div id="checkout-guarded">
+  <button id="apple-pay-btn" type="button">Bayar dengan Apple Pay</button>
+</div>
+
+<script>
+  // Compliant: guarded by typeof check and window property
+  if (typeof window !== "undefined" && window.ApplePaySession && window.ApplePaySession.canMakePayments()) {
+    console.log("Apple Pay is available");
+  }
+</script>

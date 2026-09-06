@@ -1,0 +1,16 @@
+---
+// Astro Component wrapping in try-catch
+---
+
+<div class="gecko-test">
+  <button id="try-action" type="button">Percobaan Aman</button>
+</div>
+
+<script>
+  try {
+    const el = document.getElementById("gecko-test");
+    el?.mozRequestFullScreen();
+  } catch (err) {
+    console.warn("Gecko call intercepted safely:", err);
+  }
+</script>

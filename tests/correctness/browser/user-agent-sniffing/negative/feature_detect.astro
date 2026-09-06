@@ -1,0 +1,15 @@
+---
+// Astro Component using proper feature detection
+---
+
+<div class="viewport-box">
+  <span>Tampilan adaptif</span>
+</div>
+
+<script>
+  if ("visualViewport" in window) {
+    window.visualViewport?.addEventListener("resize", () => {
+      console.log("Viewport resized");
+    });
+  }
+</script>

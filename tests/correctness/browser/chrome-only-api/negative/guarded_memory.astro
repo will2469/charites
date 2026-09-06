@@ -1,0 +1,13 @@
+---
+// Astro Component checking deviceMemory with 'in' operator
+---
+
+<div id="memory-stat">
+  <span>Memori Perangkat</span>
+</div>
+
+<script>
+  // Compliant: guarded by 'in' check with fallback
+  const ram = (typeof navigator !== "undefined" && "deviceMemory" in navigator) ? navigator.deviceMemory : 4;
+  console.log("RAM GB:", ram);
+</script>

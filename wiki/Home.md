@@ -59,7 +59,7 @@ flowchart TD
 | Category | Rules Count | Documentation |
 | :--- | :---: | :--- |
 | `a11y` | 16 | [`a11y`](a11y) |
-| `browser` | 7 | [`browser`](browser) |
+| `browser` | 12 | [`browser`](browser) |
 | `theme` | 32 | [`theme`](theme) |
 
 ---
@@ -85,12 +85,17 @@ flowchart TD
 | `a11y.touch-target-size` | `a11y` | `WARN` | Enforces minimum 44x44px physical touch target size on interactive controls (Apple HIG / WCAG 2.5.8) | [`a11y.touch-target-size`](a11y.touch-target-size) |
 | `a11y.touch-target-spacing` | `a11y` | `WARN` | Enforces at least 8px spacing between adjacent interactive elements to prevent miss-taps (WCAG 2.5.8) | [`a11y.touch-target-spacing`](a11y.touch-target-spacing) |
 | `browser.appearance-native-override` | `browser` | `WARN` | Enforces explicit appearance-none on form controls with custom styling to prevent WebKit/Safari native UI clashes | [`browser.appearance-native-override`](browser.appearance-native-override) |
+| `browser.chrome-only-api` | `browser` | `WARN` | Flags reliance on Chromium-exclusive APIs without cross-browser fallbacks for Firefox and Safari | [`browser.chrome-only-api`](browser.chrome-only-api) |
 | `browser.date-input-format-assumption` | `browser` | `ERROR` | Prohibits localized string splitting assumptions on HTML5 date input values in favor of normative ISO 8601 parsing | [`browser.date-input-format-assumption`](browser.date-input-format-assumption) |
 | `browser.experimental-api-no-featuredetect` | `browser` | `ERROR` | Detects invocation of experimental Web APIs without runtime feature detection guards | [`browser.experimental-api-no-featuredetect`](browser.experimental-api-no-featuredetect) |
+| `browser.firefox-only-api` | `browser` | `WARN` | Flags usage of legacy Gecko/Firefox-exclusive DOM extensions and APIs without standard W3C equivalents | [`browser.firefox-only-api`](browser.firefox-only-api) |
 | `browser.hover-only-interaction` | `browser` | `ERROR` | Ensures interactive actions and state reveals have keyboard and touch counterparts instead of relying solely on hover | [`browser.hover-only-interaction`](browser.hover-only-interaction) |
 | `browser.non-passive-scroll-listener` | `browser` | `WARN` | Enforces { passive: true } option on touch and wheel event listeners to prevent main thread scroll blocking | [`browser.non-passive-scroll-listener`](browser.non-passive-scroll-listener) |
 | `browser.obsolete-vendor-prefix` | `browser` | `WARN` | Detects obsolete CSS vendor prefixes and incomplete -webkit-line-clamp multi-line truncation triads | [`browser.obsolete-vendor-prefix`](browser.obsolete-vendor-prefix) |
+| `browser.safari-only-api` | `browser` | `WARN` | Flags unguarded Apple WebKit/Safari-proprietary APIs without universal web platform fallbacks | [`browser.safari-only-api`](browser.safari-only-api) |
 | `browser.scrollbar-vendor-incomplete` | `browser` | `WARN` | Enforces bidirectional cross-engine scrollbar styling pairing between WebKit pseudo-elements and W3C standard properties | [`browser.scrollbar-vendor-incomplete`](browser.scrollbar-vendor-incomplete) |
+| `browser.user-agent-sniffing` | `browser` | `WARN` | Flags conditional branching based on navigator.userAgent string sniffing and enforces W3C capability/feature detection | [`browser.user-agent-sniffing`](browser.user-agent-sniffing) |
+| `browser.webkit-only-api` | `browser` | `WARN` | Flags direct invocation of WebKit-prefixed legacy APIs without standard W3C equivalents or graceful fallbacks | [`browser.webkit-only-api`](browser.webkit-only-api) |
 | `theme.apply-bloat` | `theme` | `WARN` | Detects excessive use of @apply with more than 8 utility classes in CSS or style blocks | [`theme.apply-bloat`](theme.apply-bloat) |
 | `theme.backdrop-blur-hardcode` | `theme` | `WARN` | Detects hardcoded arbitrary blur and backdrop-blur scalars in Tailwind utility classes | [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode) |
 | `theme.chart-color-hardcode` | `theme` | `ERROR` | Detects hardcoded color values on chart visualization components | [`theme.chart-color-hardcode`](theme.chart-color-hardcode) |

@@ -394,13 +394,176 @@ Wave 2 berfokus pada **keamanan eksekusi runtime JavaScript dan performa scrolli
 
 ---
 
-## 6. Gambaran Ringkas Wave 3 (Vendor API Isolation)
-- **`browser.user-agent-sniffing` (L5):** Mengeliminasi deteksi browser rapuh berbasis `navigator.userAgent.includes(...)` dan mengarahkan ke feature detection modern via `CSS.supports` atau `'feature' in window`.
-- **`browser.webkit-only-api`, `browser.chrome-only-api`, `browser.firefox-only-api`, `browser.safari-only-api` (L5):** Mengisolasi pemanggilan API spesifik vendor agar selalu memiliki jalur fallback universal.
+## 6. Spesifikasi Detail Wave 3: Browser Capability & Vendor API Isolation (5 Rules)
+
+Wave 3 berfokus pada **isolasi API proprietary vendor, eliminasi user-agent sniffing rapuh, dan penegakan jalur fallback lintas-browser**. Cacat pada Wave 3 adalah penyebab aplikasi crash mendadak saat diakses pengguna Firefox, Safari, atau platform non-Chromium.
 
 ---
 
-## 6. Penyelarasan dengan Design Tokens & Tailwind v4 (`ThemeTokenRegistry`)
+### 6.1. `browser.user-agent-sniffing`
+- **Design Rationale:** W3C HTML Design Principles (Avoid Browser Sniffing) & Chromium Client Hints Migration Guide.
+- **Konteks Realitas Lintas-Engine:**
+  String `navigator.userAgent` adalah warisan masa lampau web yang penuh inkonsistensi: Chrome mengirimkan token "Safari" dan "WebKit", Edge mengirimkan token "Chrome", dan iPadOS secara default menyamarkan diri sebagai macOS ("Macintosh"). Melakukan percabangan logika aplikasi atau fitur (seperti mengaktifkan layout khusus mobile atau memblokir browser) via `navigator.userAgent.includes(...)` atau regex `/iPhone|Android/.test(...)` selalu berujung pada bug ketika format browser diperbarui atau saat browser lain menerapkan standar yang sama.
+  Standar web mewajibkan *Feature Detection* (`'serviceWorker' in navigator`, `window.matchMedia('(pointer: coarse)')`, atau `CSS.supports(...)`) sebagai mekanisme branching yang tahan uji masa depan.
+- **Invariant (Predikat AST):**
+  Untuk setiap percabangan kondisional (ekspresi `if`, `ternary`, atau pengujian predikat):
+  $$\text{testsUserAgent}(E) \land \neg \text{isTelemetryLogging}(E) \implies \text{Violation (Warning)}$$
+  di mana $\text{testsUserAgent}(E)$ mencakup pengujian substring atau regex terhadap `navigator.userAgent` atau `navigator.userAgentData`.
+- **Mengapa Lolos Linter Standar:**
+  Akses `navigator.userAgent` adalah API JavaScript DOM standar yang sepenuhnya valid. Linter standar tidak dapat membedakan logging analitik dengan branching logika berbahaya.
+- **Anti-False-Positive & Skip Filter:**
+  1. Pengiriman metrik analitik/telemetri murni (seperti `analytics.log({ ua: navigator.userAgent })`) diizinkan dan di-skip.
+  2. Supresi terarah `/* charites:ignore browser.user-agent-sniffing */` didukung untuk workaround bug engine vendor yang sangat spesifik.
+- **Suspicious (Branching Rapuh Berbasis String User Agent):**
+  ```javascript
+  // Branching rapuh menggunakan user agent sniffing
+  if (/android|iphone|ipad/i.test(navigator.userAgent)) {
+    initMobileLayout();
+  }
+  ```
+- **Compliant (Capability Detection Berbasis Media Feature W3C):**
+  ```javascript
+  // Menggunakan capability detection berbasis CSS media feature pointer
+  if (window.matchMedia('(pointer: coarse)').matches) {
+    initMobileLayout();
+  }
+  ```
+- **Engine:** L5 Scope & Call-Graph AST (`internal/rules/browser/user_agent_sniffing.go`).
+- **Severity:** `warning`.
+- **Autofix:** No (memerlukan keputusan arsitektural tentang capability apa yang ingin dideteksi).
+
+---
+
+### 6.2. `browser.webkit-only-api`
+- **Design Rationale:** W3C DOM & Fullscreen API Standardization.
+- **Konteks Realitas Lintas-Engine:**
+  Method dengan prefix `-webkit-` seperti `webkitRequestFullscreen`, `webkitExitFullscreen`, `webkitAudioContext`, `webkitSpeechRecognition`, atau `webkitURL` adalah API proprietary legacy dari masa transisi WebKit.
+  Memanggil method berprefix ini secara langsung tanpa memeriksa method standar W3C (`requestFullscreen`, `AudioContext`, `URL`) menyebabkan web macet di browser non-WebKit (seperti Firefox desktop) atau tidak memanfaatkan evolusi standar W3C di Safari modern.
+- **Invariant (Predikat AST):**
+  $$\text{invokesWebKitPrefixAPI}(A) \land \neg \text{hasStandardW3CFallback}(A) \implies \text{Violation (Warning)}$$
+- **Mengapa Lolos Linter Standar:**
+  TypeScript declaration file sering mengizinkan deklarasi interface parsial atau ekstensi global tanpa memaksa pengecekan fallback W3C.
+- **Anti-False-Positive & Skip Filter:**
+  1. Pola fallback bertingkat (`const ctx = window.AudioContext || window.webkitAudioContext`) dinyatakan Compliant.
+  2. Pengecekan ketersediaan guard (`if ('webkitRequestFullscreen' in el)`) dinyatakan Compliant.
+- **Suspicious (Crash di Firefox & Browser Non-WebKit):**
+  ```javascript
+  // Crash instan di Firefox: TypeError: element.webkitRequestFullscreen is not a function
+  element.webkitRequestFullscreen();
+  ```
+- **Compliant (Memprioritaskan Standar W3C dengan Fallback Anggun):**
+  ```javascript
+  // Memprioritaskan standar W3C dengan fallback anggun ke WebKit legacy
+  if (element.requestFullscreen) {
+    element.requestFullscreen();
+  } else if (element.webkitRequestFullscreen) {
+    element.webkitRequestFullscreen();
+  }
+  ```
+- **Engine:** L5 Scope & Data-Flow AST (`internal/rules/browser/webkit_only_api.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
+
+### 6.3. `browser.chrome-only-api`
+- **Design Rationale:** W3C Web Platform Status & Chromium Engine API Isolation.
+- **Konteks Realitas Lintas-Engine:**
+  Chromium (Google Chrome & Microsoft Edge) menyediakan sejumlah API eksklusif yang secara resmi ditolak atau dinyatakan tidak akan diimplementasikan oleh Mozilla Firefox dan Apple WebKit (misalnya `navigator.deviceMemory`, `navigator.connection`, `window.chrome.webstore`, Web Serial, Web USB, Web Bluetooth, dan File System Access API `showOpenFilePicker`).
+  Jika aplikasi bergantung langsung pada fitur-fitur ini tanpa menyediakan jalur fallback atau penjelasan UI bagi pengguna Firefox dan Safari, fungsionalitas aplikasi akan rusak total bagi sebagian besar pengguna web non-Chromium.
+- **Invariant (Predikat AST):**
+  $$\text{invokesChromiumExclusiveAPI}(A) \land \neg \text{hasCrossBrowserFallback}(A) \implies \text{Violation (Warning)}$$
+- **Mengapa Lolos Linter Standar:**
+  Ekosistem Chromium yang dominan membuat banyak package npm mengasumsikan ketersediaan API Blink sebagai standar umum.
+- **Anti-False-Positive & Skip Filter:**
+  1. Pemeriksaan runtime guard (`if ('deviceMemory' in navigator)`, `if ('connection' in navigator)`) atau optional chaining (`navigator.connection?.saveData`) dinyatakan Compliant.
+  2. Implementasi fallback (misalnya fallback ke elemen `<input type="file">` jika `showOpenFilePicker` tidak tersedia) dinyatakan Compliant.
+- **Suspicious (Crash di Safari dan Firefox):**
+  ```javascript
+  // Crash di Safari dan Firefox: TypeError: Cannot read properties of undefined
+  const memoryGB = navigator.deviceMemory;
+  const connSpeed = navigator.connection.effectiveType;
+  ```
+- **Compliant (Aman di Semua Engine dengan Fallback Universal):**
+  ```javascript
+  // Aman di semua engine dengan nilai default universal
+  const memoryGB = typeof navigator !== "undefined" && "deviceMemory" in navigator ? navigator.deviceMemory : 4;
+  const connSpeed = typeof navigator !== "undefined" && navigator.connection ? navigator.connection.effectiveType : "4g";
+  ```
+- **Engine:** L5 Scope & Data-Flow AST (`internal/rules/browser/chrome_only_api.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
+
+### 6.4. `browser.firefox-only-api`
+- **Design Rationale:** W3C Standards & Gecko Engine API Isolation.
+- **Konteks Realitas Lintas-Engine:**
+  Properti legacy khusus engine Gecko seperti `mozRequestFullScreen`, `InstallTrigger`, `window.sidebar`, `navigator.buildID`, atau `mozInnerScreenX` sudah lama ditinggalkan dan tidak pernah didukung oleh WebKit (Safari) maupun Blink (Chrome). Menggunakan properti ini secara langsung tanpa alternatif W3C akan menyebabkan exception atau hasil `undefined` di 97% browser pengguna.
+- **Invariant (Predikat AST):**
+  $$\text{invokesGeckoPrefixAPI}(A) \land \neg \text{hasStandardW3CFallback}(A) \implies \text{Violation (Warning)}$$
+- **Mengapa Lolos Linter Standar:**
+  Pengujian jadul berbasis browser detection sering membiarkan variabel global Gecko tertinggal di basis kode lama.
+- **Anti-False-Positive & Skip Filter:**
+  1. Fallback ekspresi or (`document.fullscreenElement || document.mozFullScreenElement`) dinyatakan Compliant.
+  2. Pemeriksaan guard `if ('mozRequestFullScreen' in el)` dinyatakan Compliant.
+- **Suspicious (Crash di Chrome dan Safari):**
+  ```javascript
+  // Crash di Chrome dan Safari: TypeError: element.mozRequestFullScreen is not a function
+  element.mozRequestFullScreen();
+  ```
+- **Compliant (Memprioritaskan Standar W3C):**
+  ```javascript
+  // Memprioritaskan standar W3C
+  if (element.requestFullscreen) {
+    element.requestFullscreen();
+  } else if (element.mozRequestFullScreen) {
+    element.mozRequestFullScreen();
+  }
+  ```
+- **Engine:** L5 Scope & Data-Flow AST (`internal/rules/browser/firefox_only_api.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
+
+### 6.5. `browser.safari-only-api`
+- **Design Rationale:** W3C Mobile Web & Apple WebKit Proprietary Isolation.
+- **Konteks Realitas Lintas-Engine:**
+  Ekosistem Apple WebKit (Safari macOS/iOS) memiliki sejumlah API proprietary seperti `navigator.standalone` (properti boolean lawas pendeteksi mode PWA fullscreen pada iOS), `ApplePaySession`, dan event non-standar `gesturestart`/`gesturechange`/`gestureend`.
+  Memanggil API ini secara langsung di lingkungan umum akan crash atau selalu bernilai `undefined` di Android Chrome dan Firefox. Untuk PWA standalone, standar W3C resmi adalah `window.matchMedia('(display-mode: standalone)').matches`. Untuk Apple Pay, wajib memastikan ketersediaan `window.ApplePaySession` sebelum mengeksekusi method transaksi.
+- **Invariant (Predikat AST):**
+  $$\text{invokesSafariExclusiveAPI}(A) \land \neg \text{hasUniversalFallback}(A) \implies \text{Violation (Warning)}$$
+- **Mengapa Lolos Linter Standar:**
+  Dokumentasi Apple Developer sering memaparkan API WebKit native tanpa menyertakan catatan kompatibilitas Android Chrome atau desktop Firefox.
+- **Anti-False-Positive & Skip Filter:**
+  1. Pemeriksaan guard eksplisit (`if (typeof window !== "undefined" && window.ApplePaySession)`) dinyatakan Compliant.
+  2. Fallback standar (`navigator.standalone || window.matchMedia('(display-mode: standalone)').matches`) dinyatakan Compliant.
+- **Suspicious (Crash di Android Chrome & Windows Edge):**
+  ```javascript
+  // Crash instan di non-Safari: ReferenceError: ApplePaySession is not defined
+  if (ApplePaySession.canMakePayments()) {
+    showApplePayButton();
+  }
+  ```
+- **Compliant (Standar W3C Lintas Platform & Guard Eksplisit):**
+  ```javascript
+  // Standar W3C lintas platform dengan dukungan Safari legacy
+  const isPWA = (typeof window !== "undefined" && window.matchMedia('(display-mode: standalone)').matches) ||
+    (typeof navigator !== "undefined" && Boolean(navigator.standalone));
+
+  // Guard eksplisit sebelum memanggil Apple Pay
+  if (typeof window !== "undefined" && window.ApplePaySession && window.ApplePaySession.canMakePayments()) {
+    showApplePayButton();
+  }
+  ```
+- **Engine:** L5 Scope & Data-Flow AST (`internal/rules/browser/safari_only_api.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
+
+## 7. Penyelarasan dengan Design Tokens & Tailwind v4 (`ThemeTokenRegistry`)
 
 Sama seperti kategori `theme.*` dan `ux.*`, kategori `browser.*` mematuhi disiplin desain sistem:
 1. **Nol Arbitrary Pixel:** Seluruh contoh kode perbaikan menggunakan standar rem Tailwind v4 (`h-11`, `px-3.5`, `py-2.5`, `rounded-xl`).
@@ -409,33 +572,38 @@ Sama seperti kategori `theme.*` dan `ux.*`, kategori `browser.*` mematuhi disipl
 
 ---
 
-## 7. Infrastruktur Anti-False-Positive & Supresi Charites
+## 8. Infrastruktur Anti-False-Positive & Supresi Charites
 
 Untuk skenario desain khusus di mana developer sengaja mempertahankan perilaku browser native tertentu:
 1. **Supresi Terpadu Charites:**
    - JSX/TSX: `{/* charites:ignore browser.appearance-native-override -- intentional native select on iOS */}`
    - Astro: `<!-- charites:ignore browser.appearance-native-override -- intentional native select on iOS -->`
    - CSS: `/* charites:ignore browser.scrollbar-vendor-incomplete */`
-2. **Component Semantic Registry Integration:** Komponen UI headless kustom (seperti Shadcn `<Select>` atau Radix UI) yang tidak merender kontrol native di-*skip* secara otomatis tanpa menghasilkan peringatan palsu.
+2. **Component Semantic Registry Integration:** Komponen UI headless kustom (seperti Shadcn `<Select>` atau Radix UI) yang tidak merender kontrol native di-skip secara otomatis tanpa menghasilkan peringatan palsu.
 
 ---
 
-## 8. Struktur Modul Kode & Roadmap Eksekusi Wave 1 & Wave 2
+## 9. Struktur Modul Kode & Roadmap Eksekusi Lengkap (Wave 1, Wave 2, Wave 3)
 
 Implementasi aturan `browser.*` ditempatkan secara modular di `internal/rules/browser/`:
 
 ```text
 internal/rules/browser/
-├── appearance_native_override.go     # Wave 1: Form control WebKit reset
-├── scrollbar_vendor_incomplete.go    # Wave 1: Two-way scrollbar pairing
-├── obsolete_vendor_prefix.go         # Wave 1: Clean dead prefixes & line-clamp triad
-├── hover_only_interaction.go         # Wave 1: Touch vs hover parity
+├── appearance_native_override.go        # Wave 1: Form control WebKit reset
+├── scrollbar_vendor_incomplete.go       # Wave 1: Two-way scrollbar pairing
+├── obsolete_vendor_prefix.go            # Wave 1: Clean dead prefixes & line-clamp triad
+├── hover_only_interaction.go            # Wave 1: Touch vs hover parity
 ├── experimental_api_no_featuredetect.go # Wave 2: Unguarded experimental APIs
-├── date_input_format_assumption.go   # Wave 2: ISO 8601 vs local date splitting
-├── non_passive_scroll_listener.go    # Wave 2: Passive event listener enforcement
-├── util.go                           # Shared AST text extraction & parsing helpers
-├── contract_test.go                  # 8-Pillars Canonical Contract Validator
-└── benchmark_test.go                 # QUAL-03 Zero Allocation Benchmarks
+├── date_input_format_assumption.go      # Wave 2: ISO 8601 vs local date splitting
+├── non_passive_scroll_listener.go       # Wave 2: Passive event listener enforcement
+├── user_agent_sniffing.go               # Wave 3: User agent branching detection
+├── webkit_only_api.go                   # Wave 3: WebKit proprietary methods isolation
+├── chrome_only_api.go                   # Wave 3: Chromium exclusive APIs isolation
+├── firefox_only_api.go                  # Wave 3: Gecko specific DOM extensions isolation
+├── safari_only_api.go                   # Wave 3: Safari standalone & gesture isolation
+├── util.go                              # Shared AST text extraction & parsing helpers
+├── contract_test.go                     # 8-Pillars Canonical Contract Validator
+└── benchmark_test.go                    # QUAL-03 Zero Allocation Benchmarks
 ```
 
-Setiap rule akan divalidasi dengan **1-SSOT Golden Tri-Corpus** di `tests/correctness/browser/<slug>/` yang mencakup kasus uji positif, negatif, dan adversarial untuk menjamin **nol regresi dan nol false-positive**.
+Setiap rule divalidasi dengan **1-SSOT Golden Tri-Corpus** di `tests/correctness/browser/<slug>/` yang mencakup kasus uji positif, negatif, dan adversarial untuk menjamin **nol regresi dan nol false-positive**.

@@ -1,0 +1,16 @@
+---
+// Astro Component using standard fullscreen with Gecko fallback
+---
+
+<div id="standard-frame">
+  <button id="std-fs" type="button">Fullscreen Standard</button>
+</div>
+
+<script>
+  const el = document.getElementById("standard-frame");
+  if (el.requestFullscreen) {
+    el.requestFullscreen();
+  } else if (el.mozRequestFullScreen) {
+    el.mozRequestFullScreen();
+  }
+</script>

@@ -1,0 +1,16 @@
+---
+// Astro Component using standard requestFullscreen with fallback
+---
+
+<div id="player">
+  <button id="fs" type="button">Mode Layar Penuh</button>
+</div>
+
+<script>
+  const el = document.getElementById("player");
+  if (el.requestFullscreen) {
+    el.requestFullscreen();
+  } else if (el.webkitRequestFullscreen) {
+    el.webkitRequestFullscreen();
+  }
+</script>

@@ -30,16 +30,21 @@
 </details>
 
 <details open>
-<summary><b>Browser</b> (7 rules)</summary>
+<summary><b>Browser</b> (12 rules)</summary>
 
 * [**Browser Overview**](browser)
 * [`browser.appearance-native-override`](browser.appearance-native-override)
+* [`browser.chrome-only-api`](browser.chrome-only-api)
 * [`browser.date-input-format-assumption`](browser.date-input-format-assumption)
 * [`browser.experimental-api-no-featuredetect`](browser.experimental-api-no-featuredetect)
+* [`browser.firefox-only-api`](browser.firefox-only-api)
 * [`browser.hover-only-interaction`](browser.hover-only-interaction)
 * [`browser.non-passive-scroll-listener`](browser.non-passive-scroll-listener)
 * [`browser.obsolete-vendor-prefix`](browser.obsolete-vendor-prefix)
+* [`browser.safari-only-api`](browser.safari-only-api)
 * [`browser.scrollbar-vendor-incomplete`](browser.scrollbar-vendor-incomplete)
+* [`browser.user-agent-sniffing`](browser.user-agent-sniffing)
+* [`browser.webkit-only-api`](browser.webkit-only-api)
 
 </details>
 

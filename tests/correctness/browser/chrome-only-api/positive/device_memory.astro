@@ -1,0 +1,13 @@
+---
+// Astro Component accessing Chromium-exclusive deviceMemory directly
+---
+
+<div id="memory-stat">
+  <span>Memori Perangkat</span>
+</div>
+
+<script>
+  // Direct access: undefined on Firefox & Safari
+  const ram = navigator.deviceMemory;
+  console.log("RAM:", ram);
+</script>

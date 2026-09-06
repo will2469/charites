@@ -1,0 +1,13 @@
+---
+// Astro Component calling mozRequestFullScreen directly
+---
+
+<div id="video-frame">
+  <button id="moz-fs-btn" type="button">Fullscreen Gecko</button>
+</div>
+
+<script>
+  const el = document.getElementById("video-frame");
+  // Fails on Chrome & Safari
+  el.mozRequestFullScreen();
+</script>

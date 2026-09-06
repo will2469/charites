@@ -127,6 +127,13 @@ func builtinRules() []Rule {
 		browser.NewExperimentalAPINoFeaturedetectRule(),
 		browser.NewDateInputFormatAssumptionRule(),
 		browser.NewNonPassiveScrollListenerRule(),
+
+		// browser Wave 3 (Browser Capability & Vendor API Isolation)
+		browser.NewUserAgentSniffingRule(),
+		browser.NewWebKitOnlyAPIRule(),
+		browser.NewChromeOnlyAPIRule(),
+		browser.NewFirefoxOnlyAPIRule(),
+		browser.NewSafariOnlyAPIRule(),
 	}
 }
 

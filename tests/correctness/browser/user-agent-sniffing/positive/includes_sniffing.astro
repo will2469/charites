@@ -1,0 +1,14 @@
+---
+// Astro Component with client user-agent sniffing
+---
+
+<div class="ua-warning">
+  <button id="check-btn" type="button">Periksa Kompatibilitas</button>
+</div>
+
+<script>
+  const ua = navigator.userAgent;
+  if (ua.includes("Chrome")) {
+    console.log("Running Chromium engine");
+  }
+</script>

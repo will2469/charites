@@ -1,0 +1,17 @@
+---
+// Astro Component wrapping Safari API in try-catch
+---
+
+<div class="pay-safe">
+  <button id="pay-btn" type="button">Metode Pembayaran</button>
+</div>
+
+<script>
+  try {
+    if (ApplePaySession.canMakePayments()) {
+      console.log("Apple Pay available");
+    }
+  } catch (err) {
+    console.warn("ApplePaySession caught safely:", err);
+  }
+</script>

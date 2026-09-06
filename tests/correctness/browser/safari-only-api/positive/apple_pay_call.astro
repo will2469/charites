@@ -1,0 +1,14 @@
+---
+// Astro Component calling ApplePaySession without guard
+---
+
+<div id="checkout">
+  <button id="apple-pay-btn" type="button">Bayar dengan Apple Pay</button>
+</div>
+
+<script>
+  // ReferenceError on Android Chrome & Linux Firefox
+  if (ApplePaySession.canMakePayments()) {
+    console.log("Apple Pay available");
+  }
+</script>

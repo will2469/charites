@@ -1,0 +1,13 @@
+---
+// Astro Component calling webkitRequestFullscreen directly
+---
+
+<div id="video-container">
+  <button id="fullscreen-btn" type="button">Layar Penuh</button>
+</div>
+
+<script>
+  const el = document.getElementById("video-container");
+  // Direct WebKit call crashes on Firefox
+  el.webkitRequestFullscreen();
+</script>

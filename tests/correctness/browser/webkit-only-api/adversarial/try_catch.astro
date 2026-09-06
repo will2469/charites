@@ -1,0 +1,16 @@
+---
+// Astro Component wrapping in try-catch
+---
+
+<div class="safe-box">
+  <button id="safe-action" type="button">Aksi Aman</button>
+</div>
+
+<script>
+  try {
+    const el = document.getElementById("safe-box");
+    el?.webkitRequestFullscreen();
+  } catch (err) {
+    console.warn("Fullscreen failed gracefully:", err);
+  }
+</script>

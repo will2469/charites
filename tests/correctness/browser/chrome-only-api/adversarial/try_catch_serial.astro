@@ -1,0 +1,16 @@
+---
+// Astro Component wrapping serial access in try-catch
+---
+
+<div class="serial-status">
+  <button id="connect-serial" type="button">Hubungkan Perangkat</button>
+</div>
+
+<script>
+  try {
+    const port = await navigator.serial.requestPort();
+    console.log("Port serial:", port);
+  } catch (err) {
+    console.warn("Serial access not supported or denied:", err);
+  }
+</script>
