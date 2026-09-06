@@ -4,6 +4,58 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 ---
 
+##  The Greek Mythology of Charites: Why This Name?
+
+In Greek mythology, the **Charites** ($\text{Χάριτες}$ / *The Three Graces*: **Aglaea** / Splendor, **Euphrosyne** / Mirth, and **Thalia** / Bloom) are the goddesses of charm, grace, beauty, joy, and visual elegance. Companions of Aphrodite and craftswomen of Olympian splendor, the Charites bring harmony, proportion, and delightful aesthetic design to all human and divine creations.
+
+Originating as the core UI design system and headless primitive library in ASTRADES (`@astrades/charites`), Charites expanded into an ultra-fast, independent static analysis compiler to guard and guarantee this exact triad of digital excellence across every commit.
+
+In modern software engineering, Charites occupies a unique, highly respectful position:
+
+$$\mathbf{Linter} < \mathbf{Charites} < \mathbf{Developer\ Preference}$$
+
+Charites is **one step ahead of conventional linters** (evaluating relational graphs, design token resolution, and interaction data-flow), yet it **never infringes on developer preference, aesthetic taste, or brand identity**.
+
+> **The Runway Fashion Principle:**
+> In fashion, choreographers do not dictate subjective standards of model beauty or forbid avant-garde styles. Rather, they enforce professional runway attitude, posture mechanics, stride rhythm, and safety so the model does not trip over the hem or suffer a wardrobe failure.
+> Similarly, in Charites:
+> - **Brand & Aesthetic Freedom (The Met Gala):** Whether your design embraces *Neo-Brutalism*, *Minimalist Bento*, *Skeuomorphism*, or *Cyberpunk Neon*, you have full creative liberty.
+> - **Ergonomic & Structural Integrity:** Charites intervenes strictly when fundamental usability and safety are breached-such as tiny unclickable touch targets ($< 44\text{px}$), un-isolated async actions causing duplicate mutations, broken mobile keyboard submit paths, collapsed dark-mode elevation shadows, or inverted spatial spacing.
+
+### The Three Goddesses as Rule Domain Archetypes
+
+Each of the Three Graces personifies a foundational static analysis domain in Charites:
+
+```mermaid
+flowchart TD
+    subgraph CHARITES [" CHARITES (The Three Graces of Frontend Engineering)"]
+        direction TB
+        A[" AGLAEA (Splendor & Radiance)\nCategory: theme.*\nDomain: Visual Grace, Token Governance & Contrast Safety"]
+        E[" EUPHROSYNE (Joy & Delight)\nCategory: ux.*\nDomain: Cognitive Flow, Spatial Rhythm & Interaction Safety"]
+        T[" THALIA (Festivity & Flourishing)\nCategory: a11y.* & responsive.*\nDomain: Universal Access & Inclusive Ergonomics"]
+    end
+```
+
+#### 1.  Aglaea (Splendor & Radiance) $\longrightarrow$ `theme.*` Rules
+*Aglaea represents visual elegance, harmony of form, and the purity of light.*
+- **Architectural Role:** Acts as the dress code guardian of the design system (the *Met Gala* manifesto declared in `global.css`).
+- **Invariant Scope:** Eliminates arbitrary color/scalar leaks (`theme.hardcode-color`), ensures dark/light theme parity without elevation collapse (`theme.shadow-without-border-dark`), resolves multi-theme tokens, and prevents specificity clashes between Tailwind v3 and v4.
+- **Creative Freedom:** Choose any palette, gradient, or theme mode-as long as it is tokenized and consistent across your application.
+
+#### 2.  Euphrosyne (Joy & Delight) $\longrightarrow$ `ux.*` Rules
+*Euphrosyne represents good cheer, seamless ease of living, and freedom from user frustration.*
+- **Architectural Role:** Protects the user's cognitive flow, spatial rhythm, and interaction state safety.
+- **Invariant Scope:** Prevents duplicate form mutations via async reentry guards (`ux.submit-feedback-missing`), eliminates infinite loading spinners on network failures (`ux.unbounded-async-flag`), maintains natural spatial hierarchy ($\text{Micro} < \text{Meso} < \text{Macro}$ via `ux.spacing-inversion`), ensures inline links are clearly discernible in prose (`ux.camouflaged-link`), and protects state persistence in multi-step workflows (`ux.wizard-state-not-persisted`).
+- **Creative Freedom:** Style your components in any aesthetic movement-as long as the interaction body language remains transparent, communicative, and safe for the user.
+
+#### 3.  Thalia (Festivity & Flourishing) $\longrightarrow$ `a11y.*` & `responsive.*` Rules
+*Thalia represents abundance, social harmony, and opening the celebration to everyone without barrier.*
+- **Architectural Role:** Ensures universal accessibility and touch-first ergonomics across all devices and physical capabilities.
+- **Invariant Scope:** Enforces Apple HIG / WCAG 2.2 touch targets ($\ge 44 \times 44\text{px}$ via `a11y.touch-target-size`), safeguards mobile viewports against iOS Safari auto-zoom traps (`a11y.input-ios-zoom-hazard`), links form errors programmatically (`a11y.error-not-announced`), and eliminates modal keyboard traps (`a11y.keyboard-trap-missing-escape`).
+- **Creative Freedom:** Build any layout while guaranteeing that screen reader users, keyboard navigators, and mobile touch users participate with equal dignity.
+
+---
+
 ## Categories
 
 | Category | Rules Count | Documentation |
