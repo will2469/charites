@@ -1,0 +1,12 @@
+---
+// Local same-origin image and below-fold lazy thumbnail do not trigger preconnect requirement
+---
+<html>
+  <head>
+    <title>Store</title>
+  </head>
+  <body>
+    <img src="/images/hero.webp" fetchpriority="high" data-perf-role="hero" />
+    <img src="https://images.unsplash.com/thumb" width="48" height="48" loading="lazy" />
+  </body>
+</html>

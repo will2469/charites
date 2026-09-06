@@ -889,3 +889,241 @@ func hasLegacyFontFormatViolation(block string) (string, bool) {
 
 	return "", false
 }
+
+// isInsideHead memeriksa apakah node berada di dalam elemen <head>.
+func isInsideHead(node *ir.Node) bool {
+	cur := node.Parent
+	for cur != nil {
+		if strings.EqualFold(cur.Tag, "head") {
+			return true
+		}
+		cur = cur.Parent
+	}
+	return false
+}
+
+// isInsideBody memeriksa apakah node berada di dalam elemen <body>.
+func isInsideBody(node *ir.Node) bool {
+	cur := node.Parent
+	for cur != nil {
+		if strings.EqualFold(cur.Tag, "body") {
+			return true
+		}
+		cur = cur.Parent
+	}
+	return false
+}
+
+// isRenderBlockingHeadScript memeriksa apakah tag script eksternal memblokir parsing HTML di head dokumen.
+func isRenderBlockingHeadScript(node *ir.Node) bool {
+	if node == nil || node.Type != ir.NodeElement || !strings.EqualFold(node.Tag, "script") {
+		return false
+	}
+	srcVal, hasSrc := node.Attributes["src"]
+	if !hasSrc || strings.TrimSpace(cleanAttrVal(srcVal)) == "" {
+		return false
+	}
+
+	// Pengecualian non-blocking: defer, async, type="module", type="application/ld+json", type="text/partytown"
+	if _, hasDefer := node.Attributes["defer"]; hasDefer {
+		return false
+	}
+	if _, hasAsync := node.Attributes["async"]; hasAsync {
+		return false
+	}
+	if typeVal, hasType := node.Attributes["type"]; hasType {
+		cleanType := cleanAttrVal(typeVal)
+		if strings.EqualFold(cleanType, "module") ||
+			strings.EqualFold(cleanType, "application/ld+json") ||
+			strings.EqualFold(cleanType, "text/partytown") {
+			return false
+		}
+	}
+
+	inHead := isInsideHead(node)
+	inBody := isInsideBody(node)
+
+	// Script inside body is not a head script
+	if inBody {
+		return false
+	}
+
+	// Must be in head, or top-level layout (not inside body)
+	if !inHead && node.Parent != nil && node.Parent.Parent != nil {
+		return false
+	}
+
+	// In Astro, standard <script> without is:inline is bundled as deferred ESM
+	_, hasIsInline := node.Attributes["is:inline"]
+	if !hasIsInline {
+		_, hasIsInline = node.Attributes["is-inline"]
+	}
+
+	if hasIsInline {
+		return true
+	}
+
+	// External raw URL inside head
+	cleanSrc := cleanAttrVal(srcVal)
+	if inHead && (strings.HasPrefix(cleanSrc, "http://") || strings.HasPrefix(cleanSrc, "https://") || strings.HasPrefix(cleanSrc, "//")) {
+		return true
+	}
+
+	return false
+}
+
+// isHeadStyleBloat memeriksa apakah blok <style> di dalam <head> memuat CSS non-kritis berlebih.
+func isHeadStyleBloat(node *ir.Node) (string, bool) {
+	if node == nil || !strings.EqualFold(node.Tag, "style") {
+		return "", false
+	}
+	if !isInsideHead(node) {
+		return "", false
+	}
+	cssText := getStyleNodeText(node)
+	if len(cssText) == 0 {
+		return "", false
+	}
+
+	if strings.Contains(cssText, "charites:ignore") {
+		return "", false
+	}
+
+	lower := strings.ToLower(cssText)
+	bloatPatterns := [...]string{
+		".footer",
+		"footer {",
+		".modal",
+		"dialog {",
+		".dialog",
+		".drawer",
+		".admin-modal",
+		".bottom-sheet",
+	}
+
+	for _, pat := range bloatPatterns {
+		if strings.Contains(lower, pat) {
+			return pat, true
+		}
+	}
+
+	if len(cssText) > 4096 {
+		return "excessive CSS payload (>4KB)", true
+	}
+
+	return "", false
+}
+
+// extractExternalOrigin mengekstrak host dan origin eksternal dari URL aset.
+func extractExternalOrigin(src string) (string, string, bool) {
+	cleanSrc := cleanAttrVal(src)
+	lower := strings.ToLower(cleanSrc)
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") && !strings.HasPrefix(lower, "//") {
+		return "", "", false
+	}
+
+	afterProto := cleanSrc
+	scheme := "https://"
+	switch {
+	case strings.HasPrefix(lower, "http://"):
+		afterProto = cleanSrc[7:]
+		scheme = "http://"
+	case strings.HasPrefix(lower, "https://"):
+		afterProto = cleanSrc[8:]
+		scheme = "https://"
+	case strings.HasPrefix(lower, "//"):
+		afterProto = cleanSrc[2:]
+		scheme = "https://"
+	}
+
+	slashIdx := strings.IndexByte(afterProto, '/')
+	host := afterProto
+	if slashIdx != -1 {
+		host = afterProto[:slashIdx]
+	}
+
+	if colonIdx := strings.IndexByte(host, ':'); colonIdx != -1 {
+		host = host[:colonIdx]
+	}
+
+	host = strings.TrimSpace(host)
+	if host == "" || strings.EqualFold(host, "localhost") || !strings.Contains(host, ".") {
+		return "", "", false
+	}
+
+	origin := scheme + host
+	return origin, host, true
+}
+
+// isPreconnectLinkForHost memeriksa apakah node merupakan elemen link preconnect/dns-prefetch untuk host yang diberikan.
+func isPreconnectLinkForHost(node *ir.Node, lowerHost string) bool {
+	if node == nil || !strings.EqualFold(node.Tag, "link") || node.Attributes == nil {
+		return false
+	}
+	rel, okRel := node.Attributes["rel"]
+	if !okRel {
+		return false
+	}
+	cleanRel := strings.ToLower(cleanAttrVal(rel))
+	if !strings.Contains(cleanRel, "preconnect") && !strings.Contains(cleanRel, "dns-prefetch") {
+		return false
+	}
+	href, okHref := node.Attributes["href"]
+	if !okHref {
+		return false
+	}
+	return strings.Contains(strings.ToLower(cleanAttrVal(href)), lowerHost)
+}
+
+// hasOriginPreconnect memeriksa apakah dokumen memiliki petunjuk koneksi <link rel="preconnect"> atau <link rel="dns-prefetch">.
+func hasOriginPreconnect(node *ir.Node, host string) bool {
+	root := findDocumentRoot(node)
+	if root == nil {
+		return false
+	}
+	lowerHost := strings.ToLower(host)
+	for curr := range root.Walk() {
+		if isPreconnectLinkForHost(curr, lowerHost) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasContentVisibilityAuto memeriksa apakah node menerapkan content-visibility: auto.
+func hasContentVisibilityAuto(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	if strings.Contains(node.RawClasses, "content-auto") {
+		return true
+	}
+	if node.Attributes != nil {
+		if style, ok := node.Attributes["style"]; ok {
+			lower := strings.ToLower(cleanAttrVal(style))
+			if strings.Contains(lower, "content-visibility") && strings.Contains(lower, "auto") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isAboveFoldHeroContainer memeriksa apakah node merupakan kontainer seksi hero atau pelipatan awal.
+func isAboveFoldHeroContainer(node *ir.Node) bool {
+	if node == nil || isHiddenOrFooter(node) {
+		return false
+	}
+	if node.Attributes != nil {
+		if role, ok := node.Attributes["data-perf-role"]; ok && strings.EqualFold(cleanAttrVal(role), "hero") {
+			return true
+		}
+	}
+	if strings.EqualFold(node.Tag, "header") {
+		return true
+	}
+	if strings.Contains(node.RawClasses, "hero") {
+		return true
+	}
+	return false
+}

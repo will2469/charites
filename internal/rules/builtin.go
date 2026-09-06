@@ -195,6 +195,12 @@ var (
 	_ Rule = (*lcp.ExternalFontDiscoveryDelayRule)(nil)
 	_ Rule = (*lcp.PreloadFontCORSMismatchRule)(nil)
 	_ Rule = (*lcp.LegacyCriticalFontResourceRule)(nil)
+
+	// lcp Wave 4 (Render-Blocking Critical Path & Document Delivery)
+	_ Rule = (*lcp.RenderBlockingHeadScriptRule)(nil)
+	_ Rule = (*lcp.CriticalHeadStyleBloatRule)(nil)
+	_ Rule = (*lcp.MissingCriticalOriginHintRule)(nil)
+	_ Rule = (*lcp.ContentVisibilitySuppressionRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -419,6 +425,12 @@ func builtinRules() []Rule {
 		lcp.NewExternalFontDiscoveryDelayRule(),
 		lcp.NewPreloadFontCORSMismatchRule(),
 		lcp.NewLegacyCriticalFontResourceRule(),
+
+		// lcp Wave 4 (Render-Blocking Critical Path & Document Delivery)
+		lcp.NewRenderBlockingHeadScriptRule(),
+		lcp.NewCriticalHeadStyleBloatRule(),
+		lcp.NewMissingCriticalOriginHintRule(),
+		lcp.NewContentVisibilitySuppressionRule(),
 	}
 }
 
