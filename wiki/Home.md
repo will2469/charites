@@ -8,6 +8,7 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 | Category | Rules Count | Documentation |
 | :--- | :---: | :--- |
+| `a11y` | 5 | [`a11y`](a11y) |
 | `theme` | 32 | [`theme`](theme) |
 
 ---
@@ -16,6 +17,11 @@ Welcome to the **Charites Static Analysis Rule Catalog**. Charites is an ultra-f
 
 | Rule ID | Category | Severity | Description | Documentation |
 | :--- | :---: | :---: | :--- | :--- |
+| `a11y.input-cramped-padding` | `a11y` | `WARN` | Flags input controls with cramped vertical padding or height under 42px that clip text and impede touch targeting | [`a11y.input-cramped-padding`](a11y.input-cramped-padding) |
+| `a11y.input-ios-zoom-hazard` | `a11y` | `WARN` | Prevents forced Safari iOS viewport auto-zoom by requiring at least 16px font size on inputs on mobile viewports | [`a11y.input-ios-zoom-hazard`](a11y.input-ios-zoom-hazard) |
+| `a11y.missing-focus-ring` | `a11y` | `WARN` | Enforces visible focus indicator when suppressing default outline with outline-none (WCAG 2.4.7) | [`a11y.missing-focus-ring`](a11y.missing-focus-ring) |
+| `a11y.touch-target-size` | `a11y` | `WARN` | Enforces minimum 44x44px physical touch target size on interactive controls (Apple HIG / WCAG 2.5.8) | [`a11y.touch-target-size`](a11y.touch-target-size) |
+| `a11y.touch-target-spacing` | `a11y` | `WARN` | Enforces at least 8px spacing between adjacent interactive elements to prevent miss-taps (WCAG 2.5.8) | [`a11y.touch-target-spacing`](a11y.touch-target-spacing) |
 | `theme.apply-bloat` | `theme` | `WARN` | Detects excessive use of @apply with more than 8 utility classes in CSS or style blocks | [`theme.apply-bloat`](theme.apply-bloat) |
 | `theme.backdrop-blur-hardcode` | `theme` | `WARN` | Detects hardcoded arbitrary blur and backdrop-blur scalars in Tailwind utility classes | [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode) |
 | `theme.chart-color-hardcode` | `theme` | `ERROR` | Detects hardcoded color values on chart visualization components | [`theme.chart-color-hardcode`](theme.chart-color-hardcode) |

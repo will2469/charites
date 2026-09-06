@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/will2469/charites/internal/rules/a11y"
 	"github.com/will2469/charites/internal/rules/theme"
 )
 
@@ -30,6 +31,13 @@ var (
 	_ Rule = (*theme.MissingTokenFallbackRule)(nil)
 	_ Rule = (*theme.TokenSourceDriftRule)(nil)
 	_ Rule = (*theme.ApplyBloatRule)(nil)
+
+	// a11y Wave 1 (Physical Touch & Mobile Viewport Ergonomics)
+	_ Rule = (*a11y.TouchTargetSizeRule)(nil)
+	_ Rule = (*a11y.TouchTargetSpacingRule)(nil)
+	_ Rule = (*a11y.InputIOSZoomHazardRule)(nil)
+	_ Rule = (*a11y.InputCrampedPaddingRule)(nil)
+	_ Rule = (*a11y.MissingFocusRingRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -66,6 +74,13 @@ func builtinRules() []Rule {
 		theme.NewDualStrategyCollisionRule(),
 		theme.NewHydrationThemeMismatchRule(),
 		theme.NewSplitThemeStateRule(),
+
+		// a11y Wave 1 (Physical Touch & Mobile Viewport Ergonomics)
+		a11y.NewTouchTargetSizeRule(),
+		a11y.NewTouchTargetSpacingRule(),
+		a11y.NewInputIOSZoomHazardRule(),
+		a11y.NewInputCrampedPaddingRule(),
+		a11y.NewMissingFocusRingRule(),
 	}
 }
 

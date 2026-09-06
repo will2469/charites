@@ -7,6 +7,18 @@
 ### Rule Categories
 
 <details open>
+<summary><b>A11y</b> (5 rules)</summary>
+
+* [**A11y Overview**](a11y)
+* [`a11y.input-cramped-padding`](a11y.input-cramped-padding)
+* [`a11y.input-ios-zoom-hazard`](a11y.input-ios-zoom-hazard)
+* [`a11y.missing-focus-ring`](a11y.missing-focus-ring)
+* [`a11y.touch-target-size`](a11y.touch-target-size)
+* [`a11y.touch-target-spacing`](a11y.touch-target-spacing)
+
+</details>
+
+<details open>
 <summary><b>Theme</b> (32 rules)</summary>
 
 * [**Theme Overview**](theme)
