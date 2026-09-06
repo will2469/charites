@@ -83,19 +83,23 @@
 </details>
 
 <details open>
-<summary><b>Inp</b> (12 rules)</summary>
+<summary><b>Inp</b> (16 rules)</summary>
 
 * [**Inp Overview**](inp)
 * [`inp.context-re-render-cascade`](inp.context-re-render-cascade)
 * [`inp.expensive-render-computation`](inp.expensive-render-computation)
+* [`inp.expensive-style-mutation`](inp.expensive-style-mutation)
 * [`inp.heavy-event-handler`](inp.heavy-event-handler)
 * [`inp.hydration-contention`](inp.hydration-contention)
 * [`inp.hydration-heavy-island`](inp.hydration-heavy-island)
+* [`inp.large-interaction-layout-scope`](inp.large-interaction-layout-scope)
 * [`inp.layout-thrashing`](inp.layout-thrashing)
 * [`inp.missing-start-transition`](inp.missing-start-transition)
+* [`inp.missing-touch-action`](inp.missing-touch-action)
 * [`inp.render-blocking-script`](inp.render-blocking-script)
 * [`inp.repeated-state-update`](inp.repeated-state-update)
 * [`inp.sync-layout-effect`](inp.sync-layout-effect)
+* [`inp.unbounded-collection-render`](inp.unbounded-collection-render)
 * [`inp.unbounded-effect-deps`](inp.unbounded-effect-deps)
 * [`inp.unyielded-long-task`](inp.unyielded-long-task)
 

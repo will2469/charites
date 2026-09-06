@@ -170,6 +170,12 @@ var (
 	_ Rule = (*inp.SyncLayoutEffectRule)(nil)
 	_ Rule = (*inp.ContextReRenderCascadeRule)(nil)
 	_ Rule = (*inp.ExpensiveRenderComputationRule)(nil)
+
+	// inp Wave 4 (Presentation, Layout Scope & Touch Scheduling)
+	_ Rule = (*inp.UnboundedCollectionRenderRule)(nil)
+	_ Rule = (*inp.LargeInteractionLayoutScopeRule)(nil)
+	_ Rule = (*inp.MissingTouchActionRule)(nil)
+	_ Rule = (*inp.ExpensiveStyleMutationRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -370,6 +376,12 @@ func builtinRules() []Rule {
 		inp.NewSyncLayoutEffectRule(),
 		inp.NewContextReRenderCascadeRule(),
 		inp.NewExpensiveRenderComputationRule(),
+
+		// inp Wave 4 (Presentation, Layout Scope & Touch Scheduling)
+		inp.NewUnboundedCollectionRenderRule(),
+		inp.NewLargeInteractionLayoutScopeRule(),
+		inp.NewMissingTouchActionRule(),
+		inp.NewExpensiveStyleMutationRule(),
 	}
 }
 

@@ -549,6 +549,17 @@ func getScriptOrSourceContent(node *ir.Node) string {
 	if node.Type == ir.NodeComment && len(node.RawClasses) > 0 {
 		return node.RawClasses
 	}
+	if node.Type == ir.NodeElement {
+		cur := node
+		for cur.Parent != nil {
+			cur = cur.Parent
+		}
+		for _, ch := range cur.Children {
+			if ch != nil && ch.Type == ir.NodeComment && len(ch.RawClasses) > 0 {
+				return ch.RawClasses
+			}
+		}
+	}
 	return ""
 }
 
@@ -763,4 +774,226 @@ func hasExpensiveRenderComputation(code string) (string, bool) {
 	}
 
 	return "", false
+}
+
+// isScrollableContainer memeriksa apakah elemen memiliki kelas CSS kontainer scroll (overflow-y-auto, dll).
+func isScrollableContainer(_ string, classes []string, rawClasses string) bool {
+	if len(rawClasses) == 0 && len(classes) == 0 {
+		return false
+	}
+	if strings.Contains(rawClasses, "overflow-y-auto") ||
+		strings.Contains(rawClasses, "overflow-auto") ||
+		strings.Contains(rawClasses, "overflow-scroll") ||
+		strings.Contains(rawClasses, "overflow-y-scroll") {
+		return true
+	}
+	for _, cls := range classes {
+		if cls == "overflow-y-auto" || cls == "overflow-auto" || cls == "overflow-scroll" || cls == "overflow-y-scroll" {
+			return true
+		}
+	}
+	return false
+}
+
+// hasUnboundedCollectionMapping mendeteksi apakah kode sumber di sekitar kontainer scroll
+// memetakan koleksi dinamis via .map(...) tanpa paginasi (.slice) atau pustaka virtualisasi.
+func hasUnboundedCollectionMapping(src string, startLine int) (string, bool) {
+	if len(src) == 0 {
+		return "", false
+	}
+
+	lines := strings.Split(src, "\n")
+	startIdx := startLine - 1
+	if startIdx < 0 {
+		startIdx = 0
+	}
+	endIdx := startIdx + 40
+	if endIdx > len(lines) {
+		endIdx = len(lines)
+	}
+
+	for i := startIdx; i < endIdx; i++ {
+		line := lines[i]
+		if !strings.Contains(line, ".map(") {
+			continue
+		}
+
+		// Pengecualian 1: Pustaka virtualisasi list
+		if strings.Contains(line, "virtual") || strings.Contains(line, "Virtual") ||
+			strings.Contains(src, "useVirtualizer") || strings.Contains(src, "getVirtualItems") {
+			return "", false
+		}
+
+		// Pengecualian 2: Paginasi atau pembatasan slice tetap
+		if strings.Contains(line, ".slice(") || strings.Contains(line, ".take(") {
+			return "", false
+		}
+
+		// Pengecualian 3: Static constant array mapping e.g. [1, 2, 3].map
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[") && strings.Contains(trimmed, "].map(") {
+			return "", false
+		}
+
+		mapIdx := strings.Index(line, ".map(")
+		expr := line[:mapIdx+len(".map()")]
+		if len(expr) > 40 {
+			expr = expr[len(expr)-40:]
+		}
+		return strings.TrimSpace(expr), true
+	}
+
+	return "", false
+}
+
+// isUnconstrainedLayoutScope mendeteksi elemen overlay/drawer/modal besar tanpa isolasi containment
+// yang memicu invalidasi layout dokumen secara menyeluruh saat dibuka/ditutup.
+func isUnconstrainedLayoutScope(tag string, classes []string, rawClasses string) bool {
+	if strings.EqualFold(tag, "dialog") {
+		return false
+	}
+	if len(rawClasses) == 0 && len(classes) == 0 {
+		return false
+	}
+
+	// Pengecualian: Telah memiliki layout containment eksplisit
+	if strings.Contains(rawClasses, "contain-layout") ||
+		strings.Contains(rawClasses, "contain-strict") ||
+		strings.Contains(rawClasses, "contain-content") ||
+		strings.Contains(rawClasses, "contain:layout") ||
+		strings.Contains(rawClasses, "contain:strict") {
+		return false
+	}
+
+	// Wajib berposisi fixed (overlay)
+	hasFixed := strings.Contains(rawClasses, "fixed")
+	if !hasFixed {
+		for _, cls := range classes {
+			if cls == "fixed" {
+				hasFixed = true
+				break
+			}
+		}
+	}
+	if !hasFixed {
+		return false
+	}
+
+	// Memiliki dimensi overlay besar
+	hasLargeBounds := strings.Contains(rawClasses, "inset-0") ||
+		strings.Contains(rawClasses, "inset-y-0") ||
+		strings.Contains(rawClasses, "inset-x-0") ||
+		strings.Contains(rawClasses, "w-screen") ||
+		strings.Contains(rawClasses, "h-screen") ||
+		strings.Contains(rawClasses, "w-96") ||
+		strings.Contains(rawClasses, "z-50")
+	if !hasLargeBounds {
+		return false
+	}
+
+	// Memiliki indikator dynamic drawer/modal/overlay atau conditional toggle
+	hasOverlayIntent := strings.Contains(rawClasses, "hidden") ||
+		strings.Contains(rawClasses, "block") ||
+		strings.Contains(rawClasses, "isOpen") ||
+		strings.Contains(rawClasses, "open") ||
+		strings.Contains(rawClasses, "drawer") ||
+		strings.Contains(rawClasses, "modal") ||
+		strings.Contains(rawClasses, "sidebar") ||
+		strings.Contains(rawClasses, "sheet")
+	return hasOverlayIntent
+}
+
+// getMissingTouchAction memeriksa apakah elemen menangani gestur sentuhan/pointer
+// kustom tanpa mendeklarasikan kebijakan CSS touch-action.
+func getMissingTouchAction(_ string, attrs map[string]string, classes []string, rawClasses string) (string, bool) {
+	if attrs == nil {
+		return "", false
+	}
+
+	var gestureHandler string
+	for k := range attrs {
+		if strings.EqualFold(k, "onPointerDown") ||
+			strings.EqualFold(k, "onTouchStart") ||
+			strings.EqualFold(k, "onPointerMove") ||
+			strings.EqualFold(k, "onTouchMove") {
+			gestureHandler = k
+			break
+		}
+	}
+	if gestureHandler == "" {
+		return "", false
+	}
+
+	// Periksa apakah telah memiliki utilitas touch-*
+	if strings.Contains(rawClasses, "touch-none") ||
+		strings.Contains(rawClasses, "touch-pan-x") ||
+		strings.Contains(rawClasses, "touch-pan-y") ||
+		strings.Contains(rawClasses, "touch-pan-left") ||
+		strings.Contains(rawClasses, "touch-pan-right") ||
+		strings.Contains(rawClasses, "touch-pan-up") ||
+		strings.Contains(rawClasses, "touch-pan-down") ||
+		strings.Contains(rawClasses, "touch-pinch-zoom") ||
+		strings.Contains(rawClasses, "touch-manipulation") ||
+		strings.Contains(rawClasses, "touch-auto") {
+		return "", false
+	}
+
+	for _, cls := range classes {
+		if strings.HasPrefix(cls, "touch-") {
+			return "", false
+		}
+	}
+
+	if styleVal, ok := attrs["style"]; ok && (strings.Contains(styleVal, "touch-action") || strings.Contains(styleVal, "touchAction")) {
+		return "", false
+	}
+
+	return gestureHandler, true
+}
+
+// findExpensiveStyleMutation mendeteksi mutasi gaya peka-cat imperatif (seperti boxShadow atau filter)
+// di dalam penangan interaksi kontinu (onPointerMove, onTouchMove, onScroll, onMouseMove, onWheel).
+func findExpensiveStyleMutation(_ string, attrs map[string]string) (string, string, bool) {
+	if attrs == nil {
+		return "", "", false
+	}
+
+	var continuousHandler string
+	var handlerCode string
+	for k, v := range attrs {
+		if strings.EqualFold(k, "onPointerMove") ||
+			strings.EqualFold(k, "onTouchMove") ||
+			strings.EqualFold(k, "onScroll") ||
+			strings.EqualFold(k, "onMouseMove") ||
+			strings.EqualFold(k, "onWheel") {
+			continuousHandler = k
+			handlerCode = v
+			break
+		}
+	}
+	if continuousHandler == "" || len(handlerCode) == 0 {
+		return "", "", false
+	}
+
+	paintProps := [...]string{
+		"boxShadow",
+		"box-shadow",
+		"filter",
+		"backdropFilter",
+		"backdrop-filter",
+		"backgroundImage",
+		"background-image",
+		"borderImage",
+		"mixBlendMode",
+	}
+
+	for _, prop := range paintProps {
+		if strings.Contains(handlerCode, "style."+prop) ||
+			strings.Contains(handlerCode, "style['"+prop+"']") ||
+			strings.Contains(handlerCode, "style[\""+prop+"\"]") {
+			return continuousHandler, prop, true
+		}
+	}
+
+	return "", "", false
 }

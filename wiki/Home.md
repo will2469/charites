@@ -89,7 +89,7 @@ flowchart TD
 | `browser` | 12 | [`browser`](browser) |
 | `cls` | 16 | [`cls`](cls) |
 | `ergonomy` | 4 | [`ergonomy`](ergonomy) |
-| `inp` | 12 | [`inp`](inp) |
+| `inp` | 16 | [`inp`](inp) |
 | `mobile` | 5 | [`mobile`](mobile) |
 | `pwa` | 10 | [`pwa`](pwa) |
 | `responsive` | 17 | [`responsive`](responsive) |
@@ -152,14 +152,18 @@ flowchart TD
 | `ergonomy.tap-highlight-not-handled` | `ergonomy` | `INFO` | Flags clickable non-native custom elements lacking tactile tap feedback or tap-highlight management | [`ergonomy.tap-highlight-not-handled`](ergonomy.tap-highlight-not-handled) |
 | `inp.context-re-render-cascade` | `inp` | `WARN` | Passing an unmemoized inline object literal to Context.Provider value triggers cascading re-renders across all consumers | [`inp.context-re-render-cascade`](inp.context-re-render-cascade) |
 | `inp.expensive-render-computation` | `inp` | `WARN` | Expensive data transformations (chained .filter() and .sort()) execute synchronously in the render path without useMemo | [`inp.expensive-render-computation`](inp.expensive-render-computation) |
+| `inp.expensive-style-mutation` | `inp` | `WARN` | Continuous interaction handler imperatively mutates high-cost paint-sensitive style properties (boxShadow, filter, etc.) | [`inp.expensive-style-mutation`](inp.expensive-style-mutation) |
 | `inp.heavy-event-handler` | `inp` | `WARN` | Interactive event handler executes heavy synchronous operations (JSON.parse, Array.sort) without cooperative yields | [`inp.heavy-event-handler`](inp.heavy-event-handler) |
 | `inp.hydration-contention` | `inp` | `WARN` | Concurrently hydrating multiple Astro client:load islands saturates the main thread and spikes input delay | [`inp.hydration-contention`](inp.hydration-contention) |
 | `inp.hydration-heavy-island` | `inp` | `WARN` | Client island wraps excessive static DOM subtree forcing heavy virtual DOM reconciliation on the client | [`inp.hydration-heavy-island`](inp.hydration-heavy-island) |
+| `inp.large-interaction-layout-scope` | `inp` | `WARN` | Interactive overlay or drawer element lacks layout containment or native dialog isolation, triggering document-wide reflow on toggle | [`inp.large-interaction-layout-scope`](inp.large-interaction-layout-scope) |
 | `inp.layout-thrashing` | `inp` | `ERROR` | Sequential DOM style mutation followed by layout geometry reading triggers forced synchronous reflow | [`inp.layout-thrashing`](inp.layout-thrashing) |
 | `inp.missing-start-transition` | `inp` | `INFO` | Secondary non-urgent state update inside interactive handler should be wrapped in startTransition to prevent input lag | [`inp.missing-start-transition`](inp.missing-start-transition) |
+| `inp.missing-touch-action` | `inp` | `WARN` | Interactive element with custom pointer or touch gesture handlers lacks an explicit touch-action CSS policy | [`inp.missing-touch-action`](inp.missing-touch-action) |
 | `inp.render-blocking-script` | `inp` | `WARN` | External script element without defer, async, or type="module" synchronously blocks rendering and input responsiveness | [`inp.render-blocking-script`](inp.render-blocking-script) |
 | `inp.repeated-state-update` | `inp` | `WARN` | Repeated state updater calls inside loops breaking automatic batching trigger cascading re-renders | [`inp.repeated-state-update`](inp.repeated-state-update) |
 | `inp.sync-layout-effect` | `inp` | `WARN` | Synchronous non-geometrical computation in useLayoutEffect blocks browser paint and inflates presentation delay | [`inp.sync-layout-effect`](inp.sync-layout-effect) |
+| `inp.unbounded-collection-render` | `inp` | `WARN` | Scrollable collection container renders unbounded dynamic data via .map() without window virtualization or pagination limits | [`inp.unbounded-collection-render`](inp.unbounded-collection-render) |
 | `inp.unbounded-effect-deps` | `inp` | `ERROR` | Lifecycle hook useEffect/useLayoutEffect is missing a dependency array, triggering unbounded re-executions on every render | [`inp.unbounded-effect-deps`](inp.unbounded-effect-deps) |
 | `inp.unyielded-long-task` | `inp` | `WARN` | Long task processing large arrays without cooperative scheduling yields stalls main-thread responsiveness | [`inp.unyielded-long-task`](inp.unyielded-long-task) |
 | `mobile.fixed-action-obstruction` | `mobile` | `WARN` | Warns when fixed bottom elements lack compensating bottom padding on parent or content siblings, risking content obstruction | [`mobile.fixed-action-obstruction`](mobile.fixed-action-obstruction) |
