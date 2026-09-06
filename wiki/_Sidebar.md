@@ -141,13 +141,17 @@
 </details>
 
 <details open>
-<summary><b>Performance</b> (4 rules)</summary>
+<summary><b>Performance</b> (8 rules)</summary>
 
 * [**Performance Overview**](performance)
 * [`performance.react-context-domain-coupling`](performance.react-context-domain-coupling)
+* [`performance.react-derived-state-in-effect`](performance.react-derived-state-in-effect)
 * [`performance.react-effect-missing-cleanup`](performance.react-effect-missing-cleanup)
 * [`performance.react-index-as-key`](performance.react-index-as-key)
 * [`performance.react-inline-prop-memo`](performance.react-inline-prop-memo)
+* [`performance.react-redundant-function-memoization`](performance.react-redundant-function-memoization)
+* [`performance.react-static-heavy-import`](performance.react-static-heavy-import)
+* [`performance.react-unstable-hook-reference`](performance.react-unstable-hook-reference)
 
 </details>
 

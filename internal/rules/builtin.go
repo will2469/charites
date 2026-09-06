@@ -208,6 +208,12 @@ var (
 	_ Rule = (*performance.ReactIndexAsKeyRule)(nil)
 	_ Rule = (*performance.ReactEffectMissingCleanupRule)(nil)
 	_ Rule = (*performance.ReactContextDomainCouplingRule)(nil)
+
+	// performance Wave 2 (React Code Splitting & Compilation Hygiene)
+	_ Rule = (*performance.ReactStaticHeavyImportRule)(nil)
+	_ Rule = (*performance.ReactRedundantFunctionMemoizationRule)(nil)
+	_ Rule = (*performance.ReactDerivedStateInEffectRule)(nil)
+	_ Rule = (*performance.ReactUnstableHookReferenceRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -444,6 +450,12 @@ func builtinRules() []Rule {
 		performance.NewReactIndexAsKeyRule(),
 		performance.NewReactEffectMissingCleanupRule(),
 		performance.NewReactContextDomainCouplingRule(),
+
+		// performance Wave 2 (React Code Splitting & Compilation Hygiene)
+		performance.NewReactStaticHeavyImportRule(),
+		performance.NewReactRedundantFunctionMemoizationRule(),
+		performance.NewReactDerivedStateInEffectRule(),
+		performance.NewReactUnstableHookReferenceRule(),
 	}
 }
 

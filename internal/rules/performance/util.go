@@ -366,3 +366,416 @@ func countObjectProperties(inner string) int {
 	}
 	return commas + 1
 }
+
+// HeavyImportViolation merepresentasikan temuan impor statis pustaka berbobot besar.
+type HeavyImportViolation struct {
+	Line   int
+	Module string
+}
+
+// findStaticHeavyImports mendeteksi pernyataan impor statis modul berukuran besar di tingkat atas.
+func findStaticHeavyImports(fileSrc string) []HeavyImportViolation {
+	if len(fileSrc) == 0 {
+		return nil
+	}
+
+	heavyModules := [...]string{
+		"monaco-editor",
+		"chart.js",
+		"echarts",
+		"quill",
+		"pdfjs-dist",
+		"pdfjs",
+		"three",
+		"datatables.net",
+		"xlsx",
+		"jspdf",
+		"plotly.js",
+		"AnalyticalChart",
+	}
+
+	var violations []HeavyImportViolation
+	lines := strings.Split(fileSrc, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "import ") || strings.HasPrefix(trimmed, "import type ") || strings.HasPrefix(trimmed, "import type{") || strings.Contains(trimmed, "{ type ") {
+			continue
+		}
+		if strings.Contains(trimmed, "lazy(") || strings.Contains(trimmed, "React.lazy(") {
+			continue
+		}
+
+		for _, mod := range heavyModules {
+			if strings.Contains(trimmed, "'"+mod) || strings.Contains(trimmed, "\""+mod) || strings.Contains(trimmed, "/"+mod) {
+				violations = append(violations, HeavyImportViolation{
+					Line:   i + 1,
+					Module: mod,
+				})
+				break
+			}
+		}
+	}
+
+	return violations
+}
+
+// RedundantMemoViolation merepresentasikan temuan pembungkusan useCallback yang hanya dipakai elemen native.
+type RedundantMemoViolation struct {
+	Line        int
+	HandlerName string
+	ElementTag  string
+}
+
+// findRedundantFunctionMemoizations mendeteksi penggunaan useCallback pada fungsi yang hanya dikonsumsi DOM native.
+func findRedundantFunctionMemoizations(fileSrc string) []RedundantMemoViolation {
+	if len(fileSrc) == 0 || !strings.Contains(fileSrc, "useCallback") {
+		return nil
+	}
+
+	var violations []RedundantMemoViolation
+	lines := strings.Split(fileSrc, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "export ") {
+			continue
+		}
+		if !strings.Contains(trimmed, "useCallback(") && !strings.Contains(trimmed, "useCallback (") {
+			continue
+		}
+
+		handler := extractHandlerName(trimmed)
+		if handler == "" {
+			continue
+		}
+
+		if isHandlerConsumedByMemoOrDeps(handler, fileSrc) {
+			continue
+		}
+
+		tag := findNativeTagConsumer(handler, fileSrc)
+		if tag != "" {
+			violations = append(violations, RedundantMemoViolation{
+				Line:        i + 1,
+				HandlerName: handler,
+				ElementTag:  tag,
+			})
+		}
+	}
+
+	return violations
+}
+
+func extractHandlerName(line string) string {
+	parts := strings.Fields(line)
+	for idx, p := range parts {
+		if (p == "const" || p == "let" || p == "var") && idx+1 < len(parts) {
+			name := parts[idx+1]
+			name = strings.Trim(name, ":= ")
+			return name
+		}
+	}
+	return ""
+}
+
+func isHandlerConsumedByMemoOrDeps(handler, fileSrc string) bool {
+	// Jika handler dijadikan dependensi hook: [..., handler, ...]
+	if strings.Contains(fileSrc, "["+handler+"]") ||
+		strings.Contains(fileSrc, ", "+handler+"]") ||
+		strings.Contains(fileSrc, "["+handler+",") ||
+		strings.Contains(fileSrc, ", "+handler+",") {
+		return true
+	}
+
+	// Jika handler diteruskan ke komponen React kustom (huruf kapital)
+	lines := strings.Split(fileSrc, "\n")
+	for _, l := range lines {
+		trimmed := strings.TrimSpace(l)
+		if !strings.Contains(trimmed, "{"+handler+"}") && !strings.Contains(trimmed, "{ "+handler+" }") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "<") && len(trimmed) > 1 {
+			tagChar := trimmed[1]
+			if tagChar >= 'A' && tagChar <= 'Z' {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func findNativeTagConsumer(handler, fileSrc string) string {
+	nativeTags := [...]string{"button", "input", "select", "textarea", "form", "div", "a", "span"}
+	lines := strings.Split(fileSrc, "\n")
+	for _, l := range lines {
+		trimmed := strings.TrimSpace(l)
+		if !strings.Contains(trimmed, "{"+handler+"}") && !strings.Contains(trimmed, "{ "+handler+" }") {
+			continue
+		}
+		for _, tag := range nativeTags {
+			if strings.Contains(trimmed, "<"+tag+" ") || strings.HasPrefix(trimmed, "<"+tag+">") {
+				return tag
+			}
+		}
+	}
+	return ""
+}
+
+// DerivedStateViolation merepresentasikan sinkronisasi derived state via useEffect.
+type DerivedStateViolation struct {
+	Line       int
+	EffectName string
+	StateName  string
+}
+
+// findDerivedStateInEffects mendeteksi useEffect yang murni melakukan sinkronisasi derived state.
+func findDerivedStateInEffects(fileSrc string) []DerivedStateViolation {
+	if len(fileSrc) == 0 || (!strings.Contains(fileSrc, "useEffect") && !strings.Contains(fileSrc, "useLayoutEffect")) {
+		return nil
+	}
+
+	var violations []DerivedStateViolation
+	lines := strings.Split(fileSrc, "\n")
+	for i, line := range lines {
+		effectName := ""
+		if strings.Contains(line, "useEffect(") || strings.Contains(line, "useEffect (") {
+			effectName = "useEffect"
+		} else if strings.Contains(line, "useLayoutEffect(") || strings.Contains(line, "useLayoutEffect (") {
+			effectName = "useLayoutEffect"
+		}
+		if effectName == "" {
+			continue
+		}
+
+		body := extractEffectBody(lines, i)
+		if body == "" || hasAsyncOrSideEffect(body) {
+			continue
+		}
+
+		stateName := extractDerivedSetterCall(body)
+		if stateName != "" {
+			violations = append(violations, DerivedStateViolation{
+				Line:       i + 1,
+				EffectName: effectName,
+				StateName:  stateName,
+			})
+		}
+	}
+
+	return violations
+}
+
+func hasAsyncOrSideEffect(body string) bool {
+	sideEffects := [...]string{
+		"fetch(", "axios.", "async ", "await ", ".then(", ".catch(",
+		"setTimeout(", "setInterval(", "addEventListener(",
+		"document.", "window.", "localStorage.", "sessionStorage.",
+		"WebSocket", "ResizeObserver", "IntersectionObserver", ".current",
+	}
+	for _, se := range sideEffects {
+		if strings.Contains(body, se) {
+			return true
+		}
+	}
+	return false
+}
+
+func extractDerivedSetterCall(body string) string {
+	lines := strings.Split(body, "\n")
+	setterCount := 0
+	foundSetter := ""
+
+	for _, l := range lines {
+		trimmed := strings.TrimSpace(l)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+		idx := strings.Index(trimmed, "set")
+		if idx != -1 && len(trimmed) > idx+3 {
+			charAfterSet := trimmed[idx+3]
+			if charAfterSet >= 'A' && charAfterSet <= 'Z' {
+				openParen := strings.Index(trimmed[idx:], "(")
+				if openParen != -1 {
+					foundSetter = trimmed[idx : idx+openParen]
+					setterCount++
+				}
+			}
+		}
+	}
+
+	if setterCount == 1 {
+		return foundSetter
+	}
+	return ""
+}
+
+// UnstableHookViolation merepresentasikan custom hook yang mengembalikan fungsi tidak stabil.
+type UnstableHookViolation struct {
+	Line         int
+	HookName     string
+	FunctionName string
+}
+
+// findUnstableHookReferences mendeteksi custom hook yang mereturn referensi fungsi tidak stabil.
+func findUnstableHookReferences(fileSrc string) []UnstableHookViolation {
+	if len(fileSrc) == 0 {
+		return nil
+	}
+
+	var violations []UnstableHookViolation
+	lines := strings.Split(fileSrc, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		hookName := extractCustomHookDeclaration(trimmed)
+		if hookName == "" {
+			continue
+		}
+
+		hookBody := extractFunctionBlock(lines, i)
+		if hookBody == "" {
+			continue
+		}
+
+		unstableFuncs := findUnstableReturnedFunctions(hookBody)
+		for _, fn := range unstableFuncs {
+			violations = append(violations, UnstableHookViolation{
+				Line:         i + 1,
+				HookName:     hookName,
+				FunctionName: fn,
+			})
+		}
+	}
+
+	return violations
+}
+
+func extractCustomHookDeclaration(line string) string {
+	if name := extractFunctionHook(line); name != "" {
+		return name
+	}
+	return extractConstHook(line)
+}
+
+func extractFunctionHook(line string) string {
+	if !strings.Contains(line, "function use") {
+		return ""
+	}
+	idx := strings.Index(line, "use")
+	end := strings.Index(line[idx:], "(")
+	if end == -1 {
+		return ""
+	}
+	name := strings.TrimSpace(line[idx : idx+end])
+	if len(name) > 3 && name[3] >= 'A' && name[3] <= 'Z' {
+		return name
+	}
+	return ""
+}
+
+func extractConstHook(line string) string {
+	if !strings.Contains(line, "use") || !strings.Contains(line, "=") {
+		return ""
+	}
+	parts := strings.Fields(line)
+	for _, p := range parts {
+		cand := strings.Trim(p, "=:")
+		if len(cand) > 3 && strings.HasPrefix(cand, "use") && cand[3] >= 'A' && cand[3] <= 'Z' {
+			return cand
+		}
+	}
+	return ""
+}
+
+func extractFunctionBlock(lines []string, startLine int) string {
+	var sb strings.Builder
+	depth := 0
+	foundOpen := false
+	maxLines := startLine + 100
+	if maxLines > len(lines) {
+		maxLines = len(lines)
+	}
+
+	for i := startLine; i < maxLines; i++ {
+		l := lines[i]
+		sb.WriteString(l)
+		sb.WriteByte('\n')
+		for j := 0; j < len(l); j++ {
+			switch l[j] {
+			case '{':
+				depth++
+				foundOpen = true
+			case '}':
+				depth--
+				if foundOpen && depth <= 0 {
+					return sb.String()
+				}
+			}
+		}
+	}
+	return sb.String()
+}
+
+func findUnstableReturnedFunctions(hookBody string) []string {
+	returnIdx := strings.LastIndex(hookBody, "return {")
+	if returnIdx == -1 {
+		return nil
+	}
+
+	returnBlock := hookBody[returnIdx:]
+	endBrace := strings.Index(returnBlock, "}")
+	if endBrace != -1 {
+		returnBlock = returnBlock[:endBrace]
+	}
+	if idx := strings.Index(returnBlock, "{"); idx != -1 {
+		returnBlock = returnBlock[idx+1:]
+	}
+
+	var unstable []string
+	items := strings.Split(returnBlock, ",")
+	for _, it := range items {
+		trimmed := strings.TrimSpace(it)
+		trimmed = strings.Trim(trimmed, ";")
+		if trimmed == "" {
+			continue
+		}
+
+		if strings.Contains(trimmed, "=>") || strings.Contains(trimmed, "function") {
+			colonIdx := strings.Index(trimmed, ":")
+			if colonIdx != -1 {
+				propName := strings.TrimSpace(trimmed[:colonIdx])
+				unstable = append(unstable, propName)
+			}
+			continue
+		}
+
+		ident := strings.TrimSpace(trimmed)
+		if strings.Contains(ident, ":") {
+			colonIdx := strings.Index(ident, ":")
+			ident = strings.TrimSpace(ident[colonIdx+1:])
+		}
+		if isUnmemoizedLocalFunction(ident, hookBody) {
+			unstable = append(unstable, ident)
+		}
+	}
+
+	return unstable
+}
+
+func isUnmemoizedLocalFunction(ident, hookBody string) bool {
+	lines := strings.Split(hookBody, "\n")
+	for _, l := range lines {
+		trimmed := strings.TrimSpace(l)
+		if strings.Contains(trimmed, "const "+ident+" =") || strings.Contains(trimmed, "let "+ident+" =") {
+			if strings.Contains(trimmed, "useCallback") {
+				return false
+			}
+			if strings.Contains(trimmed, "=>") || strings.Contains(trimmed, "function") {
+				return true
+			}
+		}
+		if strings.HasPrefix(trimmed, "function "+ident) {
+			return true
+		}
+	}
+	return false
+}

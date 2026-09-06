@@ -92,7 +92,7 @@ flowchart TD
 | `inp` | 16 | [`inp`](inp) |
 | `lcp` | 16 | [`lcp`](lcp) |
 | `mobile` | 5 | [`mobile`](mobile) |
-| `performance` | 4 | [`performance`](performance) |
+| `performance` | 8 | [`performance`](performance) |
 | `pwa` | 10 | [`pwa`](pwa) |
 | `responsive` | 17 | [`responsive`](responsive) |
 | `theme` | 32 | [`theme`](theme) |
@@ -190,9 +190,13 @@ flowchart TD
 | `mobile.orientation-lock-risk` | `mobile` | `INFO` | Advises against rigid screen orientation locking which restricts accessibility for mounted or assistive mobile setups (WCAG 2.2 SC 1.3.4) | [`mobile.orientation-lock-risk`](mobile.orientation-lock-risk) |
 | `mobile.pointer-events-block` | `mobile` | `WARN` | Warns when an ancestor declares pointer-events-none over interactive children without restoring pointer-events-auto on mobile | [`mobile.pointer-events-block`](mobile.pointer-events-block) |
 | `performance.react-context-domain-coupling` | `performance` | `WARN` | Context.Provider bundles over-coupled multi-domain state (> 5 fields), triggering cascading re-renders across all consumers on any property change | [`performance.react-context-domain-coupling`](performance.react-context-domain-coupling) |
+| `performance.react-derived-state-in-effect` | `performance` | `WARN` | Mencegah sinkronisasi derived state dari props atau state yang sudah ada melalui useEffect, yang memicu siklus perenderan sekunder ganda. | [`performance.react-derived-state-in-effect`](performance.react-derived-state-in-effect) |
 | `performance.react-effect-missing-cleanup` | `performance` | `ERROR` | Effect hook acquiring persistent resource (listener, interval, observer) lacks a symmetrical cleanup return function, causing memory leaks | [`performance.react-effect-missing-cleanup`](performance.react-effect-missing-cleanup) |
 | `performance.react-index-as-key` | `performance` | `WARN` | Using array index as 'key' in dynamic collection mapping breaks VDOM reconciliation when items reorder or mutate | [`performance.react-index-as-key`](performance.react-index-as-key) |
 | `performance.react-inline-prop-memo` | `performance` | `WARN` | Passing inline object, array, or function literal to memoized component bypasses shallow memoization on every parent render | [`performance.react-inline-prop-memo`](performance.react-inline-prop-memo) |
+| `performance.react-redundant-function-memoization` | `performance` | `INFO` | Mengaudit penggunaan useCallback pada callback yang hanya dikonsumsi oleh elemen native HTML tanpa konsumen peka identitas referensial. | [`performance.react-redundant-function-memoization`](performance.react-redundant-function-memoization) |
+| `performance.react-static-heavy-import` | `performance` | `WARN` | Mengaudit pernyataan impor statis modul berukuran besar di tingkat atas yang membengkakkan bundel JavaScript awal dan mewajibkan pemisahan kode via React.lazy() dan <Suspense>. | [`performance.react-static-heavy-import`](performance.react-static-heavy-import) |
+| `performance.react-unstable-hook-reference` | `performance` | `WARN` | Mengaudit custom hook yang mengembalikan referensi fungsi tidak stabil tanpa dibungkus useCallback, yang memicu re-render loop pada komponen konsumen. | [`performance.react-unstable-hook-reference`](performance.react-unstable-hook-reference) |
 | `pwa.apple-meta-missing` | `pwa` | `WARN` | Warns when an HTML document head with a Web App Manifest is missing Apple WebKit standalone meta tags (apple-mobile-web-app-capable and apple-touch-icon) | [`pwa.apple-meta-missing`](pwa.apple-meta-missing) |
 | `pwa.icon-maskable-missing` | `pwa` | `WARN` | Warns when a Web App Manifest defines icons but none has purpose: 'maskable' for Android adaptive launcher icons | [`pwa.icon-maskable-missing`](pwa.icon-maskable-missing) |
 | `pwa.insecure-context-resource` | `pwa` | `ERROR` | Errors when a resource element loads assets over an insecure HTTP protocol (http://) in violation of W3C Secure Contexts | [`pwa.insecure-context-resource`](pwa.insecure-context-resource) |
