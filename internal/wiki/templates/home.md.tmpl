@@ -14,11 +14,38 @@ $$\mathbf{Linter} < \mathbf{Charites} < \mathbf{Developer\ Preference}$$
 
 Charites is **one step ahead of conventional linters** (evaluating relational graphs, design token resolution, and interaction data-flow), yet it **never infringes on developer preference, aesthetic taste, or brand identity**.
 
-> **The Runway Fashion Principle:**
-> In fashion, choreographers do not dictate subjective standards of model beauty or forbid avant-garde styles. Rather, they enforce professional runway attitude, posture mechanics, stride rhythm, and safety so the model does not trip over the hem or suffer a wardrobe failure.
-> Similarly, in Charites:
-> - **Brand & Aesthetic Freedom (The Met Gala):** Whether your design embraces *Neo-Brutalism*, *Minimalist Bento*, *Skeuomorphism*, or *Cyberpunk Neon*, you have full creative liberty.
-> - **Ergonomic & Structural Integrity:** Charites intervenes strictly when fundamental usability and safety are breached-such as tiny unclickable touch targets ($< 44\text{px}$), un-isolated async actions causing duplicate mutations, broken mobile keyboard submit paths, collapsed dark-mode elevation shadows, or inverted spatial spacing.
+> **The Charites Iceberg Principle:**
+> Web application quality follows an iceberg model: developers and users are captivated by the **first impression** above the waterline, but long-term user trust and retention are decided by the **runtime performance** submerged beneath it.
+>
+> ```text
+>                               ▲
+>                              / \
+>                             /   \
+>                            /     \
+>                           /       \
+>                          /  VISUAL \
+>   ======================/=========== \====================== WATERLINE (First Impression)
+>                        /   THEME      \
+>                       /     A11Y       \   ABOVE WATER (112 RULES)
+>                      /   RESPONSIVE     \  "What is Seen & Touched"
+>                     /     ERGONOMY       \  • Design token consistency (global.css SSOT)
+>                    /       BROWSER        \ • Fitts's Law touch ergonomics (>= 44x44px)
+>                   /         PWA / UX       \• Mobile viewport integrity (dvh, min-w-0)
+>                  /                          \
+>   ~~~~~~~~~~~~~~/~~~~~~~~~~~~~~~~~~~~~~~~~~~~\~~~~~~~~~~~~~~ DEVELOPER AWARENESS THRESHOLD
+>                /                              \
+>               /       CORE WEB VITALS          \   SUBMERGED MASS (64 RULES)
+>              /        & FRAMEWORK PERF          \  "What is Felt & Sustained"
+>             /                                    \ • Layout shift stability without jank (CLS)
+>            /    CLS  •  INP  •  LCP  •  PERF     \ • Main-thread interaction latency <50ms (INP)
+>           /                                       \• Critical asset discovery & preload (LCP)
+>          /  React Compiler • Astro Island • Oxide  \• Zero-JS hydration & VDOM hygiene
+>         /                                           \
+>        /─────────────────────────────────────────────\
+> ```
+>
+> - **Above the Waterline (Surface Presence - 112 Rules):** Solve what is seen and touched first. If an interface suffers from rogue hex codes, dark mode elevation collapse, iOS Safari auto-zoom traps, clipped mobile tables, or unclickable 24px icon buttons, users bounce immediately. Charites guarantees token and ergonomic integrity while granting full creative brand liberty.
+> - **Beneath the Waterline (Runtime Perception - 64 Rules):** Solve what is felt next. Once the visual presentation is pristine, user delight hinges on runtime execution: zero layout shift on asset load (CLS), sub-50ms main-thread responsiveness (INP), instant hero image paint (LCP), and leak-free framework compiler efficiency (React Compiler, Astro Islands, and Tailwind v4 Oxide).
 
 ### The Three Goddesses as Rule Domain Archetypes
 

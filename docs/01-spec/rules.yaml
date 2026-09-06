@@ -1,0 +1,959 @@
+# Charites Static Analysis Canonical Rule Registry (SSOT)
+# Schema Version: 2026.1
+# Specification: docs/01-spec/rules.yaml
+# Rule naming convention: <category>.<slug> (lowercase, hyphens only)
+# Total Canonical Rules: 176 (112 Surface/Visual + 64 CWV/Runtime)
+
+version: "2026.1"
+rules:
+  # ============================================================================
+  # BAGIAN 1: YANG KELIHATAN (THE VISIBLE SURFACE & ERGONOMICS - 112 RULES)
+  # Filosofi: "Solve yang kelihatan dulu baru solve yang dirasakan"
+  # Desain, Geometri Fisik, Aksesibilitas, Kompatibilitas Mesin, PWA, & Ergonomi Jempol
+  # ============================================================================
+
+  # ============================================================================
+  # KATEGORI: THEME (Design Tokens, Dark Mode, & Spatial Theme Governance)
+  # Rujukan: docs/01-spec/expansion/themes.md (32 Rules)
+  # ============================================================================
+  - id: theme.hardcode-color
+    category: theme
+    severity: warning
+    tier: 1
+    description: "Penggunaan arbitrary hex atau rgb (bg-[#2563eb], text-[rgb(...)]) yang mem-bypass token warna semantik global.css."
+  - id: theme.primitive-in-component
+    category: theme
+    severity: error
+    tier: 1
+    description: "Komponen antarmuka mengonsumsi primitive token langsung (var(--blue-500), text-blue-500) alih-alih token semantik (text-primary)."
+  - id: theme.hardcode-monochrome
+    category: theme
+    severity: warning
+    tier: 1
+    description: "Penggunaan warna monokrom absolut (bg-white, bg-black, text-white) termasuk varian alpha yang merusak adaptasi mode gelap."
+  - id: theme.hardcode-border-color
+    category: theme
+    severity: warning
+    tier: 1
+    description: "Penggunaan border warna primitif atau hardcode (border-gray-200) yang memecah batas kontras tema."
+  - id: theme.gradient-hardcode
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Deklarasi gradien warna menggunakan nilai arbitrary atau primitif (from-[#3b82f6], to-blue-500) tanpa token gradien semantik."
+  - id: theme.hardcode-opacity-color
+    category: theme
+    severity: error
+    tier: 1
+    description: "Penggunaan modifier slash opacity liar pada warna (primary/20, primary/[0.08]) tanpa varian token semantik di global.css."
+  - id: theme.pseudo-hardcode-color
+    category: theme
+    severity: warning
+    tier: 1
+    description: "Penggunaan warna hardcode atau primitif pada pseudo-classes/elements (placeholder:text-gray-400, selection:bg-yellow-200)."
+  - id: theme.inline-style-hardcode
+    category: theme
+    severity: error
+    tier: 1
+    description: "Penetapan warna atau gaya visual pada atribut style inline JSX/Astro yang membatalkan cascade tema global."
+  - id: theme.important-override
+    category: theme
+    severity: error
+    tier: 1
+    description: "Penggunaan direktif !important pada utilitas Tailwind (!bg-red-500) yang merusak tata kelola cascade dan layer tema."
+  - id: theme.hardcode-size
+    category: theme
+    severity: warning
+    tier: 1
+    description: "Penggunaan arbitrary spacing dan dimension (p-[13px], w-[230px]) yang melanggar skala modular token sistem."
+  - id: theme.hardcode-border-radius
+    category: theme
+    severity: warning
+    tier: 1
+    description: "Penggunaan nilai radius kaku arbitrary (rounded-[7px], rounded-[11px]) yang memecah konsistensi kurvatur kontainer."
+  - id: theme.hardcode-z-index
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Penggunaan nilai arbitrary z-index (z-[999], z-[10000]) tanpa mengikuti skala elevasi token semantik (z-modal, z-toast)."
+  - id: theme.hardcode-shadow-color
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Deklarasi elevasi bayangan dengan warna hardcode (shadow-[0_4px_10px_#00000040]) yang tidak adaptif terhadap latar gelap."
+  - id: theme.backdrop-blur-hardcode
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Penggunaan nilai arbitrary backdrop blur (backdrop-blur-[5px]) yang melanggar skala token keburaman latar."
+  - id: theme.focus-ring-hardcode
+    category: theme
+    severity: warning
+    tier: 1
+    description: "Penetapan warna cincin fokus kustom arbitrary (ring-[#3b82f6]) alih-alih token cincin aksesibel terpadu (ring-ring)."
+  - id: theme.unpaired-dark-variant
+    category: theme
+    severity: error
+    tier: 1
+    description: "Penerapan varian dark:* tanpa mitra terang yang seimbang, menyebabkan kontras anjlok (black-on-black) di salah satu mode."
+  - id: theme.shadow-without-border-dark
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Elevasi bayangan kontainer pada dark mode tanpa penegasan border pembatas kontras (border-border)."
+  - id: theme.nested-opacity-contrast
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Penumpukan modifier opacity berganda (opacity-75 di parent dan text-*/50 di child) yang melanggar ambang batas kontras WCAG."
+  - id: theme.image-theme-hardcode
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Aset gambar atau ilustrasi vektor statis yang hanya dioptimalkan untuk mode terang tanpa varian mode gelap."
+  - id: theme.svg-hardcode-fill
+    category: theme
+    severity: warning
+    tier: 1
+    description: "Atribut fill atau stroke hardcode pada elemen SVG grafis yang menghambat pewarnaan dinamis via currentColor."
+  - id: theme.unlayered-token-definition
+    category: theme
+    severity: error
+    tier: 1
+    description: "Deklarasi token CSS custom property di luar @layer theme atau tanpa urutan precedence yang eksplisit."
+  - id: theme.missing-token-fallback
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Konsumsi var(--token) pada berkas stylesheet tanpa menyediakan nilai fallback darurat."
+  - id: theme.token-source-drift
+    category: theme
+    severity: error
+    tier: 1
+    description: "Inkonsistensi nilai token antara konfigurasi tailwind.config dan deklarasi CSS variable pada global.css."
+  - id: theme.apply-bloat
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Penggunaan direktif @apply yang memuat lebih dari 8 utility classes, memicu pembengkakan CSS dan cascade overhead."
+  - id: theme.missing-color-scheme
+    category: theme
+    severity: error
+    tier: 1
+    description: "Ketiadaan deklarasi CSS color-scheme: light dark pada root dokumen atau kelas tema pembeda."
+  - id: theme.meta-theme-color-mismatch
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Tag meta theme-color di dokumen HTML tidak sinkron dengan preferensi state tema aktif pengguna."
+  - id: theme.dual-strategy-collision
+    category: theme
+    severity: error
+    tier: 1
+    description: "Pencampuran strategi deteksi tema (@media prefers-color-scheme dan selector .dark/[data-theme]) yang memicu fluktuasi tema."
+  - id: theme.hydration-theme-mismatch
+    category: theme
+    severity: error
+    tier: 1
+    description: "Render SSR server dengan tema default berbeda dari preferensi klien yang memicu hydration mismatch dan FOUC."
+  - id: theme.split-theme-state
+    category: theme
+    severity: error
+    tier: 2
+    description: "Penyimpanan dan resolusi state tema terpecah di berbagai sumber tanpa Single Source of Truth yang sinkron."
+  - id: theme.no-reduced-motion
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Transisi atau animasi tema yang tidak menghormati preferensi aksesibilitas pengguna prefers-reduced-motion."
+  - id: theme.chart-color-hardcode
+    category: theme
+    severity: warning
+    tier: 2
+    description: "Konfigurasi palet warna visualisasi data grafik menggunakan kode warna statis terputus dari token tema aplikasi."
+  - id: theme.dynamic-class
+    category: theme
+    severity: error
+    tier: 1
+    description: "Interpolasi template string dinamis pada className yang menggagalkan ekstraksi kelas statis oleh engine Tailwind."
+
+  # ============================================================================
+  # KATEGORI: A11Y (Accessibility & Physical Touch Ergonomics)
+  # Rujukan: docs/01-spec/expansion/a11y.md (16 Rules)
+  # ============================================================================
+  - id: a11y.touch-target-size
+    category: a11y
+    severity: warning
+    tier: 1
+    description: "Elemen interaktif (button, a, input) dengan ukuran fisik < 44x44px tanpa kompensasi dimensi atau padding."
+  - id: a11y.touch-target-spacing
+    category: a11y
+    severity: warning
+    tier: 1
+    description: "Jarak antar kontrol interaktif bersebelahan < 8px (gap-2) yang meningkatkan risiko salah ketuk (miss-tap)."
+  - id: a11y.input-ios-zoom-hazard
+    category: a11y
+    severity: warning
+    tier: 1
+    description: "Elemen input atau select dengan ukuran font < 16px (text-sm) yang memicu auto-zoom paksa pada Safari iOS."
+  - id: a11y.input-cramped-padding
+    category: a11y
+    severity: warning
+    tier: 1
+    description: "Kontrol isian formulir dengan ketinggian fisik < 42px tanpa bantalan vertikal memadai yang menghimpit teks isian."
+  - id: a11y.missing-focus-ring
+    category: a11y
+    severity: warning
+    tier: 1
+    description: "Penghapusan garis fokus default (outline-none) pada elemen fokus tanpa menyertakan cincin fokus pengganti (ring-*)."
+  - id: a11y.error-not-announced
+    category: a11y
+    severity: error
+    tier: 2
+    description: "Kontrol formulir dengan indikator kesalahan (aria-invalid) tanpa wiring aria-describedby ke elemen pesan kesalahan."
+  - id: a11y.placeholder-as-label
+    category: a11y
+    severity: error
+    tier: 1
+    description: "Penggunaan teks placeholder sebagai satu-satunya nama aksesibel kontrol formulir tanpa tag label pendamping."
+  - id: a11y.label-missing-control
+    category: a11y
+    severity: error
+    tier: 1
+    description: "Atribut htmlFor pada elemen label tidak cocok dengan identifier id kontrol input mana pun di dalam berkas."
+  - id: a11y.form-input-missing-name
+    category: a11y
+    severity: warning
+    tier: 1
+    description: "Kontrol isian di dalam tag form yang tidak memiliki atribut name atau id untuk identifikasi saat submit."
+  - id: a11y.form-label-missing-control
+    category: a11y
+    severity: error
+    tier: 2
+    description: "Komponen FormItem Shadcn UI yang memuat FormLabel tanpa adanya komponen FormControl di bawahnya."
+  - id: a11y.form-label-composite-control
+    category: a11y
+    severity: warning
+    tier: 2
+    description: "FormLabel mengikat komponen komposit multi-field sekaligus yang membingungkan assistive technology."
+  - id: a11y.img-missing-alt
+    category: a11y
+    severity: error
+    tier: 1
+    description: "Komponen gambar Astro (Image, Picture) atau MDX tanpa atribut teks alternatif alt."
+  - id: a11y.button-type-missing
+    category: a11y
+    severity: warning
+    tier: 1
+    description: "Elemen button di dalam formulir tanpa atribut type eksplisit, berisiko memicu form submission tak disengaja."
+  - id: a11y.keyboard-trap-missing-escape
+    category: a11y
+    severity: error
+    tier: 2
+    description: "Komponen overlay modal dialog kustom tanpa mekanisme penutupan via tombol keyboard Escape."
+  - id: a11y.dialog-missing-aria
+    category: a11y
+    severity: error
+    tier: 2
+    description: "Elemen modal dialog kustom (role=dialog) tanpa atribut aria-modal=true atau nama aksesibel (aria-labelledby)."
+  - id: a11y.empty-interactive
+    category: a11y
+    severity: error
+    tier: 1
+    description: "Tombol atau tautan yang hanya memuat grafis SVG atau ikon tanpa teks terlihat maupun atribut aria-label."
+
+  # ============================================================================
+  # KATEGORI: UX (Usability, Interaction Flow & Cognitive Invariants)
+  # Rujukan: docs/01-spec/expansion/ux.md (16 Rules)
+  # ============================================================================
+  - id: ux.spacing-inversion
+    category: ux
+    severity: warning
+    tier: 2
+    description: "Jarak spasi internal elemen anak lebih besar daripada jarak pemisah kontainer induk (pelanggaran Gestalt Proximity)."
+  - id: ux.nav-overflow-chunking
+    category: ux
+    severity: warning
+    tier: 1
+    description: "Landmark navigasi memuat lebih dari 7 direct navigation link tanpa mekanisme pembagian kelompok (Miller's Law)."
+  - id: ux.competing-primary-cta
+    category: ux
+    severity: warning
+    tier: 1
+    description: "Keberadaan lebih dari satu tombol aksi utama (Primary CTA) di dalam satu kontainer aksi yang memicu keraguan pengguna."
+  - id: ux.camouflaged-link
+    category: ux
+    severity: warning
+    tier: 2
+    description: "Tautan inline di dalam paragraf teks hanya mengandalkan warna tanpa affordance visual non-warna (garis bawah)."
+  - id: ux.unconventional-home-link
+    category: ux
+    severity: warning
+    tier: 1
+    description: "Logo atau identitas brand pada header aplikasi tidak dihubungkan ke rute akar '/' (Jakob's Law)."
+  - id: ux.radio-overchoice
+    category: ux
+    severity: warning
+    tier: 1
+    description: "Grup pilihan radio flat melebihi 7 opsi tanpa filter pencarian atau alternatif antarmuka dropdown/combobox."
+  - id: ux.monolithic-form-bloat
+    category: ux
+    severity: warning
+    tier: 1
+    description: "Formulir monolitik dengan lebih dari 9 kolom input tanpa pembagian kelompok visual (fieldset / multi-step)."
+  - id: ux.missing-autofill
+    category: ux
+    severity: warning
+    tier: 1
+    description: "Bidang formulir data sensitif atau umum (email, password, telp) tanpa atribut autocomplete standar W3C."
+  - id: ux.empty-collection-unhandled
+    category: ux
+    severity: advisory
+    tier: 1
+    description: "Perulangan pemetaan koleksi data (.map) tanpa penanganan visual kondisi data kosong (Zero-State Usability)."
+  - id: ux.disabled-control-no-explanation
+    category: ux
+    severity: warning
+    tier: 2
+    description: "Kontrol interaktif yang dinonaktifkan (disabled) secara kondisional tanpa penjelasan alasan bagi pengguna."
+  - id: ux.orphaned-error-state
+    category: ux
+    severity: warning
+    tier: 2
+    description: "Fungsi validasi menetapkan state error namun identifier error tersebut tidak pernah dirender ke tampilan JSX."
+  - id: ux.unthrottled-input-handler
+    category: ux
+    severity: warning
+    tier: 2
+    description: "Handler pengetikan teks (onChange) memicu pemanggilan jaringan atau kalkulasi berat tanpa debounce atau throttle."
+  - id: ux.submit-feedback-missing
+    category: ux
+    severity: warning
+    tier: 3
+    description: "Aksi mutasi asinkron formulir tanpa mekanisme penguncian re-entry dan tanpa indikator status pemrosesan aktif."
+  - id: ux.unbounded-async-flag
+    category: ux
+    severity: error
+    tier: 3
+    description: "State loading asinkron diaktifkan sebelum eksekusi await tanpa jaminan pelepasan di blok finally atau catch."
+  - id: ux.destructive-action-unconfirmed
+    category: ux
+    severity: error
+    tier: 3
+    description: "Pemicu aksi mutasi destruktif permanen (hapus data) tanpa didahului dialog konfirmasi pengaman."
+  - id: ux.silent-catch-swallow
+    category: ux
+    severity: error
+    tier: 3
+    description: "Penangkapan kesalahan operasi pengguna pada blok catch yang dibiarkan kosong tanpa umpan balik kepada antarmuka."
+
+  # ============================================================================
+  # KATEGORI: RESPONSIVE (Responsive Layout & Viewport Integrity)
+  # Rujukan: docs/01-spec/expansion/responsive.md (17 Rules)
+  # ============================================================================
+  - id: responsive.missing-breakpoint
+    category: responsive
+    severity: warning
+    tier: 1
+    description: "Deklarasi multi-kolom (grid-cols-3+) atau ukuran font raksasa pada baseline mobile tanpa breakpoint responsif."
+  - id: responsive.unwrapped-table-overflow
+    category: responsive
+    severity: warning
+    tier: 1
+    description: "Tabel data HTML tanpa kontainer pembungkus scroll horizontal (overflow-x-auto) yang merusak viewport mobile."
+  - id: responsive.fixed-width-overflow
+    category: responsive
+    severity: error
+    tier: 1
+    description: "Penetapan lebar statis kaku > 320px tanpa pembatas responsif max-w-full yang memicu luapan horizontal."
+  - id: responsive.viewport-unit-leak
+    category: responsive
+    severity: warning
+    tier: 1
+    description: "Penggunaan 100vh kaku tanpa unit viewport dinamis (dvh/svh) yang memicu pergeseran layout saat bilah alamat muncul."
+  - id: responsive.safe-area-missing
+    category: responsive
+    severity: warning
+    tier: 1
+    description: "Bilah aksi tetap di bagian bawah layar tanpa kompensasi padding safe-area-inset-bottom perangkat berponi."
+  - id: responsive.viewport-meta-missing
+    category: responsive
+    severity: warning
+    tier: 1
+    description: "Deklarasi tag meta viewport tanpa kelengkapan viewport-fit=cover atau width=device-width."
+  - id: responsive.horizontal-overflow
+    category: responsive
+    severity: warning
+    tier: 2
+    description: "Kontainer dengan kelas pembatas scroll horizontal tanpa pengelolaan pembungkus yang memicu horizontal page sway."
+  - id: responsive.flex-child-overflow
+    category: responsive
+    severity: warning
+    tier: 2
+    description: "Elemen anak di dalam kontainer flexbox tanpa min-w-0 yang memicu luapan teks atau konten melampaui lebar layar."
+  - id: responsive.image-overflow
+    category: responsive
+    severity: warning
+    tier: 1
+    description: "Elemen media atau gambar dengan dimensi absolut tanpa kelas pembatas fluida max-w-full."
+  - id: responsive.mobile-text-overflow
+    category: responsive
+    severity: warning
+    tier: 2
+    description: "Elemen teks dinamis berpotensi panjang tanpa utilitas pemutus kata (break-words atau truncate) di layar ponsel."
+  - id: responsive.desktop-only-content
+    category: responsive
+    severity: warning
+    tier: 2
+    description: "Penyembunyian konten informatif atau aksi primer pada viewport seluler menggunakan hidden md:block."
+  - id: responsive.mobile-density-overload
+    category: responsive
+    severity: warning
+    tier: 2
+    description: "Penempatan lebih dari 4 tombol aksi berurutan secara horizontal di baseline mobile tanpa menu kolaps."
+  - id: responsive.dynamic-viewport-inconsistency
+    category: responsive
+    severity: warning
+    tier: 2
+    description: "Pencampuran unit viewport statis (vh) dan dinamis (dvh) yang saling bertentangan dalam hierarki kontainer bersarang."
+  - id: responsive.keyboard-obstruction
+    category: responsive
+    severity: warning
+    tier: 2
+    description: "Tombol aksi submit dengan posisi fixed bottom menutupi bidang isian formulir saat keyboard virtual naik."
+  - id: responsive.container-overconstraint
+    category: responsive
+    severity: warning
+    tier: 1
+    description: "Padding horizontal berlebihan pada baseline mobile yang menyisakan lebar area baca kurang dari 280px."
+  - id: responsive.grid-min-column
+    category: responsive
+    severity: warning
+    tier: 1
+    description: "Nilai minimum minmax pada CSS grid melebihi lebar layar fisik ponsel (360px) tanpa batas fluid min(100%, ...)."
+  - id: responsive.aspect-ratio-overflow
+    category: responsive
+    severity: warning
+    tier: 2
+    description: "Penetapan rasio aspek dengan ketinggian statis kaku tanpa batas lebar fluida yang memicu ledakan horizontal."
+
+  # ============================================================================
+  # KATEGORI: BROWSER (Multi-Browser & Multi-Engine Compatibility)
+  # Rujukan: docs/01-spec/expansion/browser.md (12 Rules)
+  # ============================================================================
+  - id: browser.appearance-native-override
+    category: browser
+    severity: warning
+    tier: 1
+    description: "Kontrol formulir native dengan styling kustom tanpa appearance-none untuk mereset render WebKit Safari."
+  - id: browser.scrollbar-vendor-incomplete
+    category: browser
+    severity: warning
+    tier: 2
+    description: "Kustomisasi scrollbar hanya mendeklarasikan satu vendor tanpa pasangan dua arah (WebKit vs W3C standar)."
+  - id: browser.obsolete-vendor-prefix
+    category: browser
+    severity: warning
+    tier: 2
+    description: "Penggunaan vendor prefix usang atau pemotongan teks line-clamp tanpa deklarasi triad WebKit yang lengkap."
+  - id: browser.hover-only-interaction
+    category: browser
+    severity: error
+    tier: 1
+    description: "Aksi atau pengungkapan konten interaktif hanya terikat pada interaksi hover desktop tanpa alternatif layar sentuh."
+  - id: browser.experimental-api-no-featuredetect
+    category: browser
+    severity: error
+    tier: 2
+    description: "Pemanggilan Web API peramban modern tanpa mekanisme pemeriksaan ketersediaan fitur (feature detection)."
+  - id: browser.date-input-format-assumption
+    category: browser
+    severity: error
+    tier: 2
+    description: "Penguraian nilai input tanggal menggunakan asumsi format lokal tertentu alih-alih standar ISO 8601."
+  - id: browser.non-passive-scroll-listener
+    category: browser
+    severity: warning
+    tier: 2
+    description: "Pendaftaran event listener touch atau wheel pada jendela dokumen tanpa opsi passive: true."
+  - id: browser.user-agent-sniffing
+    category: browser
+    severity: warning
+    tier: 2
+    description: "Percabangan logika aplikasi mengandalkan inspeksi string navigator.userAgent alih-alih feature detection."
+  - id: browser.webkit-only-api
+    category: browser
+    severity: warning
+    tier: 2
+    description: "Penggunaan API berprefix WebKit tanpa menyediakan resolusi fallback ke method standar W3C."
+  - id: browser.chrome-only-api
+    category: browser
+    severity: warning
+    tier: 2
+    description: "Penggunaan Web API eksklusif Chromium tanpa jalur fallback untuk peramban Firefox dan Safari."
+  - id: browser.firefox-only-api
+    category: browser
+    severity: warning
+    tier: 2
+    description: "Penggunaan properti atau method non-standar Gecko Firefox tanpa resolusi standar W3C."
+  - id: browser.safari-only-api
+    category: browser
+    severity: warning
+    tier: 2
+    description: "Penggunaan API eksklusif Apple Safari tanpa penyediaan penanganan graceful untuk ekosistem lain."
+
+  # ============================================================================
+  # KATEGORI: PWA (Progressive Web App, Manifest & Offline Standards)
+  # Rujukan: docs/01-spec/expansion/pwa.md (10 Rules)
+  # ============================================================================
+  - id: pwa.manifest-required-fields-missing
+    category: pwa
+    severity: error
+    tier: 1
+    description: "Deklarasi Web App Manifest kehilangan field wajib (name, start_url, display, atau icons)."
+  - id: pwa.icon-maskable-missing
+    category: pwa
+    severity: warning
+    tier: 1
+    description: "Manifest PWA tidak menyediakan ikon maskable adaptif untuk peluncur perangkat Android."
+  - id: pwa.manifest-missing
+    category: pwa
+    severity: warning
+    tier: 1
+    description: "Dokumen HTML aplikasi tidak memuat tag link rel=manifest yang merujuk ke berkas manifest PWA."
+  - id: pwa.start-url-inconsistency
+    category: pwa
+    severity: error
+    tier: 1
+    description: "Properti start_url pada manifest berada di luar cakupan scope navigasi aplikasi yang didefinisikan."
+  - id: pwa.apple-meta-missing
+    category: pwa
+    severity: warning
+    tier: 2
+    description: "Ketiadaan tag meta apple-mobile-web-app-capable dan link rel apple-touch-icon untuk pengalaman iOS."
+  - id: pwa.insecure-context-resource
+    category: pwa
+    severity: error
+    tier: 2
+    description: "Pemuatan sumber daya menggunakan protokol tidak aman (http://) di dalam konteks PWA yang aman (HTTPS)."
+  - id: pwa.service-worker-no-offline-fallback
+    category: pwa
+    severity: warning
+    tier: 3
+    description: "Handler fetch Service Worker tidak menyediakan respon fallback cadangan saat koneksi jaringan terputus."
+  - id: pwa.service-worker-missing
+    category: pwa
+    severity: warning
+    tier: 3
+    description: "Proyek bertipe aplikasi mandiri tanpa adanya registrasi skrip Service Worker untuk kapabilitas luring."
+  - id: pwa.service-worker-registration
+    category: pwa
+    severity: warning
+    tier: 3
+    description: "Registrasi Service Worker dieksekusi secara sinkron di jalur kritis inisialisasi tanpa penanganan error."
+  - id: pwa.pwa-cache-runtime-api-risk
+    category: pwa
+    severity: error
+    tier: 3
+    description: "Akses ke objek DOM atau window peramban di dalam cakupan eksekusi Service Worker yang terisolasi."
+
+  # ============================================================================
+  # KATEGORI: ERGONOMY & MOBILE (Mobile Ergonomics, Touch & Viewport Physics)
+  # Rujukan: docs/01-spec/expansion/ergonomy.md (9 Rules)
+  # ============================================================================
+  - id: ergonomy.missing-inputmode-keyboard
+    category: ergonomy
+    severity: info
+    tier: 1
+    description: "Bidang input nomor telepon atau numerik tanpa atribut inputmode atau type contextual keyboard (Tesler's Law)."
+  - id: ergonomy.tap-highlight-not-handled
+    category: ergonomy
+    severity: info
+    tier: 1
+    description: "Elemen interaktif non-native tanpa styling umpan balik sentuhan aktif atau reset tap-highlight Chrome Android."
+  - id: ergonomy.gesture-without-touch-action
+    category: ergonomy
+    severity: warning
+    tier: 1
+    description: "Elemen dengan penanganan gesture sentuh kustom tanpa deklarasi properti CSS touch-action yang memisahkan scroll."
+  - id: ergonomy.bottom-nav-thumb-unreachable
+    category: ergonomy
+    severity: info
+    tier: 2
+    description: "Tombol aksi primer diletakkan di luar zona jangkauan alami ibu jari pada antarmuka navigasi seluler."
+  - id: mobile.keyboard-viewport-risk
+    category: mobile
+    severity: advisory
+    tier: 3
+    description: "Potensi distorsi layout viewport saat keyboard virtual perangkat lunak muncul menutupi layar."
+  - id: mobile.fixed-action-obstruction
+    category: mobile
+    severity: warning
+    tier: 3
+    description: "Bilah aksi tetap di bagian bawah layar menutupi konten teks atau formulir tanpa kompensasi scroll bawah."
+  - id: mobile.modal-viewport-lock
+    category: mobile
+    severity: error
+    tier: 3
+    description: "Modal dialog seluler dengan ketinggian tetap tanpa kontainer scroll internal yang memotong konten pada layar pendek."
+  - id: mobile.orientation-lock-risk
+    category: mobile
+    severity: advisory
+    tier: 3
+    description: "Penguncian orientasi layar yang kaku yang membatasi aksesibilitas bagi pengguna dengan kebutuhan khusus."
+  - id: mobile.pointer-events-block
+    category: mobile
+    severity: warning
+    tier: 3
+    description: "Penggunaan pointer-events-none pada kontainer induk yang memblokir interaksi sentuh pada elemen anak interaktif."
+
+  # ============================================================================
+  # BAGIAN 2: YANG DIRASAKAN (THE FELT RUNTIME & PERFORMANCE - 64 RULES)
+  # Filosofi: "Baru solve yang dirasakan"
+  # Stabilitas Layout (CLS), Responsivitas Interaksi (INP), Kecepatan Paint (LCP), & Framework Optimization (Performance)
+  # ============================================================================
+  # ============================================================================
+  # KATEGORI: CLS (Cumulative Layout Shift - Runtime Geometry Stability)
+  # Rujukan: docs/01-spec/expansion/cls.md
+  # ============================================================================
+  - id: cls.unsized-image
+    category: cls
+    severity: warning
+    tier: 1
+    description: "Elemen img atau Image tanpa reservasi dimensi width/height atau aspect-ratio yang memicu lonjakan layout saat aset selesai diunduh."
+  - id: cls.unsized-embed-frame
+    category: cls
+    severity: warning
+    tier: 1
+    description: "Elemen iframe atau video tanpa pembungkus rasio aspek tetap (aspect-video) yang memicu pergeseran vertikal saat iframe dimuat."
+  - id: cls.unreserved-ad-container
+    category: cls
+    severity: warning
+    tier: 2
+    description: "Kontainer slot iklan dinamis tanpa penetapan dimensi minimum (min-h-*) yang memicu pergeseran layout saat skrip iklan menyuntikkan konten."
+  - id: cls.unconstrained-carousel
+    category: cls
+    severity: warning
+    tier: 2
+    description: "Komponen slider atau carousel dengan tinggi konten dinamis tanpa batas kontainer terisolasi yang memicu lonjakan layout saat pergantian slide."
+  - id: cls.font-display-missing
+    category: cls
+    severity: error
+    tier: 1
+    description: "Deklarasi @font-face tanpa deskriptor font-display: swap atau optional yang memicu layout shift saat web font terunduh."
+  - id: cls.unadjusted-font-metric
+    category: cls
+    severity: info
+    tier: 3
+    description: "Deklarasi web font tanpa deskriptor penyesuaian metrik fallback (size-adjust, ascent-override) yang memicu reflow saat font swap."
+  - id: cls.font-import-late-discovery
+    category: cls
+    aliases: ["cls.render-blocking-font-import"]
+    severity: warning
+    tier: 2
+    description: "Penggunaan @import font eksternal di dalam CSS yang memicu rantai dependensi sekuensial cascade dan memperpanjang durasi pergeseran teks."
+  - id: cls.text-icon-late-reflow
+    category: cls
+    severity: info
+    tier: 3
+    description: "Ikon inline berbasis font atau SVG tanpa reservasi ukuran dimensi pasti (w-6 h-6 inline-block) yang menyebabkan reflow teks di sekitarnya."
+  - id: cls.layout-trigger-animation
+    category: cls
+    severity: warning
+    tier: 1
+    description: "Animasi CSS yang menganimasikan properti pemicu layout geometris (top, left, width, height) alih-alih transformasi composited GPU (transform)."
+  - id: cls.layout-trigger-transition
+    category: cls
+    severity: warning
+    tier: 1
+    description: "Transisi CSS pada properti layout geometris yang memicu layout pass berulang di main-thread per frame rendering."
+  - id: cls.unstable-scrollbar-gutter
+    category: cls
+    severity: info
+    tier: 3
+    description: "Ketiadaan deklarasi scrollbar-gutter: stable pada root dokumen yang menyebabkan pergeseran horizontal saat bilah gulir muncul/hilang."
+  - id: cls.dynamic-table-reflow
+    category: cls
+    severity: warning
+    tier: 2
+    description: "Tabel HTML dengan tata letak otomatis tanpa kelas table-fixed atau deklarasi colgroup yang menyebabkan reflow kolom saat data bertambah."
+  - id: cls.client-only-hydration-pop
+    category: cls
+    severity: warning
+    tier: 1
+    description: "Penggunaan direktif client:only pada pulau Astro tanpa adanya slot='fallback' yang menyebabkan kekosongan ruang dan lonjakan layout saat hidrasi."
+  - id: cls.unreserved-fixed-header
+    category: cls
+    severity: warning
+    tier: 2
+    description: "Header dengan posisi fixed atau sticky tanpa kompensasi padding/margin pada elemen pembungkus konten utama dokumen."
+  - id: cls.dynamic-content-without-reserved-space
+    category: cls
+    severity: warning
+    tier: 2
+    description: "Penyuntikan konten dinamis asinkron (data-fetching) tanpa skeleton placeholder atau wadah ruang yang terreservasi."
+  - id: cls.collapsible-height-jump
+    category: cls
+    severity: warning
+    tier: 2
+    description: "Komponen akordeon atau menu kolaps yang menganimasikan height tanpa interpolasi transisi grid (0fr -> 1fr) yang mulus."
+
+  # ============================================================================
+  # KATEGORI: INP (Interaction to Next Paint - Runtime Main-Thread Responsiveness)
+  # Rujukan: docs/01-spec/expansion/inp.md
+  # ============================================================================
+  - id: inp.layout-thrashing
+    category: inp
+    severity: error
+    tier: 1
+    description: "Pola pembacaan geometri layout DOM (offsetHeight, clientWidth) yang diselingi langsung dengan mutasi gaya di dalam satu event loop tick."
+  - id: inp.heavy-event-handler
+    category: inp
+    severity: warning
+    tier: 2
+    description: "Handler event interaksi pengguna yang mengeksekusi kalkulasi berbiaya komputasi tinggi secara sinkron tanpa cooperative yielding."
+  - id: inp.repeated-state-update
+    category: inp
+    aliases: ["inp.setstate-in-loop"]
+    severity: warning
+    tier: 1
+    description: "Pemanggilan setState berulang-ulang di dalam perulangan yang melompati automatic batching (misal dipisahkan await atau flushSync)."
+  - id: inp.unyielded-long-task
+    category: inp
+    severity: warning
+    tier: 2
+    description: "Perulangan atau tugas pemrosesan data panjang tanpa titik penyerahan thread kooperatif (await scheduler.yield() atau setTimeout fallback)."
+  - id: inp.hydration-contention
+    category: inp
+    aliases: ["inp.concurrent-client-load"]
+    severity: warning
+    tier: 1
+    description: "Penumpukan hidrasi paralel dari banyak pulau Astro client:load yang memonopoli main-thread saat pengguna mulai berinteraksi di awal muat halaman."
+  - id: inp.hydration-heavy-island
+    category: inp
+    severity: warning
+    tier: 2
+    description: "Pulau interaktif berukuran DOM sangat besar yang dihidrasi serentak alih-alih didekomposisi atau dideferensiasi via client:visible."
+  - id: inp.render-blocking-script
+    category: inp
+    aliases: ["inp.waterfall-script-load"]
+    severity: warning
+    tier: 1
+    description: "Tag script eksternal sinkron tanpa atribut defer, async, atau type=module yang menunda kesiapan main-thread menerima interaksi pengguna."
+  - id: inp.missing-start-transition
+    category: inp
+    severity: info
+    tier: 2
+    description: "Pembaruan state transisi non-kritis berukuran besar yang tidak dibungkus dalam React startTransition (khusus non-input kontrol teks)."
+  - id: inp.unbounded-effect-deps
+    category: inp
+    severity: error
+    tier: 1
+    description: "Deklarasi useEffect atau useLayoutEffect tanpa array dependensi yang memicu re-eksekusi efek dan lonjakan CPU di setiap siklus render."
+  - id: inp.sync-layout-effect
+    category: inp
+    severity: warning
+    tier: 2
+    description: "Eksekusi komputasi non-geometris berat di dalam useLayoutEffect yang menahan fase paint browser secara sinkron."
+  - id: inp.context-re-render-cascade
+    category: inp
+    severity: warning
+    tier: 1
+    description: "Instansiasi objek literal inline pada prop value di Context.Provider yang memicu cascade re-render seluruh pohon komponen konsumen."
+  - id: inp.expensive-render-computation
+    category: inp
+    aliases: ["inp.unmemoized-heavy-selector"]
+    severity: warning
+    tier: 2
+    description: "Kalkulasi algoritma atau transformasi data berat di badan fungsi komponen render tanpa pembungkusan useMemo."
+  - id: inp.unbounded-collection-render
+    category: inp
+    aliases: ["inp.unvirtualized-large-list"]
+    severity: warning
+    tier: 2
+    description: "Perenderan koleksi data masif langsung ke dalam DOM tanpa teknik virtual windowing yang memperpanjang durasi commit & paint."
+  - id: inp.large-interaction-layout-scope
+    category: inp
+    severity: warning
+    tier: 2
+    description: "Mutasi DOM pada elemen interaktif yang memicu kalkulasi ulang gaya dan reflow pada leluhur dokumen luas (tanpa batas contain layout)."
+  - id: inp.missing-touch-action
+    category: inp
+    severity: warning
+    tier: 2
+    description: "Elemen gesture sentuh khusus yang tidak menetapkan properti CSS touch-action (pan-y / none) sehingga memicu latensi delay gesture 300ms."
+  - id: inp.expensive-style-mutation
+    category: inp
+    severity: warning
+    tier: 2
+    description: "Mutasi gaya visual saat interaksi pengguna yang memicu proses paint ulang menyeluruh (repaint) alih-alih transformasi composited GPU."
+
+  # ============================================================================
+  # KATEGORI: LCP (Largest Contentful Paint - Runtime Resource Discovery & Paint)
+  # Rujukan: docs/01-spec/expansion/lcp.md
+  # ============================================================================
+  - id: lcp.lazy-loaded-lcp-image
+    category: lcp
+    severity: error
+    tier: 1
+    description: "Elemen gambar kandidat LCP di pelipatan atas yang diberi atribut loading=lazy sehingga menunda inisiasi pengunduhan aset oleh browser."
+  - id: lcp.unhinted-lcp-image-priority
+    category: lcp
+    severity: warning
+    tier: 1
+    description: "Elemen gambar kandidat LCP utama di HTML yang tidak memiliki petunjuk prioritas fetchpriority=high untuk mengalokasikan bandwidth awal."
+  - id: lcp.undiscoverable-lcp-image
+    category: lcp
+    severity: warning
+    tier: 2
+    description: "Citra visual kandidat LCP yang dimuat via CSS background-image tanpa adanya tag preload di head dokumen sehingga tidak terdeteksi preload scanner."
+  - id: lcp.missing-lcp-image-preload
+    category: lcp
+    severity: info
+    tier: 2
+    description: "Aset gambar kandidat LCP yang mengalami keterlambatan penemuan (via CSS atau JS dinamis) tanpa didampingi link rel=preload di head."
+  - id: lcp.oversized-lcp-resource-selection
+    category: lcp
+    severity: warning
+    tier: 1
+    description: "Gambar hero fluida lebar penuh yang tidak menyertakan atribut responsif srcset dan sizes sehingga memaksa perangkat seluler mengunduh aset 4K."
+  - id: lcp.heavy-raster-lcp-asset
+    category: lcp
+    severity: warning
+    tier: 2
+    description: "Gambar kandidat LCP berukuran besar yang menggunakan format raster mentah tak terkompresi tanpa menyediakan varian modern WebP/AVIF."
+  - id: lcp.image-source-density-mismatch
+    category: lcp
+    severity: info
+    tier: 2
+    description: "Gambar kandidat LCP berdimensi tetap yang menggunakan deskriptor densitas piksel (1x, 2x) yang tidak selaras dengan dimensi fisik render."
+  - id: lcp.client-only-lcp-content
+    category: lcp
+    severity: warning
+    tier: 1
+    description: "Elemen kandidat LCP pelipatan atas yang dibungkus dalam direktif Astro client:only tanpa fallback slot sehingga absen dari HTML kiriman server."
+  - id: lcp.blocked-critical-font
+    category: lcp
+    severity: warning
+    tier: 1
+    description: "Deklarasi web font kustom untuk teks judul LCP primer yang tidak menyertakan font-display: swap atau optional (memicu FOIT teks tak terlihat)."
+  - id: lcp.external-font-discovery-delay
+    category: lcp
+    severity: warning
+    tier: 2
+    description: "Impor stylesheet font pihak ketiga lintas domain tanpa didahului link rel=preconnect ke domain stylesheet dan font binary."
+  - id: lcp.preload-font-cors-mismatch
+    category: lcp
+    severity: error
+    tier: 1
+    description: "Preload berkas font (as=font) tanpa atribut crossorigin yang menyebabkan browser mengabaikan hasil preload dan melakukan fetch ganda."
+  - id: lcp.legacy-critical-font-resource
+    category: lcp
+    severity: warning
+    tier: 2
+    description: "Deklarasi font kritis yang tidak menyediakan format terkompresi Brotli WOFF2 pada posisi prioritas pertama dalam deklarasi src."
+  - id: lcp.render-blocking-head-script
+    category: lcp
+    severity: warning
+    tier: 1
+    description: "Tag script eksternal sinkron di dalam head layout yang menghentikan parser HTML dan menunda pencapaian First Paint elemen LCP."
+  - id: lcp.critical-head-style-bloat
+    category: lcp
+    severity: warning
+    tier: 2
+    description: "Blok style inline di dalam head yang memuat aturan CSS non-kritis (modal, footer) sehingga memperbesar muatan payload dokumen HTML awal."
+  - id: lcp.missing-critical-origin-hint
+    category: lcp
+    severity: info
+    tier: 2
+    description: "Aset kandidat LCP yang di-host pada origin pihak ketiga tanpa adanya petunjuk koneksi awal (preconnect atau dns-prefetch) di head dokumen."
+  - id: lcp.lcp-content-visibility-suppression
+    category: lcp
+    severity: error
+    tier: 1
+    description: "Penetapan properti CSS content-visibility: auto pada kontainer hero pelipatan atas yang menginstruksikan browser melompati render LCP awal."
+
+  # ============================================================================
+  # KATEGORI: PERFORMANCE (Framework, Compiler & Build Engine Optimization)
+  # Rujukan: docs/01-spec/expansion/performance.md (Alias CLI: perf)
+  # ============================================================================
+  - id: performance.react-inline-prop-memo
+    category: performance
+    severity: warning
+    tier: 1
+    description: "Pengiriman inline object, array, fungsi, atau spread baru pada komponen yang dibungkus React.memo sehingga membatalkan memoization."
+  - id: performance.react-index-as-key
+    category: performance
+    severity: warning
+    tier: 1
+    description: "Penggunaan indeks array (key={index}) sebagai kunci rekonsiliasi VDOM pada pemetaan koleksi mutable yang dapat terurut ulang atau termutasi."
+  - id: performance.react-effect-missing-cleanup
+    category: performance
+    severity: error
+    tier: 1
+    description: "Hook useEffect yang mengakuisisi resource persisten (listener, timer, observer, websocket) tanpa mengembalikan fungsi cleanup pelepasan memori."
+  - id: performance.react-context-domain-coupling
+    category: performance
+    severity: warning
+    tier: 2
+    description: "Penggabungan domain state yang berbeda frekuensi mutasinya ke dalam satu Context Provider tunggal dengan basis konsumen luas."
+  - id: performance.react-static-heavy-import
+    category: performance
+    severity: warning
+    tier: 2
+    description: "Impor statis pustaka atau komponen non-kritis berbobot besar pada rute awal tanpa memanfaatkan pemisahan kode React.lazy dan Suspense."
+  - id: performance.react-redundant-function-memoization
+    category: performance
+    severity: info
+    tier: 1
+    description: "Penggunaan useCallback pada fungsi yang tidak memiliki konsumen sensitif identitas (elemen native DOM) saat React Compiler tidak aktif."
+  - id: performance.react-derived-state-in-effect
+    category: performance
+    severity: warning
+    tier: 1
+    description: "Pola anti-pattern sinkronisasi state turunan melalui useEffect yang memicu perenderan ulang sekunder; wajib dihitung inline saat render."
+  - id: performance.react-unstable-hook-reference
+    category: performance
+    severity: warning
+    tier: 1
+    description: "Custom React hook yang mengembalikan objek atau fungsi helper baru di setiap pemanggilan yang diteruskan ke dependensi hook hilir."
+  - id: performance.astro-unnecessary-client-directive
+    category: performance
+    severity: error
+    tier: 1
+    description: "Pemberian direktif hidrasi client:* pada komponen antarmuka yang terbukti murni statis tanpa interaktivitas, melanggar arsitektur Zero-JS."
+  - id: performance.astro-island-boundary-overlap
+    category: performance
+    severity: warning
+    tier: 2
+    description: "Penyarangan pulau interaktif multi-framework atau operan props reaktif lintas batas hidrasi independen yang memicu state breakdown."
+  - id: performance.astro-unoptimized-local-image
+    category: performance
+    severity: info
+    tier: 1
+    description: "Penggunaan tag img mentah untuk berkas gambar lokal yang melewatkan pipeline kompresi dan hashing otomatis bawaan astro:assets."
+  - id: performance.astro-over-prefetching
+    category: performance
+    severity: warning
+    tier: 1
+    description: "Pemasangan strategi prefetch agresif (viewport atau load) pada tautan navigasi internal sekunder yang memiliki probabilitas kunjungan rendah."
+  - id: performance.tailwind-dynamic-class-concatenation
+    category: performance
+    severity: error
+    tier: 1
+    description: "Penggabungan string kelas dinamis melalui template literal yang tidak dapat diekstrak oleh static scanner Tailwind CSS v4 (Oxide engine)."
+  - id: performance.tailwind-duplicate-arbitrary-rules
+    category: performance
+    severity: warning
+    tier: 2
+    description: "Penggunaan nilai arbitrary berulang yang menghasilkan deklarasi CSS ekuivalen ganda yang seharusnya memanfaatkan skala utilitas bawaan."
+  - id: performance.tailwind-untracked-package-source
+    category: performance
+    severity: error
+    tier: 1
+    description: "Impor komponen dari paket monorepo eksternal tanpa mendaftarkan direktif @source pada berkas stylesheet root Tailwind CSS v4."
+  - id: performance.tailwind-duplicate-utility-definition
+    category: performance
+    severity: warning
+    tier: 1
+    description: "Deklarasi kustom @utility di dalam berkas CSS yang menduplikasi properti dan nilai yang sudah disediakan native oleh core Tailwind v4."
