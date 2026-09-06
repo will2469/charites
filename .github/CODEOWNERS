@@ -1,0 +1,5 @@
+# Code Owners for Charites
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Global Code Owner: Any pull request modifying any file requires review and approval from @will2469.
+* @will2469
