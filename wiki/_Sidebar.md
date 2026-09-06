@@ -83,6 +83,17 @@
 </details>
 
 <details open>
+<summary><b>Inp</b> (4 rules)</summary>
+
+* [**Inp Overview**](inp)
+* [`inp.heavy-event-handler`](inp.heavy-event-handler)
+* [`inp.layout-thrashing`](inp.layout-thrashing)
+* [`inp.repeated-state-update`](inp.repeated-state-update)
+* [`inp.unyielded-long-task`](inp.unyielded-long-task)
+
+</details>
+
+<details open>
 <summary><b>Mobile</b> (5 rules)</summary>
 
 * [**Mobile Overview**](mobile)

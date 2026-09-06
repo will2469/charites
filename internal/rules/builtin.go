@@ -5,6 +5,7 @@ import (
 	"github.com/will2469/charites/internal/rules/browser"
 	"github.com/will2469/charites/internal/rules/cls"
 	"github.com/will2469/charites/internal/rules/ergonomy"
+	"github.com/will2469/charites/internal/rules/inp"
 	"github.com/will2469/charites/internal/rules/mobile"
 	"github.com/will2469/charites/internal/rules/pwa"
 	"github.com/will2469/charites/internal/rules/responsive"
@@ -151,6 +152,12 @@ var (
 	_ Rule = (*cls.UnreservedFixedHeaderRule)(nil)
 	_ Rule = (*cls.DynamicContentWithoutReservedSpaceRule)(nil)
 	_ Rule = (*cls.CollapsibleHeightJumpRule)(nil)
+
+	// inp Wave 1 (Event Handler Execution & Synchronous Work)
+	_ Rule = (*inp.LayoutThrashingRule)(nil)
+	_ Rule = (*inp.HeavyEventHandlerRule)(nil)
+	_ Rule = (*inp.RepeatedStateUpdateRule)(nil)
+	_ Rule = (*inp.UnyieldedLongTaskRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -333,6 +340,12 @@ func builtinRules() []Rule {
 		cls.NewUnreservedFixedHeaderRule(),
 		cls.NewDynamicContentWithoutReservedSpaceRule(),
 		cls.NewCollapsibleHeightJumpRule(),
+
+		// inp Wave 1 (Event Handler Execution & Synchronous Work)
+		inp.NewLayoutThrashingRule(),
+		inp.NewHeavyEventHandlerRule(),
+		inp.NewRepeatedStateUpdateRule(),
+		inp.NewUnyieldedLongTaskRule(),
 	}
 }
 
