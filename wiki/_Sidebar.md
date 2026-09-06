@@ -49,9 +49,12 @@
 </details>
 
 <details open>
-<summary><b>Cls</b> (12 rules)</summary>
+<summary><b>Cls</b> (16 rules)</summary>
 
 * [**Cls Overview**](cls)
+* [`cls.client-only-hydration-pop`](cls.client-only-hydration-pop)
+* [`cls.collapsible-height-jump`](cls.collapsible-height-jump)
+* [`cls.dynamic-content-without-reserved-space`](cls.dynamic-content-without-reserved-space)
 * [`cls.dynamic-table-reflow`](cls.dynamic-table-reflow)
 * [`cls.font-display-missing`](cls.font-display-missing)
 * [`cls.font-import-late-discovery`](cls.font-import-late-discovery)
@@ -61,6 +64,7 @@
 * [`cls.unadjusted-font-metric`](cls.unadjusted-font-metric)
 * [`cls.unconstrained-carousel`](cls.unconstrained-carousel)
 * [`cls.unreserved-ad-container`](cls.unreserved-ad-container)
+* [`cls.unreserved-fixed-header`](cls.unreserved-fixed-header)
 * [`cls.unsized-embed-frame`](cls.unsized-embed-frame)
 * [`cls.unsized-image`](cls.unsized-image)
 * [`cls.unstable-scrollbar-gutter`](cls.unstable-scrollbar-gutter)

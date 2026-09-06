@@ -87,7 +87,7 @@ flowchart TD
 | :--- | :---: | :--- |
 | `a11y` | 16 | [`a11y`](a11y) |
 | `browser` | 12 | [`browser`](browser) |
-| `cls` | 12 | [`cls`](cls) |
+| `cls` | 16 | [`cls`](cls) |
 | `ergonomy` | 4 | [`ergonomy`](ergonomy) |
 | `mobile` | 5 | [`mobile`](mobile) |
 | `pwa` | 10 | [`pwa`](pwa) |
@@ -129,6 +129,9 @@ flowchart TD
 | `browser.scrollbar-vendor-incomplete` | `browser` | `WARN` | Enforces bidirectional cross-engine scrollbar styling pairing between WebKit pseudo-elements and W3C standard properties | [`browser.scrollbar-vendor-incomplete`](browser.scrollbar-vendor-incomplete) |
 | `browser.user-agent-sniffing` | `browser` | `WARN` | Flags conditional branching based on navigator.userAgent string sniffing and enforces W3C capability/feature detection | [`browser.user-agent-sniffing`](browser.user-agent-sniffing) |
 | `browser.webkit-only-api` | `browser` | `WARN` | Flags direct invocation of WebKit-prefixed legacy APIs without standard W3C equivalents or graceful fallbacks | [`browser.webkit-only-api`](browser.webkit-only-api) |
+| `cls.client-only-hydration-pop` | `cls` | `WARN` | Astro client:only island lacks a slot='fallback' shell or reserved min-height container, causing hydration layout shift | [`cls.client-only-hydration-pop`](cls.client-only-hydration-pop) |
+| `cls.collapsible-height-jump` | `cls` | `WARN` | Collapsible accordion or drawer animates arbitrary max-height bounds instead of zero-shift CSS Grid | [`cls.collapsible-height-jump`](cls.collapsible-height-jump) |
+| `cls.dynamic-content-without-reserved-space` | `cls` | `WARN` | Dynamic widget or banner injected in document flow lacks reserved vertical dimensions (min-h/h), risking content reflow | [`cls.dynamic-content-without-reserved-space`](cls.dynamic-content-without-reserved-space) |
 | `cls.dynamic-table-reflow` | `cls` | `WARN` | Dynamic <table> lacks a statically inferable column sizing strategy, risking continuous column reflow | [`cls.dynamic-table-reflow`](cls.dynamic-table-reflow) |
 | `cls.font-display-missing` | `cls` | `ERROR` | Requires font-display descriptor on custom @font-face declarations to prevent FOIT reflow | [`cls.font-display-missing`](cls.font-display-missing) |
 | `cls.font-import-late-discovery` | `cls` | `WARN` | Warns when CSS @import is used for external font loading, delaying discovery and risking layout shift | [`cls.font-import-late-discovery`](cls.font-import-late-discovery) |
@@ -138,6 +141,7 @@ flowchart TD
 | `cls.unadjusted-font-metric` | `cls` | `INFO` | Recommends font metric overrides on fallback font declarations to reduce swap CLS | [`cls.unadjusted-font-metric`](cls.unadjusted-font-metric) |
 | `cls.unconstrained-carousel` | `cls` | `WARN` | Warns when carousel or slider containers lack bounded height or slide aspect-ratio constraints | [`cls.unconstrained-carousel`](cls.unconstrained-carousel) |
 | `cls.unreserved-ad-container` | `cls` | `WARN` | Warns when dynamic ad containers lack reserved vertical dimensions or initial skeleton placeholders | [`cls.unreserved-ad-container`](cls.unreserved-ad-container) |
+| `cls.unreserved-fixed-header` | `cls` | `WARN` | Fixed or sticky header lacks layout space compensation (pt/mt) on subsequent in-flow content or spacer block | [`cls.unreserved-fixed-header`](cls.unreserved-fixed-header) |
 | `cls.unsized-embed-frame` | `cls` | `WARN` | Warns when embedded media frames lack explicit dimensions or an aspect-ratio container wrapper | [`cls.unsized-embed-frame`](cls.unsized-embed-frame) |
 | `cls.unsized-image` | `cls` | `WARN` | Warns when image elements lack explicit dimensions, aspect-ratio, or Tailwind box sizing | [`cls.unsized-image`](cls.unsized-image) |
 | `cls.unstable-scrollbar-gutter` | `cls` | `INFO` | Root document scroller declares overflow-y: auto without scrollbar-gutter: stable, risking horizontal layout shifts | [`cls.unstable-scrollbar-gutter`](cls.unstable-scrollbar-gutter) |

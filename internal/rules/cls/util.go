@@ -927,3 +927,242 @@ func hasStaticHeaderWidth(th *ir.Node) bool {
 	}
 	return false
 }
+
+// isClientOnlyIsland memeriksa apakah elemen merupakan Astro island dengan direktif client:only.
+func isClientOnlyIsland(node *ir.Node) bool {
+	if node == nil || node.Type != ir.NodeElement {
+		return false
+	}
+	if _, ok := node.Attributes["data-cls-ignore"]; ok {
+		return false
+	}
+	if _, ok := node.Attributes["data-cls-below-fold"]; ok {
+		return false
+	}
+	for k := range node.Attributes {
+		if k == "client:only" || strings.HasPrefix(k, "client:only") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasAstroFallbackSlot memeriksa apakah island memiliki child dengan slot="fallback" atau pembungkus min-height.
+func hasAstroFallbackSlot(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for curr := range node.Walk() {
+		if curr != node {
+			if slot, ok := curr.Attributes["slot"]; ok && strings.Trim(slot, "\"'") == "fallback" {
+				return true
+			}
+		}
+	}
+	if hasReservedHeightClass(node) {
+		return true
+	}
+	if node.Parent != nil && hasReservedHeightClass(node.Parent) {
+		return true
+	}
+	return false
+}
+
+func hasReservedHeightClass(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, cls := range node.Classes {
+		if strings.HasPrefix(cls, "min-h-") && cls != "min-h-0" {
+			return true
+		}
+		if strings.HasPrefix(cls, "h-") && cls != "h-auto" {
+			return true
+		}
+	}
+	return false
+}
+
+// isFixedHeader memeriksa apakah elemen merupakan navigasi header yang berposisi fixed/sticky top-0.
+func isFixedHeader(node *ir.Node) bool {
+	if node == nil || node.Type != ir.NodeElement {
+		return false
+	}
+	isHeaderTag := strings.EqualFold(node.Tag, "header") || strings.EqualFold(node.Tag, "nav")
+	hasFixedPos := false
+	hasTopZero := false
+
+	for _, cls := range node.Classes {
+		if cls == "fixed" || cls == "sticky" {
+			hasFixedPos = true
+		}
+		if cls == "top-0" {
+			hasTopZero = true
+		}
+	}
+
+	if isHeaderTag && hasFixedPos && hasTopZero {
+		return true
+	}
+
+	if style, ok := node.Attributes["style"]; ok {
+		styleLower := strings.ToLower(style)
+		if (strings.Contains(styleLower, "position: fixed") || strings.Contains(styleLower, "position: fixed;")) &&
+			(strings.Contains(styleLower, "top: 0") || strings.Contains(styleLower, "top: 0px") || strings.Contains(styleLower, "top:0")) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// hasHeaderCompensation memeriksa apakah ada elemen berikutnya (misal <main>) atau spacer yang memberikan kompensasi ruang.
+func hasHeaderCompensation(node *ir.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	foundNode := false
+	for _, sibling := range node.Parent.Children {
+		if sibling == node {
+			foundNode = true
+			continue
+		}
+		if !foundNode {
+			continue
+		}
+		if hasPaddingTopCompensation(sibling) || isSpacerElement(sibling) {
+			return true
+		}
+		if strings.EqualFold(sibling.Tag, "main") {
+			return hasPaddingTopCompensation(sibling)
+		}
+	}
+	return false
+}
+
+func hasPaddingTopCompensation(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, cls := range node.Classes {
+		if strings.HasPrefix(cls, "pt-") || strings.HasPrefix(cls, "mt-") ||
+			strings.HasPrefix(cls, "py-") || strings.HasPrefix(cls, "my-") {
+			return true
+		}
+	}
+	return false
+}
+
+func isSpacerElement(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, cls := range node.Classes {
+		if strings.HasPrefix(cls, "h-") && cls != "h-0" && cls != "h-auto" {
+			return true
+		}
+	}
+	return false
+}
+
+// isUnreservedDynamicContent mendeteksi widget dinamis atau mutasi DOM langsung tanpa reservasi ruang.
+func isUnreservedDynamicContent(node *ir.Node) (string, bool) {
+	if node == nil || node.Type != ir.NodeElement {
+		return "", false
+	}
+
+	for _, cls := range node.Classes {
+		if cls == "absolute" || cls == "fixed" || cls == "hidden" {
+			return "", false
+		}
+	}
+
+	if isInsideSuspense(node) {
+		return "", false
+	}
+
+	if hasReservedHeightClass(node) || (node.Parent != nil && hasReservedHeightClass(node.Parent)) {
+		return "", false
+	}
+
+	tagLower := strings.ToLower(node.Tag)
+	if strings.Contains(tagLower, "banner") || strings.Contains(tagLower, "widget") ||
+		strings.Contains(tagLower, "promo") || strings.Contains(tagLower, "notification") {
+		return node.Tag, true
+	}
+
+	for _, cls := range node.Classes {
+		clsLower := strings.ToLower(cls)
+		if strings.Contains(clsLower, "banner") || strings.Contains(clsLower, "promo") ||
+			strings.Contains(clsLower, "dynamic-widget") {
+			return cls, true
+		}
+	}
+
+	return "", false
+}
+
+func isInsideSuspense(node *ir.Node) bool {
+	curr := node.Parent
+	for curr != nil {
+		if strings.EqualFold(curr.Tag, "Suspense") {
+			return true
+		}
+		curr = curr.Parent
+	}
+	return false
+}
+
+func hasCollapsibleTransition(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, cls := range node.Classes {
+		if cls == "transition-all" || strings.HasPrefix(cls, "transition-[max-height]") || strings.HasPrefix(cls, "transition-[height]") {
+			return true
+		}
+	}
+	return false
+}
+
+func isZeroShiftGrid(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	isGrid := false
+	hasGridRows := false
+	for _, cls := range node.Classes {
+		if cls == "contain-paint" {
+			return true
+		}
+		if cls == "grid" {
+			isGrid = true
+		}
+		if strings.HasPrefix(cls, "grid-rows-") || strings.Contains(cls, "grid-template-rows") {
+			hasGridRows = true
+		}
+	}
+	return isGrid && hasGridRows
+}
+
+// isCollapsibleHeightAnimation mendeteksi elemen akordeon/drawer yang menganimasikan max-height alih-alih CSS Grid.
+func isCollapsibleHeightAnimation(node *ir.Node) (string, bool) {
+	if node == nil || node.Type != ir.NodeElement {
+		return "", false
+	}
+	if !hasCollapsibleTransition(node) || isZeroShiftGrid(node) {
+		return "", false
+	}
+
+	for _, cls := range node.Classes {
+		if strings.HasPrefix(cls, "max-h-") || strings.HasPrefix(cls, "max-h-[") {
+			return cls, true
+		}
+	}
+
+	if strings.Contains(node.RawClasses, "max-h-") {
+		return "max-height", true
+	}
+
+	return "", false
+}

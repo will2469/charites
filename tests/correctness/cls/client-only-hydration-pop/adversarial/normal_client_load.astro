@@ -1,0 +1,9 @@
+---
+// Adversarial fixture for cls.client-only-hydration-pop: client:load and client:idle (server rendered with SSR)
+---
+<main class="space-y-4">
+  <h1>Dashboard Analytics</h1>
+  <InteractiveCounter client:load initialCount={0} />
+  <CommentsSection client:idle postId="123" />
+  <ServerFooter />
+</main>

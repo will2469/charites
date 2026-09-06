@@ -1,0 +1,12 @@
+---
+// Negative fixture for cls.client-only-hydration-pop: client:only with fallback slot shell
+---
+<main class="space-y-4">
+  <h1>Dashboard Analytics</h1>
+  <AnalyticsChart client:only="react">
+    <div slot="fallback" class="w-full min-h-[350px] bg-muted/20 animate-pulse rounded-lg flex items-center justify-center">
+      <span>Loading chart...</span>
+    </div>
+  </AnalyticsChart>
+  <p>Live metrics updated every 5 minutes.</p>
+</main>

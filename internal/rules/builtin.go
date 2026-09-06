@@ -145,6 +145,12 @@ var (
 	_ Rule = (*cls.LayoutTriggerTransitionRule)(nil)
 	_ Rule = (*cls.UnstableScrollbarGutterRule)(nil)
 	_ Rule = (*cls.DynamicTableReflowRule)(nil)
+
+	// cls Wave 4 (Lifecycle DOM, Client-Only Hydration, Fixed Headers, Dynamic Injections, & Collapsibles)
+	_ Rule = (*cls.ClientOnlyHydrationPopRule)(nil)
+	_ Rule = (*cls.UnreservedFixedHeaderRule)(nil)
+	_ Rule = (*cls.DynamicContentWithoutReservedSpaceRule)(nil)
+	_ Rule = (*cls.CollapsibleHeightJumpRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -321,6 +327,12 @@ func builtinRules() []Rule {
 		cls.NewLayoutTriggerTransitionRule(),
 		cls.NewUnstableScrollbarGutterRule(),
 		cls.NewDynamicTableReflowRule(),
+
+		// cls Wave 4 (Lifecycle DOM, Client-Only Hydration, Fixed Headers, Dynamic Injections, & Collapsibles)
+		cls.NewClientOnlyHydrationPopRule(),
+		cls.NewUnreservedFixedHeaderRule(),
+		cls.NewDynamicContentWithoutReservedSpaceRule(),
+		cls.NewCollapsibleHeightJumpRule(),
 	}
 }
 
