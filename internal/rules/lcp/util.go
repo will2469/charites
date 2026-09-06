@@ -388,3 +388,266 @@ func isCandidateHeroContainer(node *ir.Node) bool {
 	}
 	return hasSemanticContainer(node)
 }
+
+// isFluidImage memeriksa apakah gambar memiliki ukuran fluida responsif
+// (lebar mengikuti kontainer/viewport, misal w-full, max-w-*, aspect-*, atau tanpa atribut width tetap).
+func isFluidImage(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	// Jika secara eksplisit berdimensi tetap dan bukan w-full, maka bukan fluida
+	if _, _, fixed := isFixedDimensionImage(node); fixed {
+		return false
+	}
+	return true
+}
+
+// isFixedDimensionImage mendeteksi apakah elemen memiliki dimensi piksel tetap (width/height atribut atau fixed Tailwind classes).
+func isFixedDimensionImage(node *ir.Node) (int, int, bool) {
+	if node == nil {
+		return 0, 0, false
+	}
+
+	// Jika memiliki utility fluid w-full atau w-screen, CSS mengambil preseden menjadikan gambar fluida
+	raw := strings.ToLower(node.RawClasses)
+	if strings.Contains(raw, "w-full") || strings.Contains(raw, "w-screen") {
+		return 0, 0, false
+	}
+
+	if node.Attributes != nil {
+		rawW, hasW := node.Attributes["width"]
+		rawH, hasH := node.Attributes["height"]
+		if hasW {
+			wStr := cleanAttrVal(rawW)
+			wStr = strings.TrimSuffix(wStr, "px")
+			if w, err := strconv.Atoi(wStr); err == nil && w > 0 {
+				h := 0
+				if hasH {
+					hStr := cleanAttrVal(rawH)
+					hStr = strings.TrimSuffix(hStr, "px")
+					if val, err2 := strconv.Atoi(hStr); err2 == nil {
+						h = val
+					}
+				}
+				return w, h, true
+			}
+		}
+	}
+
+	return parseFixedTailwindDims(node.Classes)
+}
+
+func parseFixedTailwindDims(classes []string) (int, int, bool) {
+	w, h := 0, 0
+	for _, cls := range classes {
+		if strings.HasPrefix(cls, "w-[") && strings.HasSuffix(cls, "px]") {
+			inner := cls[3 : len(cls)-3]
+			if val, err := strconv.Atoi(inner); err == nil {
+				w = val
+			}
+		} else if strings.HasPrefix(cls, "h-[") && strings.HasSuffix(cls, "px]") {
+			inner := cls[3 : len(cls)-3]
+			if val, err := strconv.Atoi(inner); err == nil {
+				h = val
+			}
+		}
+	}
+	if w > 0 {
+		return w, h, true
+	}
+	return 0, 0, false
+}
+
+// getSrcsetAttribute mengambil nilai atribut srcset atau srcSet (varian JSX).
+func getSrcsetAttribute(attrs map[string]string) (string, bool) {
+	if attrs == nil {
+		return "", false
+	}
+	if val, ok := attrs["srcset"]; ok {
+		return val, true
+	}
+	if val, ok := attrs["srcSet"]; ok {
+		return val, true
+	}
+	return "", false
+}
+
+// hasResponsiveSrcset memeriksa apakah media mendefinisikan varian responsif (srcset dengan width descriptors atau sizes).
+func hasResponsiveSrcset(attrs map[string]string) bool {
+	if attrs == nil {
+		return false
+	}
+	rawSrcset, okSrcset := getSrcsetAttribute(attrs)
+	if !okSrcset || len(cleanAttrVal(rawSrcset)) == 0 {
+		return false
+	}
+	cleaned := cleanAttrVal(rawSrcset)
+	hasWidthDesc := strings.Contains(cleaned, "w,") || strings.HasSuffix(cleaned, "w")
+	_, hasSizes := attrs["sizes"]
+	return hasWidthDesc || hasSizes
+}
+
+// isInsidePictureWithResponsiveSource memeriksa apakah <img> berada dalam <picture> dengan <source srcset="...">.
+func isInsidePictureWithResponsiveSource(node *ir.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	if !strings.EqualFold(node.Parent.Tag, "picture") {
+		return false
+	}
+	for _, child := range node.Parent.Children {
+		if child != nil && strings.EqualFold(child.Tag, "source") && child.Attributes != nil {
+			if ss, ok := getSrcsetAttribute(child.Attributes); ok && len(cleanAttrVal(ss)) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isSVGFile memeriksa apakah sumber gambar merupakan berkas SVG.
+func isSVGFile(src string) bool {
+	lower := strings.ToLower(cleanAttrVal(src))
+	if idx := strings.IndexAny(lower, "?#"); idx != -1 {
+		lower = lower[:idx]
+	}
+	return strings.HasSuffix(lower, ".svg")
+}
+
+// isKnownImageCDN memeriksa apakah URL berasal dari CDN gambar modern yang mengotomatisasi negosiasi konten WebP/AVIF.
+func isKnownImageCDN(src string) bool {
+	lower := strings.ToLower(src)
+	cdnHosts := [...]string{
+		"cloudinary.com",
+		"unsplash.com",
+		"imgix.net",
+		"cloudflare.com",
+		"cdn.sanity.io",
+		"ctfassets.net",
+		"imagekit.io",
+		"shopify.com",
+	}
+	for _, host := range cdnHosts {
+		if strings.Contains(lower, host) {
+			return true
+		}
+	}
+	return false
+}
+
+// isPictureWithModernSource memeriksa apakah <img> dibungkus dalam <picture> yang memiliki source type webp/avif.
+func isPictureWithModernSource(node *ir.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	if !strings.EqualFold(node.Parent.Tag, "picture") {
+		return false
+	}
+	for _, child := range node.Parent.Children {
+		if child != nil && strings.EqualFold(child.Tag, "source") && child.Attributes != nil {
+			if t, ok := child.Attributes["type"]; ok {
+				cleanType := strings.ToLower(cleanAttrVal(t))
+				if strings.Contains(cleanType, "webp") || strings.Contains(cleanType, "avif") {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// isHeavyLegacyRasterFormat memeriksa apakah berkas gambar menggunakan format raster kuno (.png, .bmp, .tiff, .gif) tanpa WebP/AVIF.
+func isHeavyLegacyRasterFormat(rawSrc string) (string, bool) {
+	cleaned := cleanAttrVal(rawSrc)
+	if len(cleaned) == 0 {
+		return "", false
+	}
+	lower := strings.ToLower(cleaned)
+	if idx := strings.IndexAny(lower, "?#"); idx != -1 {
+		lower = lower[:idx]
+	}
+	if isKnownImageCDN(lower) {
+		return "", false
+	}
+	for _, ext := range [...]string{".png", ".bmp", ".tiff", ".tif", ".gif"} {
+		if strings.HasSuffix(lower, ext) {
+			return ext, true
+		}
+	}
+	return "", false
+}
+
+// hasDensityDescriptors memeriksa apakah srcset menyertakan deskriptor 1x, 2x, atau 3x.
+func hasDensityDescriptors(srcset string) bool {
+	cleaned := cleanAttrVal(srcset)
+	if len(cleaned) == 0 {
+		return false
+	}
+	parts := strings.Split(cleaned, ",")
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if strings.HasSuffix(trimmed, "1x") || strings.HasSuffix(trimmed, "2x") || strings.HasSuffix(trimmed, "3x") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasClientOnlyDirective memeriksa apakah atribut memiliki direktif client:only pada Astro.
+func hasClientOnlyDirective(attrs map[string]string) bool {
+	if attrs == nil {
+		return false
+	}
+	for k := range attrs {
+		if k == "client:only" || strings.HasPrefix(k, "client:only") {
+			return true
+		}
+	}
+	return false
+}
+
+// isHeroIsland memeriksa apakah pulau komponen berada pada area hero pelipatan atas.
+func isHeroIsland(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	lowerTag := strings.ToLower(node.Tag)
+	if strings.Contains(lowerTag, "hero") {
+		return true
+	}
+	if node.Attributes != nil {
+		if role, ok := node.Attributes["data-perf-role"]; ok && strings.EqualFold(cleanAttrVal(role), "hero") {
+			return true
+		}
+	}
+	if strings.Contains(strings.ToLower(node.RawClasses), "hero") {
+		return true
+	}
+	if isAncestorHero(node) {
+		return true
+	}
+	if node.Parent != nil {
+		pTag := strings.ToLower(node.Parent.Tag)
+		if pTag == "header" || pTag == "main" {
+			return true
+		}
+	}
+	return false
+}
+
+// hasFallbackSlot memeriksa apakah ada child node yang memiliki atribut slot="fallback".
+func hasFallbackSlot(node *ir.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, child := range node.Children {
+		if child != nil && child.Attributes != nil {
+			if slot, ok := child.Attributes["slot"]; ok {
+				if strings.EqualFold(cleanAttrVal(slot), "fallback") {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}

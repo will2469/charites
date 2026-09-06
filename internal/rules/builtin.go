@@ -183,6 +183,12 @@ var (
 	_ Rule = (*lcp.UnhintedLCPImagePriorityRule)(nil)
 	_ Rule = (*lcp.UndiscoverableLCPImageRule)(nil)
 	_ Rule = (*lcp.MissingLCPImagePreloadRule)(nil)
+
+	// lcp Wave 2 (Responsive Images & Format Optimization)
+	_ Rule = (*lcp.OversizedLCPResourceSelectionRule)(nil)
+	_ Rule = (*lcp.HeavyRasterLCPAssetRule)(nil)
+	_ Rule = (*lcp.ImageSourceDensityMismatchRule)(nil)
+	_ Rule = (*lcp.ClientOnlyLCPContentRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -395,6 +401,12 @@ func builtinRules() []Rule {
 		lcp.NewUnhintedLCPImagePriorityRule(),
 		lcp.NewUndiscoverableLCPImageRule(),
 		lcp.NewMissingLCPImagePreloadRule(),
+
+		// lcp Wave 2 (Responsive Images & Format Optimization)
+		lcp.NewOversizedLCPResourceSelectionRule(),
+		lcp.NewHeavyRasterLCPAssetRule(),
+		lcp.NewImageSourceDensityMismatchRule(),
+		lcp.NewClientOnlyLCPContentRule(),
 	}
 }
 

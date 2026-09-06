@@ -90,7 +90,7 @@ flowchart TD
 | `cls` | 16 | [`cls`](cls) |
 | `ergonomy` | 4 | [`ergonomy`](ergonomy) |
 | `inp` | 16 | [`inp`](inp) |
-| `lcp` | 4 | [`lcp`](lcp) |
+| `lcp` | 8 | [`lcp`](lcp) |
 | `mobile` | 5 | [`mobile`](mobile) |
 | `pwa` | 10 | [`pwa`](pwa) |
 | `responsive` | 17 | [`responsive`](responsive) |
@@ -167,8 +167,12 @@ flowchart TD
 | `inp.unbounded-collection-render` | `inp` | `WARN` | Scrollable collection container renders unbounded dynamic data via .map() without window virtualization or pagination limits | [`inp.unbounded-collection-render`](inp.unbounded-collection-render) |
 | `inp.unbounded-effect-deps` | `inp` | `ERROR` | Lifecycle hook useEffect/useLayoutEffect is missing a dependency array, triggering unbounded re-executions on every render | [`inp.unbounded-effect-deps`](inp.unbounded-effect-deps) |
 | `inp.unyielded-long-task` | `inp` | `WARN` | Long task processing large arrays without cooperative scheduling yields stalls main-thread responsiveness | [`inp.unyielded-long-task`](inp.unyielded-long-task) |
+| `lcp.client-only-lcp-content` | `lcp` | `WARN` | Above-the-fold hero island declared with 'client:only' without an SSR fallback slot, eliminating server HTML and delaying LCP until client-side bundle execution | [`lcp.client-only-lcp-content`](lcp.client-only-lcp-content) |
+| `lcp.heavy-raster-lcp-asset` | `lcp` | `WARN` | LCP candidate image uses legacy uncompressed raster format (.png, .bmp, .tiff, .gif); modern formats like WebP or AVIF should be served to reduce transfer size | [`lcp.heavy-raster-lcp-asset`](lcp.heavy-raster-lcp-asset) |
+| `lcp.image-source-density-mismatch` | `lcp` | `INFO` | Fixed-dimension LCP candidate image lacks aligned '1x, 2x' pixel density descriptors in 'srcset', risking blurry rendering or unoptimized asset delivery on high-DPI screens | [`lcp.image-source-density-mismatch`](lcp.image-source-density-mismatch) |
 | `lcp.lazy-loaded-lcp-image` | `lcp` | `ERROR` | Critical above-the-fold LCP candidate image has loading="lazy", delaying resource discovery and load initiation | [`lcp.lazy-loaded-lcp-image`](lcp.lazy-loaded-lcp-image) |
 | `lcp.missing-lcp-image-preload` | `lcp` | `INFO` | Delayed-discovery LCP image lacks <link rel="preload" as="image"> in document head to initiate early asset transfer | [`lcp.missing-lcp-image-preload`](lcp.missing-lcp-image-preload) |
+| `lcp.oversized-lcp-resource-selection` | `lcp` | `WARN` | Fluid responsive LCP candidate image lacks responsive 'srcset' and 'sizes' attributes, forcing mobile viewports to download oversized desktop assets | [`lcp.oversized-lcp-resource-selection`](lcp.oversized-lcp-resource-selection) |
 | `lcp.undiscoverable-lcp-image` | `lcp` | `WARN` | Above-the-fold hero container loads primary image via CSS background without <link rel="preload"> in document head | [`lcp.undiscoverable-lcp-image`](lcp.undiscoverable-lcp-image) |
 | `lcp.unhinted-lcp-image-priority` | `lcp` | `WARN` | Above-the-fold LCP candidate image lacks fetchpriority="high", delaying bandwidth allocation in early network stream | [`lcp.unhinted-lcp-image-priority`](lcp.unhinted-lcp-image-priority) |
 | `mobile.fixed-action-obstruction` | `mobile` | `WARN` | Warns when fixed bottom elements lack compensating bottom padding on parent or content siblings, risking content obstruction | [`mobile.fixed-action-obstruction`](mobile.fixed-action-obstruction) |

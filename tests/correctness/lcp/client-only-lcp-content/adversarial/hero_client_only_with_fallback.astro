@@ -1,0 +1,10 @@
+---
+import HeroInteractive from '../components/HeroInteractive.tsx';
+---
+<main>
+  <HeroInteractive client:only="react">
+    <div slot="fallback" class="hero-placeholder">
+      <h1>SSR Hero Fallback Title</h1>
+    </div>
+  </HeroInteractive>
+</main>

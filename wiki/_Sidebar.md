@@ -106,11 +106,15 @@
 </details>
 
 <details open>
-<summary><b>Lcp</b> (4 rules)</summary>
+<summary><b>Lcp</b> (8 rules)</summary>
 
 * [**Lcp Overview**](lcp)
+* [`lcp.client-only-lcp-content`](lcp.client-only-lcp-content)
+* [`lcp.heavy-raster-lcp-asset`](lcp.heavy-raster-lcp-asset)
+* [`lcp.image-source-density-mismatch`](lcp.image-source-density-mismatch)
 * [`lcp.lazy-loaded-lcp-image`](lcp.lazy-loaded-lcp-image)
 * [`lcp.missing-lcp-image-preload`](lcp.missing-lcp-image-preload)
+* [`lcp.oversized-lcp-resource-selection`](lcp.oversized-lcp-resource-selection)
 * [`lcp.undiscoverable-lcp-image`](lcp.undiscoverable-lcp-image)
 * [`lcp.unhinted-lcp-image-priority`](lcp.unhinted-lcp-image-priority)
 
