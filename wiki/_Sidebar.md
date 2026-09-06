@@ -141,6 +141,17 @@
 </details>
 
 <details open>
+<summary><b>Performance</b> (4 rules)</summary>
+
+* [**Performance Overview**](performance)
+* [`performance.react-context-domain-coupling`](performance.react-context-domain-coupling)
+* [`performance.react-effect-missing-cleanup`](performance.react-effect-missing-cleanup)
+* [`performance.react-index-as-key`](performance.react-index-as-key)
+* [`performance.react-inline-prop-memo`](performance.react-inline-prop-memo)
+
+</details>
+
+<details open>
 <summary><b>Pwa</b> (10 rules)</summary>
 
 * [**Pwa Overview**](pwa)

@@ -8,6 +8,7 @@ import (
 	"github.com/will2469/charites/internal/rules/inp"
 	"github.com/will2469/charites/internal/rules/lcp"
 	"github.com/will2469/charites/internal/rules/mobile"
+	"github.com/will2469/charites/internal/rules/performance"
 	"github.com/will2469/charites/internal/rules/pwa"
 	"github.com/will2469/charites/internal/rules/responsive"
 	"github.com/will2469/charites/internal/rules/theme"
@@ -201,6 +202,12 @@ var (
 	_ Rule = (*lcp.CriticalHeadStyleBloatRule)(nil)
 	_ Rule = (*lcp.MissingCriticalOriginHintRule)(nil)
 	_ Rule = (*lcp.ContentVisibilitySuppressionRule)(nil)
+
+	// performance Wave 1 (React Reconciliation & Memory Lifecycle)
+	_ Rule = (*performance.ReactInlinePropMemoRule)(nil)
+	_ Rule = (*performance.ReactIndexAsKeyRule)(nil)
+	_ Rule = (*performance.ReactEffectMissingCleanupRule)(nil)
+	_ Rule = (*performance.ReactContextDomainCouplingRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -431,6 +438,12 @@ func builtinRules() []Rule {
 		lcp.NewCriticalHeadStyleBloatRule(),
 		lcp.NewMissingCriticalOriginHintRule(),
 		lcp.NewContentVisibilitySuppressionRule(),
+
+		// performance Wave 1 (React Reconciliation & Memory Lifecycle)
+		performance.NewReactInlinePropMemoRule(),
+		performance.NewReactIndexAsKeyRule(),
+		performance.NewReactEffectMissingCleanupRule(),
+		performance.NewReactContextDomainCouplingRule(),
 	}
 }
 
