@@ -141,7 +141,7 @@
 </details>
 
 <details open>
-<summary><b>Performance</b> (12 rules)</summary>
+<summary><b>Performance</b> (16 rules)</summary>
 
 * [**Performance Overview**](performance)
 * [`performance.astro-island-boundary-overlap`](performance.astro-island-boundary-overlap)
@@ -156,6 +156,10 @@
 * [`performance.react-redundant-function-memoization`](performance.react-redundant-function-memoization)
 * [`performance.react-static-heavy-import`](performance.react-static-heavy-import)
 * [`performance.react-unstable-hook-reference`](performance.react-unstable-hook-reference)
+* [`performance.tailwind-duplicate-arbitrary-rules`](performance.tailwind-duplicate-arbitrary-rules)
+* [`performance.tailwind-duplicate-utility-definition`](performance.tailwind-duplicate-utility-definition)
+* [`performance.tailwind-dynamic-class-concatenation`](performance.tailwind-dynamic-class-concatenation)
+* [`performance.tailwind-untracked-package-source`](performance.tailwind-untracked-package-source)
 
 </details>
 

@@ -1,6 +1,7 @@
 package performance
 
 import (
+	"bytes"
 	"strings"
 
 	"github.com/will2469/charites/internal/ir"
@@ -37,6 +38,28 @@ func getFileSourceContent(node *ir.Node) string {
 		}
 	}
 	return ""
+}
+
+// getStyleNodeText mengekstrak seluruh teks CSS dari child node NodeText dalam <style>.
+func getStyleNodeText(node *ir.Node) string {
+	if node == nil {
+		return ""
+	}
+	if len(node.Children) == 0 {
+		return node.RawClasses
+	}
+
+	var sb strings.Builder
+	for _, child := range node.Children {
+		if child != nil && child.Type == ir.NodeText {
+			sb.WriteString(child.RawClasses)
+		}
+	}
+	res := sb.String()
+	if res == "" {
+		return node.RawClasses
+	}
+	return res
 }
 
 // isSourceRootOrScript memastikan evaluasi kode sumber script hanya dieksekusi sekali per berkas.
@@ -921,4 +944,192 @@ func isSecondaryHref(href string) bool {
 		}
 	}
 	return false
+}
+
+// findDynamicClassConcatenation mendeteksi penggabungan string template literal dengan prefiks parsial Tailwind.
+func findDynamicClassConcatenation(val string) (string, bool) {
+	if !strings.Contains(val, "${") && !strings.Contains(val, " + ") {
+		return "", false
+	}
+
+	prefixes := [...]string{
+		"bg-${", "text-${", "border-${", "p-${", "px-${", "py-${",
+		"m-${", "mx-${", "my-${", "mt-${", "mb-${",
+		"w-${", "h-${", "gap-${", "grid-cols-${", "flex-${",
+		"rounded-${", "shadow-${", "opacity-${", "z-${",
+		"\"bg-\" +", "'bg-' +", "\"text-\" +", "'text-' +", "\"p-\" +", "'p-' +",
+	}
+
+	for _, p := range prefixes {
+		if strings.Contains(val, p) {
+			return p, true
+		}
+	}
+
+	return "", false
+}
+
+var arbitraryScaleDuplicates = map[string]string{
+	"p-[16px]":         "p-4",
+	"p-[1rem]":         "p-4",
+	"px-[16px]":        "px-4",
+	"px-[1rem]":        "px-4",
+	"py-[16px]":        "py-4",
+	"py-[1rem]":        "py-4",
+	"m-[16px]":         "m-4",
+	"m-[1rem]":         "m-4",
+	"mt-[16px]":        "mt-4",
+	"mt-[1rem]":        "mt-4",
+	"mb-[16px]":        "mb-4",
+	"mb-[1rem]":        "mb-4",
+	"w-[100%]":         "w-full",
+	"h-[100%]":         "h-full",
+	"w-[100vw]":        "w-screen",
+	"h-[100vh]":        "h-screen",
+	"text-[16px]":      "text-base",
+	"text-[1rem]":      "text-base",
+	"rounded-[0px]":    "rounded-none",
+	"rounded-[9999px]": "rounded-full",
+	"gap-[16px]":       "gap-4",
+	"gap-[1rem]":       "gap-4",
+	"p-[0px]":          "p-0",
+	"m-[0px]":          "m-0",
+}
+
+// findDuplicateArbitraryUtility memeriksa apakah ada kelas arbitrary yang menduplikasi skala core bawaan.
+func findDuplicateArbitraryUtility(classes []string, rawClasses string) (string, string, bool) {
+	if len(classes) == 0 || !strings.Contains(rawClasses, "-[") {
+		return "", "", false
+	}
+
+	for _, c := range classes {
+		if equiv, ok := arbitraryScaleDuplicates[c]; ok {
+			return c, equiv, true
+		}
+	}
+
+	return "", "", false
+}
+
+// stripCSSCommentsString menghapus komentar /* ... */ dari CSS string.
+func stripCSSCommentsString(src string) string {
+	if !strings.Contains(src, "/*") {
+		return src
+	}
+
+	var buf bytes.Buffer
+	buf.Grow(len(src))
+
+	i := 0
+	n := len(src)
+	for i < n {
+		if i+1 < n && src[i] == '/' && src[i+1] == '*' {
+			end := strings.Index(src[i+2:], "*/")
+			if end == -1 {
+				break
+			}
+			i += 2 + end + 2
+			continue
+		}
+		buf.WriteByte(src[i])
+		i++
+	}
+
+	return buf.String()
+}
+
+// findUntrackedPackageSource mendeteksi berkas CSS root Tailwind v4 yang tidak memuat direktif @source saat mengimpor monorepo package.
+func findUntrackedPackageSource(fileSrc string) (string, bool) {
+	if len(fileSrc) == 0 {
+		return "", false
+	}
+
+	clean := stripCSSCommentsString(fileSrc)
+	hasImport := strings.Contains(clean, "@import \"tailwindcss\"") ||
+		strings.Contains(clean, "@import 'tailwindcss'") ||
+		strings.Contains(clean, "@import \"tailwindcss\";") ||
+		strings.Contains(clean, "@import 'tailwindcss';")
+
+	if !hasImport {
+		return "", false
+	}
+
+	if strings.Contains(clean, "@source") {
+		return "", false
+	}
+
+	return "workspace packages", true
+}
+
+// DuplicateUtilityViolation merepresentasikan deklarasi @utility yang menduplikasi utilitas native core.
+type DuplicateUtilityViolation struct {
+	Line        int
+	UtilityName string
+	CoreEquiv   string
+}
+
+// findDuplicateUtilityDefinitions memeriksa berkas CSS terhadap deklarasi @utility yang menduplikasi core.
+func findDuplicateUtilityDefinitions(fileSrc string) []DuplicateUtilityViolation {
+	if len(fileSrc) == 0 || !strings.Contains(fileSrc, "@utility") {
+		return nil
+	}
+
+	var violations []DuplicateUtilityViolation
+	lines := strings.Split(fileSrc, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "@utility") {
+			continue
+		}
+
+		utilName := extractUtilityName(trimmed)
+		if utilName == "" {
+			continue
+		}
+
+		block := extractFunctionBlock(lines, i)
+		if equiv := matchCoreUtilityEquivalent(block); equiv != "" {
+			violations = append(violations, DuplicateUtilityViolation{
+				Line:        i + 1,
+				UtilityName: utilName,
+				CoreEquiv:   equiv,
+			})
+		}
+	}
+
+	return violations
+}
+
+func extractUtilityName(line string) string {
+	parts := strings.Fields(line)
+	if len(parts) >= 2 && parts[0] == "@utility" {
+		name := strings.Trim(parts[1], "{ ")
+		return name
+	}
+	return ""
+}
+
+func matchCoreUtilityEquivalent(block string) string {
+	clean := strings.ReplaceAll(block, " ", "")
+	clean = strings.ReplaceAll(clean, "\t", "")
+	clean = strings.ReplaceAll(clean, "\n", "")
+
+	switch {
+	case strings.Contains(clean, "display:flex") && strings.Contains(clean, "justify-content:center") && strings.Contains(clean, "align-items:center"):
+		return "flex justify-center items-center"
+	case strings.Contains(clean, "display:flex") && strings.Contains(clean, "align-items:center"):
+		return "flex items-center"
+	case strings.Contains(clean, "display:none"):
+		return "hidden"
+	case strings.Contains(clean, "width:100%"):
+		return "w-full"
+	case strings.Contains(clean, "height:100%"):
+		return "h-full"
+	case strings.Contains(clean, "cursor:pointer"):
+		return "cursor-pointer"
+	case strings.Contains(clean, "font-weight:bold"):
+		return "font-bold"
+	}
+
+	return ""
 }

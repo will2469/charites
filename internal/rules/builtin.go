@@ -220,6 +220,12 @@ var (
 	_ Rule = (*performance.AstroIslandBoundaryOverlapRule)(nil)
 	_ Rule = (*performance.AstroUnoptimizedLocalImageRule)(nil)
 	_ Rule = (*performance.AstroOverPrefetchingRule)(nil)
+
+	// performance Wave 4 (Tailwind CSS v4 & Build-Time Stylesheet Hygiene)
+	_ Rule = (*performance.TailwindDynamicClassConcatenationRule)(nil)
+	_ Rule = (*performance.TailwindDuplicateArbitraryRulesRule)(nil)
+	_ Rule = (*performance.TailwindUntrackedPackageSourceRule)(nil)
+	_ Rule = (*performance.TailwindDuplicateUtilityDefinitionRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -468,6 +474,12 @@ func builtinRules() []Rule {
 		performance.NewAstroIslandBoundaryOverlapRule(),
 		performance.NewAstroUnoptimizedLocalImageRule(),
 		performance.NewAstroOverPrefetchingRule(),
+
+		// performance Wave 4 (Tailwind CSS v4 & Build-Time Stylesheet Hygiene)
+		performance.NewTailwindDynamicClassConcatenationRule(),
+		performance.NewTailwindDuplicateArbitraryRulesRule(),
+		performance.NewTailwindUntrackedPackageSourceRule(),
+		performance.NewTailwindDuplicateUtilityDefinitionRule(),
 	}
 }
 

@@ -92,7 +92,7 @@ flowchart TD
 | `inp` | 16 | [`inp`](inp) |
 | `lcp` | 16 | [`lcp`](lcp) |
 | `mobile` | 5 | [`mobile`](mobile) |
-| `performance` | 12 | [`performance`](performance) |
+| `performance` | 16 | [`performance`](performance) |
 | `pwa` | 10 | [`pwa`](pwa) |
 | `responsive` | 17 | [`responsive`](responsive) |
 | `theme` | 32 | [`theme`](theme) |
@@ -201,6 +201,10 @@ flowchart TD
 | `performance.react-redundant-function-memoization` | `performance` | `INFO` | Mengaudit penggunaan useCallback pada callback yang hanya dikonsumsi oleh elemen native HTML tanpa konsumen peka identitas referensial. | [`performance.react-redundant-function-memoization`](performance.react-redundant-function-memoization) |
 | `performance.react-static-heavy-import` | `performance` | `WARN` | Mengaudit pernyataan impor statis modul berukuran besar di tingkat atas yang membengkakkan bundel JavaScript awal dan mewajibkan pemisahan kode via React.lazy() dan <Suspense>. | [`performance.react-static-heavy-import`](performance.react-static-heavy-import) |
 | `performance.react-unstable-hook-reference` | `performance` | `WARN` | Mengaudit custom hook yang mengembalikan referensi fungsi tidak stabil tanpa dibungkus useCallback, yang memicu re-render loop pada komponen konsumen. | [`performance.react-unstable-hook-reference`](performance.react-unstable-hook-reference) |
+| `performance.tailwind-duplicate-arbitrary-rules` | `performance` | `WARN` | Menganjurkan penggunaan utilitas skala inti bawaan Tailwind v4 alih-alih nilai arbitrary sembarang yang menghasilkan deklarasi CSS duplikat. | [`performance.tailwind-duplicate-arbitrary-rules`](performance.tailwind-duplicate-arbitrary-rules) |
+| `performance.tailwind-duplicate-utility-definition` | `performance` | `WARN` | Mencegah duplikasi deklarasi utilitas CSS kustom (@utility) yang properti dan nilainya sudah disediakan oleh utilitas core bawaan Tailwind CSS v4. | [`performance.tailwind-duplicate-utility-definition`](performance.tailwind-duplicate-utility-definition) |
+| `performance.tailwind-dynamic-class-concatenation` | `performance` | `ERROR` | Mencegah penggabungan string nama kelas dinamis parsial yang merusak deteksi compiler scanner Tailwind CSS v4 (Oxide engine). | [`performance.tailwind-dynamic-class-concatenation`](performance.tailwind-dynamic-class-concatenation) |
+| `performance.tailwind-untracked-package-source` | `performance` | `ERROR` | Mewajibkan pendaftaran direktif @source pada berkas CSS root Tailwind v4 ketika mengimpor paket workspace monorepo eksternal. | [`performance.tailwind-untracked-package-source`](performance.tailwind-untracked-package-source) |
 | `pwa.apple-meta-missing` | `pwa` | `WARN` | Warns when an HTML document head with a Web App Manifest is missing Apple WebKit standalone meta tags (apple-mobile-web-app-capable and apple-touch-icon) | [`pwa.apple-meta-missing`](pwa.apple-meta-missing) |
 | `pwa.icon-maskable-missing` | `pwa` | `WARN` | Warns when a Web App Manifest defines icons but none has purpose: 'maskable' for Android adaptive launcher icons | [`pwa.icon-maskable-missing`](pwa.icon-maskable-missing) |
 | `pwa.insecure-context-resource` | `pwa` | `ERROR` | Errors when a resource element loads assets over an insecure HTTP protocol (http://) in violation of W3C Secure Contexts | [`pwa.insecure-context-resource`](pwa.insecure-context-resource) |
