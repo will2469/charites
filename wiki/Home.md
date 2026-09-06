@@ -92,7 +92,7 @@ flowchart TD
 | `inp` | 16 | [`inp`](inp) |
 | `lcp` | 16 | [`lcp`](lcp) |
 | `mobile` | 5 | [`mobile`](mobile) |
-| `performance` | 8 | [`performance`](performance) |
+| `performance` | 12 | [`performance`](performance) |
 | `pwa` | 10 | [`pwa`](pwa) |
 | `responsive` | 17 | [`responsive`](responsive) |
 | `theme` | 32 | [`theme`](theme) |
@@ -189,6 +189,10 @@ flowchart TD
 | `mobile.modal-viewport-lock` | `mobile` | `ERROR` | Detects modal dialog containers locked with overflow-hidden without an internal scrollable region on mobile viewports | [`mobile.modal-viewport-lock`](mobile.modal-viewport-lock) |
 | `mobile.orientation-lock-risk` | `mobile` | `INFO` | Advises against rigid screen orientation locking which restricts accessibility for mounted or assistive mobile setups (WCAG 2.2 SC 1.3.4) | [`mobile.orientation-lock-risk`](mobile.orientation-lock-risk) |
 | `mobile.pointer-events-block` | `mobile` | `WARN` | Warns when an ancestor declares pointer-events-none over interactive children without restoring pointer-events-auto on mobile | [`mobile.pointer-events-block`](mobile.pointer-events-block) |
+| `performance.astro-island-boundary-overlap` | `performance` | `WARN` | Mencegah konflik batas hidrasi pulau (island boundary overlap) dengan mewajibkan isolasi slot pada penyarangan komponen pulau interaktif. | [`performance.astro-island-boundary-overlap`](performance.astro-island-boundary-overlap) |
+| `performance.astro-over-prefetching` | `performance` | `WARN` | Mencegah pemborosan kuota data seluler dengan melarang penempatan strategi prefetch agresif (viewport/load) pada tautan navigasi sekunder atau footer. | [`performance.astro-over-prefetching`](performance.astro-over-prefetching) |
+| `performance.astro-unnecessary-client-directive` | `performance` | `ERROR` | Menegakkan prinsip Zero-JS Astro dengan melarang penambahan direktif hidrasi (client:*) pada komponen antarmuka yang murni statis. | [`performance.astro-unnecessary-client-directive`](performance.astro-unnecessary-client-directive) |
+| `performance.astro-unoptimized-local-image` | `performance` | `INFO` | Menganjurkan pemakaian komponen <Image /> dari astro:assets pada gambar lokal guna mengaktifkan konversi format modern dan kompresi build. | [`performance.astro-unoptimized-local-image`](performance.astro-unoptimized-local-image) |
 | `performance.react-context-domain-coupling` | `performance` | `WARN` | Context.Provider bundles over-coupled multi-domain state (> 5 fields), triggering cascading re-renders across all consumers on any property change | [`performance.react-context-domain-coupling`](performance.react-context-domain-coupling) |
 | `performance.react-derived-state-in-effect` | `performance` | `WARN` | Mencegah sinkronisasi derived state dari props atau state yang sudah ada melalui useEffect, yang memicu siklus perenderan sekunder ganda. | [`performance.react-derived-state-in-effect`](performance.react-derived-state-in-effect) |
 | `performance.react-effect-missing-cleanup` | `performance` | `ERROR` | Effect hook acquiring persistent resource (listener, interval, observer) lacks a symmetrical cleanup return function, causing memory leaks | [`performance.react-effect-missing-cleanup`](performance.react-effect-missing-cleanup) |

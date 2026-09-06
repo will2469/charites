@@ -779,3 +779,146 @@ func isUnmemoizedLocalFunction(ident, hookBody string) bool {
 	}
 	return false
 }
+
+// hasClientDirective memeriksa apakah node memiliki direktif hidrasi client Astro.
+func hasClientDirective(node *ir.Node) (string, bool) {
+	if node == nil || len(node.Attributes) == 0 {
+		return "", false
+	}
+	directives := [...]string{
+		"client:load",
+		"client:idle",
+		"client:visible",
+		"client:only",
+		"client:media",
+	}
+	for _, dir := range directives {
+		if _, ok := node.Attributes[dir]; ok {
+			return dir, true
+		}
+	}
+	return "", false
+}
+
+// isStaticComponentTag memeriksa apakah nama komponen mengindikasikan komponen statis murni.
+func isStaticComponentTag(tag string) bool {
+	return strings.Contains(tag, "Static") || strings.Contains(tag, "static")
+}
+
+// findNestedIslandOverlap mendeteksi penyarangan pulau interaktif di dalam pulau lain tanpa isolasi slot.
+func findNestedIslandOverlap(node *ir.Node) (*ir.Node, string, bool) {
+	if _, isIsland := hasClientDirective(node); !isIsland {
+		return nil, "", false
+	}
+
+	for _, ch := range node.Children {
+		if ch == nil {
+			continue
+		}
+		if n, dir, found := checkChildIslandOverlap(ch); found {
+			return n, dir, true
+		}
+	}
+	return nil, "", false
+}
+
+func checkChildIslandOverlap(curr *ir.Node) (*ir.Node, string, bool) {
+	if curr == nil || isSlotIsolated(curr) {
+		return nil, "", false
+	}
+	if dir, hasDir := hasClientDirective(curr); hasDir {
+		return curr, dir, true
+	}
+	for _, ch := range curr.Children {
+		if n, dir, found := checkChildIslandOverlap(ch); found {
+			return n, dir, true
+		}
+	}
+	return nil, "", false
+}
+
+func isSlotIsolated(n *ir.Node) bool {
+	if n == nil {
+		return false
+	}
+	if n.Tag == "slot" {
+		return true
+	}
+	if n.Attributes != nil {
+		if _, ok := n.Attributes["slot"]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// isLocalRawImage mendeteksi elemen <img> yang merujuk pada aset gambar lokal tanpa modul astro:assets.
+func isLocalRawImage(node *ir.Node) (string, bool) {
+	if node == nil || node.Type != ir.NodeElement || node.Tag != "img" {
+		return "", false
+	}
+	src, ok := node.Attributes["src"]
+	if !ok {
+		return "", false
+	}
+	src = cleanAttrVal(src)
+	if src == "" || strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") ||
+		strings.HasPrefix(src, "data:") || strings.HasPrefix(src, "//") || strings.HasSuffix(src, ".svg") {
+		return "", false
+	}
+	if strings.HasPrefix(src, "/images/") || strings.HasPrefix(src, "/favicon") || strings.HasPrefix(src, "/assets/") {
+		return "", false
+	}
+	if strings.Contains(src, "assets/") || strings.Contains(src, "../") || strings.Contains(src, "./") || strings.HasPrefix(src, "@/") {
+		return src, true
+	}
+	return "", false
+}
+
+// isAggressiveSecondaryPrefetch mendeteksi prefetch agresif pada tautan sekunder atau tautan footer.
+func isAggressiveSecondaryPrefetch(node *ir.Node) (string, string, bool) {
+	if node == nil || node.Type != ir.NodeElement || node.Tag != "a" {
+		return "", "", false
+	}
+	prefetch, ok := node.Attributes["data-astro-prefetch"]
+	if !ok {
+		return "", "", false
+	}
+	prefetch = cleanAttrVal(prefetch)
+	if prefetch != "viewport" && prefetch != "load" && prefetch != "" && prefetch != "true" {
+		return "", "", false
+	}
+
+	href, hasHref := node.Attributes["href"]
+	cleanHref := ""
+	if hasHref {
+		cleanHref = cleanAttrVal(href)
+	}
+
+	if isSecondaryHref(cleanHref) {
+		return cleanHref, prefetch, true
+	}
+
+	cur := node.Parent
+	for cur != nil {
+		if cur.Type == ir.NodeElement && (cur.Tag == "footer" || cur.Tag == "aside") {
+			return cleanHref, prefetch, true
+		}
+		cur = cur.Parent
+	}
+
+	return "", "", false
+}
+
+func isSecondaryHref(href string) bool {
+	low := strings.ToLower(href)
+	secondaryPatterns := [...]string{
+		"terms", "privacy", "kebijakan", "syarat", "cookie", "legal", "disclaimer",
+	}
+	for _, p := range secondaryPatterns {
+		if strings.Contains(low, p) {
+			return true
+		}
+	}
+	return false
+}

@@ -141,9 +141,13 @@
 </details>
 
 <details open>
-<summary><b>Performance</b> (8 rules)</summary>
+<summary><b>Performance</b> (12 rules)</summary>
 
 * [**Performance Overview**](performance)
+* [`performance.astro-island-boundary-overlap`](performance.astro-island-boundary-overlap)
+* [`performance.astro-over-prefetching`](performance.astro-over-prefetching)
+* [`performance.astro-unnecessary-client-directive`](performance.astro-unnecessary-client-directive)
+* [`performance.astro-unoptimized-local-image`](performance.astro-unoptimized-local-image)
 * [`performance.react-context-domain-coupling`](performance.react-context-domain-coupling)
 * [`performance.react-derived-state-in-effect`](performance.react-derived-state-in-effect)
 * [`performance.react-effect-missing-cleanup`](performance.react-effect-missing-cleanup)

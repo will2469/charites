@@ -1,0 +1,9 @@
+---
+import ReactContainer from '../components/ReactContainer.tsx';
+import VueWidget from '../components/VueWidget.vue';
+---
+<ReactContainer client:load>
+  <div slot="chart">
+    <VueWidget client:idle />
+  </div>
+</ReactContainer>

@@ -214,6 +214,12 @@ var (
 	_ Rule = (*performance.ReactRedundantFunctionMemoizationRule)(nil)
 	_ Rule = (*performance.ReactDerivedStateInEffectRule)(nil)
 	_ Rule = (*performance.ReactUnstableHookReferenceRule)(nil)
+
+	// performance Wave 3 (Astro Architecture & Zero-JS Island Pipeline)
+	_ Rule = (*performance.AstroUnnecessaryClientDirectiveRule)(nil)
+	_ Rule = (*performance.AstroIslandBoundaryOverlapRule)(nil)
+	_ Rule = (*performance.AstroUnoptimizedLocalImageRule)(nil)
+	_ Rule = (*performance.AstroOverPrefetchingRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -456,6 +462,12 @@ func builtinRules() []Rule {
 		performance.NewReactRedundantFunctionMemoizationRule(),
 		performance.NewReactDerivedStateInEffectRule(),
 		performance.NewReactUnstableHookReferenceRule(),
+
+		// performance Wave 3 (Astro Architecture & Zero-JS Island Pipeline)
+		performance.NewAstroUnnecessaryClientDirectiveRule(),
+		performance.NewAstroIslandBoundaryOverlapRule(),
+		performance.NewAstroUnoptimizedLocalImageRule(),
+		performance.NewAstroOverPrefetchingRule(),
 	}
 }
 
