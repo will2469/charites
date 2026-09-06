@@ -68,7 +68,7 @@ flowchart TD
       <input id="name" type="text" className="w-full" />
     </div>
     <div className="pt-8"> {/* Macro: 32px pemisah tegas ke tombol Submit */}
-      <button type="submit" className="w-full py-2.5 px-5 bg-primary text-white">
+      <button type="submit" className="w-full py-2.5 px-5 bg-primary text-primary-foreground">
         Simpan Perubahan
       </button>
     </div>
@@ -121,13 +121,13 @@ flowchart TD
 - **In-Scope:** Tag `<button type="submit">` di dalam form yang tidak memiliki binding atribut `disabled` dan tidak memuat indikator visual pemrosesan (spinner).
 - **Bad:**
   ```tsx
-  <button type="submit" className="bg-primary text-white">
+  <button type="submit" className="bg-primary text-primary-foreground">
     Bayar Sekarang
   </button>
   ```
 - **Good:**
   ```tsx
-  <button type="submit" disabled={isSubmitting} className="bg-primary text-white">
+  <button type="submit" disabled={isSubmitting} className="bg-primary text-primary-foreground">
     {isSubmitting ? <Spinner /> : "Bayar Sekarang"}
   </button>
   ```

@@ -86,8 +86,8 @@ flowchart TD
 - **Mengapa Lolos Linter Standar:** `w-[500px]` adalah arbitrary value yang sah di Tailwind. Linter tidak mengetahui lebar rata-rata layar smartphone dan tidak tahu apakah kontainer memiliki pembatas `max-w-full`.
 - **In-Scope:** Elemen kontainer dengan lebar statis `w-[...px]` atau `min-w-[...px]` dengan nilai > 320px tanpa pembatas `max-w-full`.
 - **Bad:** `<div className="w-[500px] bg-card">`
-- **Good:** `<div className="w-[500px] max-w-full bg-card">`
-- **Good:** `<div className="w-full md:w-[500px]">`
+- **Good (Tailwind v4 Token):** `<div className="w-full max-w-lg bg-card">`
+- **Good (Responsive Modifier):** `<div className="w-full md:max-w-xl bg-card">`
 - **Engine:** Token Geometry AST.
 - **Severity:** Error.
 
@@ -96,8 +96,8 @@ flowchart TD
 - **Mengapa Lolos Linter Standar:** `h-screen` (`100vh`) adalah utility standar Tailwind yang valid secara CSS spec level 3. Linter biasa tidak mengetahui standar CSS Values Level 4 (`100dvh` / `100svh`).
 - **In-Scope:** Elemen layout utama yang menggunakan `h-screen`, `min-h-screen`, `h-[100vh]`, atau `min-h-[100vh]` tanpa dynamic units (`dvh`/`svh`).
 - **Bad:** `<main className="min-h-screen">`
-- **Good:** `<main className="min-h-[100dvh]">`
-- **Good:** `<main className="min-h-svh">`
+- **Good (Tailwind v4):** `<main className="min-h-dvh">`
+- **Good (Fallback SVH):** `<main className="min-h-svh">`
 - **Engine:** JSX/TSX AST + CSS AST.
 - **Severity:** Warning.
 
@@ -251,6 +251,6 @@ flowchart TD
 ## 4. Cross-Reference Delegasi Kanonikal
 
 Untuk mencegah duplikasi antar-kategori (*zero redundancy*), aturan-aturan terkait kontrol interaktif dan ergonomi fisik sentuh didelegasikan secara kanonikal:
-- **Ukuran target sentuh ($\ge 44	ext{px}$):** Didelegasikan ke `a11y.touch-target-size` & `ergonomy.touch-target-too-small`.
-- **Jarak aman miss-tap ($\ge 8	ext{px}$):** Didelegasikan ke `a11y.touch-target-spacing`.
+- **Ukuran target sentuh ($\ge 44\text{px}$):** Didelegasikan ke `a11y.touch-target-size` & `ergonomy.touch-target-too-small`.
+- **Jarak aman miss-tap ($\ge 8\text{px}$):** Didelegasikan ke `a11y.touch-target-spacing`.
 - **Keyboard virtual contextual inputmode:** Didelegasikan ke `ergonomy.missing-inputmode-keyboard`.

@@ -45,17 +45,18 @@ flowchart TD
 ## 2. Spesifikasi Detail Rule `ergonomy.*` & `mobile.*`
 
 ### 2.1. `ergonomy.touch-target-too-small`
-- **Tujuan:** Memastikan elemen interaktif punya area sentuh memadai. WCAG 2.2 SC 2.5.8 mensyaratkan minimum 24×24px (Level AA), sementara Apple HIG & Material Design merekomendasikan ambang lebih aman 44-48px - dipakai sebagai baseline linter agar toleran di semua platform.
-- **In-Scope:** `<button>`/`<a>`/elemen ber-`onClick` dengan kelas tinggi/lebar eksplisit menghasilkan < 44px (mis. `h-6 w-6`, `h-8 w-8`) tanpa `p-*` yang cukup mengompensasi luas total.
-- **Bad:** `<button className="h-6 w-6"><TrashIcon /></button>`
-- **Good:** `<button className="h-11 w-11 flex items-center justify-center"><TrashIcon className="h-5 w-5" /></button>`
+- **Tujuan:** Memastikan elemen interaktif punya area sentuh memadai. WCAG 2.2 SC 2.5.8 mensyaratkan minimum 24×24px (Level AA), sementara Apple HIG & Material Design merekomendasikan ambang lebih aman 44-48px ($2.75\text{rem}$, `size-11` di Tailwind v4) - dipakai sebagai baseline linter agar toleran di semua platform.
+- **In-Scope:** `<button>`/`<a>`/elemen ber-`onClick` dengan kelas tinggi/lebar eksplisit menghasilkan < 44px (mis. `h-6 w-6`, `h-8 w-8`) tanpa padding kompensasi atau minimum dimensions.
+- **Bad:** `<button className="h-6 w-6"><TrashIcon className="size-4" /></button>`
+- **Good (Tailwind v4):** `<button className="size-11 flex items-center justify-center"><TrashIcon className="size-5" /></button>`
+- **Good (Kompensasi):** `<button className="h-8 w-8 min-h-11 min-w-11 flex items-center justify-center"><TrashIcon className="size-4" /></button>`
 - **Severity:** Warning.
 
 ### 2.2. `ergonomy.input-font-size-ios-zoom`
 - **Tujuan:** Mencegah Safari iOS melakukan auto-zoom paksa saat fokus ke `<input>`/`<textarea>`/`<select>` berukuran font di bawah 16px, yang merusak layout dan alur pengetikan.
 - **In-Scope:** Elemen form dengan kelas ukuran teks eksplisit di bawah `text-base` (mis. `text-sm`, `text-xs`) tanpa override untuk menaikkannya ke minimal 16px pada breakpoint mobile.
-- **Bad:** `<input className="text-sm px-3 py-2" />`
-- **Good:** `<input className="text-base sm:text-sm px-3 py-2" />`
+- **Bad:** `<input className="text-sm px-3 py-2 border rounded" />`
+- **Good (Tailwind v4):** `<input className="text-base sm:text-sm px-3.5 py-2.5 border rounded-lg" />`
 - **Severity:** Warning.
 
 ### 2.3. `ergonomy.missing-inputmode-keyboard`
@@ -90,7 +91,7 @@ flowchart TD
 * **Tujuan:** Mendeteksi layout yang berpotensi rusak atau terpotong ketika virtual keyboard perangkat mobile muncul.
 * **In-Scope:**
   * Fixed bottom controls di dalam container dengan input aktif
-  * Kontainer `100vh` yang terkunci tanpa dynamic units (`100dvh`)
+  * Kontainer `100vh` yang terkunci tanpa dynamic units (`dvh` / `svh`)
   * Input form di dalam modal fixed yang tidak dapat bergulir saat keyboard aktif
 * **Bad:**
   ```tsx
@@ -99,9 +100,9 @@ flowchart TD
     <button className="fixed bottom-0">Submit</button>
   </div>
   ```
-* **Good:**
+* **Good (Tailwind v4):**
   ```tsx
-  <div className="min-h-[100dvh] flex flex-col justify-between pb-[env(safe-area-inset-bottom)]">
+  <div className="min-h-dvh flex flex-col justify-between pb-[env(safe-area-inset-bottom)]">
     <input type="text" />
     <button className="sticky bottom-4">Submit</button>
   </div>
@@ -172,8 +173,8 @@ flowchart TD
 
 | Rule ID | Fokus Tujuan | Severity | Engine / Target |
 |---|---|---|---|
-| `ergonomy.touch-target-too-small` | Ukuran target sentuh minimum $\ge 44\times 44\text{px}$ (Fitts's Law) | warning | JSX/TSX AST |
-| `ergonomy.input-font-size-ios-zoom` | Pencegahan auto-zoom paksa Safari iOS (< 16px) | warning | JSX/TSX AST |
+| `ergonomy.touch-target-too-small` | Ukuran target sentuh minimum $\ge 44\times 44\text{px}$ ($2.75\text{rem}$ / `size-11`) | warning | JSX/TSX AST |
+| `ergonomy.input-font-size-ios-zoom` | Pencegahan auto-zoom paksa Safari iOS (< 16px / `text-base`) | warning | JSX/TSX AST |
 | `ergonomy.missing-inputmode-keyboard` | Penentuan keyboard virtual kontekstual (Tesler's Law) | info | JSX/TSX AST |
 | `ergonomy.tap-highlight-not-handled` | Penanganan feedback tap highlight Android | info | JSX/TSX AST |
 | `ergonomy.gesture-without-touch-action` | Pencegahan konflik gesture custom dengan native scroll | warning | JSX/TSX AST |
