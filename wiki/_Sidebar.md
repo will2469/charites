@@ -49,9 +49,10 @@
 </details>
 
 <details open>
-<summary><b>Ergonomy</b> (3 rules)</summary>
+<summary><b>Ergonomy</b> (4 rules)</summary>
 
 * [**Ergonomy Overview**](ergonomy)
+* [`ergonomy.bottom-nav-thumb-unreachable`](ergonomy.bottom-nav-thumb-unreachable)
 * [`ergonomy.gesture-without-touch-action`](ergonomy.gesture-without-touch-action)
 * [`ergonomy.missing-inputmode-keyboard`](ergonomy.missing-inputmode-keyboard)
 * [`ergonomy.tap-highlight-not-handled`](ergonomy.tap-highlight-not-handled)

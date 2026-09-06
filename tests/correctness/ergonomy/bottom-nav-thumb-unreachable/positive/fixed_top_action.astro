@@ -1,0 +1,17 @@
+---
+// Astro Component with primary action in fixed top bar and no bottom alternative
+---
+<div class="min-h-screen bg-background text-foreground">
+  <div class="fixed top-0 inset-x-0 z-20 flex items-center justify-between p-4 bg-card border-b">
+    <button type="button" aria-label="Kembali" class="p-2">
+      <span>Back</span>
+    </button>
+    <h1 class="font-semibold text-lg">Konfirmasi Pembayaran</h1>
+    <button type="button" class="h-10 px-4 bg-primary text-white rounded-xl font-medium">
+      Bayar Sekarang
+    </button>
+  </div>
+  <div class="p-4 mt-20">
+    <p>Rincian tagihan iuran desa warga</p>
+  </div>
+</div>

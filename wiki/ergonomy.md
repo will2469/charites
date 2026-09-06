@@ -8,6 +8,7 @@ The `ergonomy` category contains static analysis rules for code quality, archite
 
 | Rule ID | Severity | Summary | Full Specification | Status |
 | :--- | :---: | :--- | :--- | :---: |
+| `ergonomy.bottom-nav-thumb-unreachable` | `INFO` | Warns when primary call-to-action (CTA) buttons are exclusively located in the top mobile header without reachable alternatives in the bottom thumb zone | [`ergonomy.bottom-nav-thumb-unreachable`](ergonomy.bottom-nav-thumb-unreachable) | `enabled` |
 | `ergonomy.gesture-without-touch-action` | `WARN` | Enforces CSS touch-action declaration on elements with custom gesture swipe/drag event handlers | [`ergonomy.gesture-without-touch-action`](ergonomy.gesture-without-touch-action) | `enabled` |
 | `ergonomy.missing-inputmode-keyboard` | `INFO` | Enforces contextual virtual keyboard inputmode and type attributes on mobile form inputs (Tesler's Law) | [`ergonomy.missing-inputmode-keyboard`](ergonomy.missing-inputmode-keyboard) | `enabled` |
 | `ergonomy.tap-highlight-not-handled` | `INFO` | Flags clickable non-native custom elements lacking tactile tap feedback or tap-highlight management | [`ergonomy.tap-highlight-not-handled`](ergonomy.tap-highlight-not-handled) | `enabled` |

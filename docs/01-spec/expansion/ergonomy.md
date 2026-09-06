@@ -173,7 +173,73 @@ flowchart TD
 
 ---
 
-## 3. Spesifikasi Detail Rule Wave 2 & Wave 3 (Mobile Viewport & Thumb Ergonomics)
+## 3. Spesifikasi Detail Rule Wave 2: Thumb Zone & Navigation Ergonomics (1 Rule)
+
+---
+
+### 3.1. `ergonomy.bottom-nav-thumb-unreachable`
+- **Design Rationale:** Steven Hoober (2017, "Designing for Touch"), Fitts's Law of Motor Movement, Apple Human Interface Guidelines (Bottom Toolbars & Reachability), dan Google Material Design 3 (Bottom App Bars & Floating Action Buttons).
+- **Konteks Realitas Mobile:**
+  Pada smartphone modern dengan bentang layar tinggi (6.1 inci hingga 6.7+ inci dengan rasio 19.5:9 atau 20:9), sepertiga area atas layar berada pada "Hard to Reach Zone" / "Ow Zone" untuk penggunaan satu tangan (*one-handed thumb navigation*).
+  Riset Steven Hoober membuktikan bahwa 49% pengguna mengoperasikan ponsel hanya dengan satu jempol satu tangan. Menempatkan tombol aksi utama (*primary Call-to-Action*, seperti tombol submit form "Simpan", "Kirim", atau tombol checkout "Bayar") secara eksklusif di header navigasi atas (`<header>` atau kontainer `top-0`) memaksa pengguna meregangkan ibu jari secara berlebihan atau menggunakan tangan kedua.
+  Sesuai Fitts's Law ($T = a + b \log_2(2D/W)$), jarak $D$ ke pojok atas layar memperlambat waktu aksi pengguna dan meningkatkan risiko perangkat tergelincir (*drop hazards*).
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen tombol aksi primer $B \in \text{InteractiveButtons}$:
+  $$\text{isInTopHeader}(B) \land \text{isPrimaryCTA}(B) \land \neg \text{isDesktopOnly}(B) \land \neg \text{hasBottomAlternative}(\text{Root}) \implies \text{Violation (Info)}$$
+  di mana $\text{isPrimaryCTA}(B)$ bernilai true jika $B$ memiliki atribut `type="submit"`, styling kelas primer (`bg-primary`, `btn-primary`), atau teks aksi konfirmasi ("Simpan", "Submit", "Kirim", "Bayar", "Selesai", "Lanjut", "Daftar", "Beli", "Checkout"), dan bukan merupakan tombol sekunder/utilitas header (seperti tombol kembali, tutup/batal, hamburger menu, atau search toggle).
+- **Mengapa Lolos Linter Standar:**
+  Tombol `<button type="submit">Simpan</button>` di dalam `<header>` adalah HTML dan JSX yang valid secara sintaksis. Linter konvensional (ESLint, Prettier) tidak memiliki pemahaman ergonomis fisik genggaman perangkat seluler ataupun jangkauan jempol layar sentuh.
+- **Suspicious (Tombol Aksi Utama Terjebak di Header Atas Tanpa Alternatif Bawah):**
+  ```tsx
+  {/* Pengguna ponsel harus meregangkan jempol ke pojok kanan atas untuk submit form */}
+  <header className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background border-b">
+    <button type="button" aria-label="Kembali">
+      <ArrowLeft className="w-6 h-6" />
+    </button>
+    <h1 className="font-semibold text-lg">Edit Profil Warga</h1>
+    <button
+      type="submit"
+      className="h-10 px-4 bg-primary text-primary-foreground rounded-xl font-medium"
+    >
+      Simpan
+    </button>
+  </header>
+  <main className="p-4 space-y-4">
+    <input name="nama" placeholder="Nama Lengkap" />
+    <input name="nik" placeholder="NIK" />
+  </main>
+  ```
+- **Compliant (Tombol Aksi Primer Berada di Zona Nyaman Ibu Jari Bawah):**
+  ```tsx
+  {/* Aksi primer ditempatkan pada floating bottom bar yang mudah dijangkau satu tangan */}
+  <header className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background border-b">
+    <button type="button" aria-label="Kembali">
+      <ArrowLeft className="w-6 h-6" />
+    </button>
+    <h1 className="font-semibold text-lg">Edit Profil Warga</h1>
+  </header>
+  <main className="p-4 space-y-4 pb-24">
+    <input name="nama" placeholder="Nama Lengkap" />
+    <input name="nik" placeholder="NIK" />
+  </main>
+  <footer className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t pb-[env(safe-area-inset-bottom)]">
+    <button
+      type="submit"
+      className="w-full h-12 bg-primary text-primary-foreground rounded-xl font-semibold"
+    >
+      Simpan Perubahan
+    </button>
+  </footer>
+  ```
+- **Engine:** L1 Syntax + L2 Structural Thumb Zone AST (`internal/rules/ergonomy/bottom_nav_thumb_unreachable.go`).
+- **Severity:** `info`.
+- **Autofix:** No (memerlukan restrukturisasi tata letak antarmuka oleh developer).
+
+---
+
+## 4. Spesifikasi Detail Rule Wave 3: Mobile Viewport & Obstruction Physics (5 Rules)
+
+### 4.1. `mobile.keyboard-viewport-risk`
 * **Tujuan:** Mendeteksi layout yang berpotensi rusak atau terpotong ketika virtual keyboard perangkat mobile muncul.
 * **In-Scope:**
   * Fixed bottom controls di dalam container dengan input aktif
@@ -195,7 +261,7 @@ flowchart TD
   ```
 * **Severity:** Advisory (Heuristic AST).
 
-### 2.8. `mobile.fixed-action-obstruction`
+### 4.2. `mobile.fixed-action-obstruction`
 * **Tujuan:** Mencegah fixed bottom navigation bar atau floating CTA menutupi konten bawah atau form inputs.
 * **In-Scope:** Elemen `fixed bottom-0` tanpa padding kompensasi (`pb-*`) pada container layout induk atau sibling layout.
 * **Bad:**
@@ -214,7 +280,7 @@ flowchart TD
   ```
 * **Severity:** Warning.
 
-### 2.9. `mobile.modal-viewport-lock`
+### 4.3. `mobile.modal-viewport-lock`
 * **Tujuan:** Mendeteksi modal atau dialog popup yang menggunakan fixed viewport dimensions dan tidak dapat discroll pada layar smartphone pendek.
 * **In-Scope:** Kontainer modal `fixed inset-0` dengan `overflow-hidden` tanpa region scroll vertikal internal (`overflow-y-auto`).
 * **Bad:**
@@ -231,12 +297,12 @@ flowchart TD
   ```
 * **Severity:** Error.
 
-### 2.10. `mobile.orientation-lock-risk`
+### 4.4. `mobile.orientation-lock-risk`
 * **Tujuan:** Mendeteksi penguncian orientasi layar (*orientation lock*) yang membatasi aksesibilitas bagi pengguna dengan mount holder atau tablet horizontal.
 * **In-Scope:** Penggunaan Screen Orientation API lock (`screen.orientation.lock()`) atau deklarasi manifest `orientation: "portrait"` tanpa justifikasi aplikasi spesifik.
 * **Severity:** Advisory.
 
-### 2.11. `mobile.pointer-events-block`
+### 4.5. `mobile.pointer-events-block`
 * **Tujuan:** Mencegah kelas `pointer-events-none` pada kontainer induk memblokir seluruh interaksi ketukan sentuh pada elemen anak di perangkat mobile.
 * **In-Scope:** Interaktif descendants (`<button>`, `<a>`, `<input>`) di bawah elemen leluhur ber-`pointer-events-none` tanpa pemulihan eksplisit `pointer-events-auto`.
 * **Bad:**
@@ -255,7 +321,7 @@ flowchart TD
 
 ---
 
-## 4. Ringkasan Matriks Rule `ergonomy.*` & `mobile.*` (9 Aturan Terkurasi)
+## 5. Ringkasan Matriks Rule `ergonomy.*` & `mobile.*` (9 Aturan Terkurasi)
 
 | Rule ID | Fokus Tujuan | Wave | Severity | Engine / Target |
 |---|---|:---:|---|---|
@@ -273,7 +339,7 @@ flowchart TD
 
 ---
 
-## 5. Rule Classification & Execution Boundary
+## 6. Rule Classification & Execution Boundary
 
 1. **Deterministic AST Rules (< 50ms pre-commit gate):**
    - `ergonomy.missing-inputmode-keyboard`, `ergonomy.tap-highlight-not-handled`, `ergonomy.gesture-without-touch-action`, `mobile.fixed-action-obstruction`, `mobile.modal-viewport-lock`, `mobile.pointer-events-block`.
@@ -284,17 +350,19 @@ flowchart TD
 
 ---
 
-## 6. Struktur Modul Kode & Roadmap Eksekusi Wave 1
+## 7. Struktur Modul Kode & Roadmap Eksekusi Wave 1 & Wave 2
 
 Implementasi aturan `ergonomy.*` ditempatkan secara modular di `internal/rules/ergonomy/`:
 
 ```text
 internal/rules/ergonomy/
-├── missing_inputmode_keyboard.go   # Wave 1: Contextual virtual keyboard (Tesler)
-├── tap_highlight_not_handled.go    # Wave 1: Android Chrome tap feedback
-├── gesture_without_touch_action.go # Wave 1: Touch-action gesture isolation
-├── contract_test.go                # 8-Pillars Canonical Contract Validator
-└── benchmark_test.go               # QUAL-03 Zero Allocation Benchmarks
+├── missing_inputmode_keyboard.go      # Wave 1: Contextual virtual keyboard (Tesler)
+├── tap_highlight_not_handled.go       # Wave 1: Android Chrome tap feedback
+├── gesture_without_touch_action.go    # Wave 1: Touch-action gesture isolation
+├── bottom_nav_thumb_unreachable.go    # Wave 2: Fitts's Law Thumb Zone Reachability
+├── contract_test.go                   # 8-Pillars Canonical Contract Validator
+└── benchmark_test.go                  # QUAL-03 Zero Allocation Benchmarks
 ```
 
 Setiap rule divalidasi dengan **1-SSOT Golden Tri-Corpus** di `tests/correctness/ergonomy/<slug>/` yang mencakup kasus uji positif, negatif, dan adversarial untuk menjamin **nol regresi dan nol false-positive**.
+

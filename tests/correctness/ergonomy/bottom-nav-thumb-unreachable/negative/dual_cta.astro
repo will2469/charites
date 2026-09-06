@@ -1,0 +1,22 @@
+---
+// Negative fixture: Dual CTA with desktop header button and mobile bottom sticky bar
+---
+<div class="min-h-screen bg-background text-foreground pb-24">
+  <header class="sticky top-0 z-10 flex items-center justify-between p-4 bg-card border-b">
+    <button type="button" aria-label="Kembali" class="p-2">
+      <span>Back</span>
+    </button>
+    <h1 class="font-semibold text-lg">Konfirmasi Pembayaran</h1>
+    <button type="submit" class="hidden md:inline-flex h-10 px-4 bg-primary text-white rounded-xl font-medium">
+      Bayar
+    </button>
+  </header>
+  <main class="p-4 space-y-4">
+    <p>Rincian tagihan iuran desa warga</p>
+  </main>
+  <div class="fixed bottom-0 inset-x-0 p-4 bg-card border-t">
+    <button type="submit" class="w-full h-12 bg-primary text-white rounded-xl font-semibold">
+      Bayar Sekarang
+    </button>
+  </div>
+</div>

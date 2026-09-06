@@ -140,6 +140,9 @@ func builtinRules() []Rule {
 		ergonomy.NewMissingInputmodeKeyboardRule(),
 		ergonomy.NewTapHighlightNotHandledRule(),
 		ergonomy.NewGestureWithoutTouchActionRule(),
+
+		// ergonomy Wave 2 (Thumb Zone & Navigation Ergonomics)
+		ergonomy.NewBottomNavThumbUnreachableRule(),
 	}
 }
 
