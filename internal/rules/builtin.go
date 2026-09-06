@@ -90,6 +90,11 @@ var (
 	_ Rule = (*responsive.FlexChildOverflowRule)(nil)
 	_ Rule = (*responsive.ImageOverflowRule)(nil)
 	_ Rule = (*responsive.MobileTextOverflowRule)(nil)
+
+	// responsive Wave 3 (Mobile-First Content & Viewport Dynamics)
+	_ Rule = (*responsive.DesktopOnlyContentRule)(nil)
+	_ Rule = (*responsive.MobileDensityOverloadRule)(nil)
+	_ Rule = (*responsive.DynamicViewportInconsistencyRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -213,6 +218,11 @@ func builtinRules() []Rule {
 		responsive.NewFlexChildOverflowRule(),
 		responsive.NewImageOverflowRule(),
 		responsive.NewMobileTextOverflowRule(),
+
+		// responsive Wave 3 (Mobile-First Content & Viewport Dynamics)
+		responsive.NewDesktopOnlyContentRule(),
+		responsive.NewMobileDensityOverloadRule(),
+		responsive.NewDynamicViewportInconsistencyRule(),
 	}
 }
 

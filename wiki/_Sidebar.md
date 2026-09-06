@@ -89,14 +89,17 @@
 </details>
 
 <details open>
-<summary><b>Responsive</b> (10 rules)</summary>
+<summary><b>Responsive</b> (13 rules)</summary>
 
 * [**Responsive Overview**](responsive)
+* [`responsive.desktop-only-content`](responsive.desktop-only-content)
+* [`responsive.dynamic-viewport-inconsistency`](responsive.dynamic-viewport-inconsistency)
 * [`responsive.fixed-width-overflow`](responsive.fixed-width-overflow)
 * [`responsive.flex-child-overflow`](responsive.flex-child-overflow)
 * [`responsive.horizontal-overflow`](responsive.horizontal-overflow)
 * [`responsive.image-overflow`](responsive.image-overflow)
 * [`responsive.missing-breakpoint`](responsive.missing-breakpoint)
+* [`responsive.mobile-density-overload`](responsive.mobile-density-overload)
 * [`responsive.mobile-text-overflow`](responsive.mobile-text-overflow)
 * [`responsive.safe-area-missing`](responsive.safe-area-missing)
 * [`responsive.unwrapped-table-overflow`](responsive.unwrapped-table-overflow)

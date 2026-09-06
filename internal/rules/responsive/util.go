@@ -306,3 +306,165 @@ func hasCodeWrapOrScroll(node *ir.Node) bool {
 	}
 	return hasScrollContainerAncestor(node)
 }
+
+func isDesktopHidden(classes []string) bool {
+	hasHiddenMobile := false
+	hasDesktopDisplay := false
+	for _, cls := range classes {
+		if cls == "hidden" {
+			hasHiddenMobile = true
+		}
+		if strings.HasPrefix(cls, "sm:") || strings.HasPrefix(cls, "md:") || strings.HasPrefix(cls, "lg:") || strings.HasPrefix(cls, "xl:") || strings.HasPrefix(cls, "2xl:") {
+			suffix := cls[strings.Index(cls, ":")+1:]
+			switch suffix {
+			case "block", "inline-block", "inline", "flex", "inline-flex", "grid", "inline-grid", "table":
+				hasDesktopDisplay = true
+			}
+		}
+	}
+	return hasHiddenMobile && hasDesktopDisplay
+}
+
+func isPrimaryAction(node *ir.Node) bool {
+	if node == nil || !isActionControlTag(node.Tag) {
+		return false
+	}
+	if hasPrimaryActionAttribute(node) || hasPrimaryActionClass(node.Classes) {
+		return true
+	}
+	return hasPrimaryActionText(node.Children)
+}
+
+func isActionControlTag(tag string) bool {
+	return tag == "button" || tag == "a" || tag == "input"
+}
+
+func hasPrimaryActionAttribute(node *ir.Node) bool {
+	if node.Attributes == nil {
+		return false
+	}
+	if node.Attributes["type"] == "submit" {
+		return true
+	}
+	if aria, ok := node.Attributes["aria-label"]; ok {
+		return isActionKeyword(strings.ToLower(aria))
+	}
+	return false
+}
+
+func hasPrimaryActionClass(classes []string) bool {
+	for _, cls := range classes {
+		if cls == "bg-primary" || cls == "bg-destructive" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPrimaryActionText(children []*ir.Node) bool {
+	for _, child := range children {
+		if child != nil && child.Type == ir.NodeText {
+			lower := strings.ToLower(strings.TrimSpace(child.RawClasses))
+			if isActionKeyword(lower) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isActionKeyword(text string) bool {
+	keywords := [...]string{
+		"simpan", "save", "bayar", "pay", "checkout", "kirim", "send", "submit",
+		"konfirmasi", "confirm", "beli", "buy", "daftar", "register", "selesai", "finish",
+	}
+	for _, kw := range keywords {
+		if strings.Contains(text, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func countInteractiveChildren(node *ir.Node) int {
+	if node == nil {
+		return 0
+	}
+	count := 0
+	for _, child := range node.Children {
+		if isInteractiveElement(child) {
+			count++
+		}
+	}
+	return count
+}
+
+func isInteractiveElement(child *ir.Node) bool {
+	if child == nil || child.Type != ir.NodeElement {
+		return false
+	}
+	switch child.Tag {
+	case "button", "Button", "a", "Link":
+		return true
+	case "input":
+		if child.Attributes != nil {
+			t := child.Attributes["type"]
+			return t == "button" || t == "submit" || t == "reset"
+		}
+	}
+	return false
+}
+
+func isHorizontalFlexRow(classes []string) bool {
+	isFlex := false
+	isCol := false
+	isWrap := false
+	hasScroll := false
+	for _, cls := range classes {
+		if hasBreakpointPrefix(cls) {
+			continue
+		}
+		switch cls {
+		case "flex", "inline-flex":
+			isFlex = true
+		case "flex-col", "flex-col-reverse":
+			isCol = true
+		case "flex-wrap", "flex-wrap-reverse":
+			isWrap = true
+		case "overflow-x-auto", "overflow-x-scroll", "overflow-auto", "overflow-scroll":
+			hasScroll = true
+		}
+	}
+	return isFlex && !isCol && !isWrap && !hasScroll
+}
+
+func isDynamicViewportHeightClass(cls string) bool {
+	if hasBreakpointPrefix(cls) {
+		return false
+	}
+	switch cls {
+	case "h-dvh", "min-h-dvh", "max-h-dvh", "h-svh", "min-h-svh", "max-h-svh",
+		"h-[100dvh]", "min-h-[100dvh]", "max-h-[100dvh]", "h-[100svh]", "min-h-[100svh]", "max-h-[100svh]":
+		return true
+	default:
+		return false
+	}
+}
+
+func hasDynamicViewportHeight(classes []string) bool {
+	for _, cls := range classes {
+		if isDynamicViewportHeightClass(cls) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasClassicalViewportHeight(classes []string) bool {
+	for _, cls := range classes {
+		if isViewportHeightClass(cls) {
+			return true
+		}
+	}
+	return false
+}

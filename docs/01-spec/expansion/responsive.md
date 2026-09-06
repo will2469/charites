@@ -39,12 +39,11 @@ flowchart TD
     subgraph W3 ["Wave 3: Mobile-First Content & Kepadatan Interaksi (3 Rules)"]
         R11["responsive.desktop-only-content (Aksi/konten penting hanya muncul di desktop)"]
         R12["responsive.mobile-density-overload (Toolbar > 4 tombol tanpa collapse)"]
-        R13["responsive.hover-only-interaction (Aksi penting hanya via hover tanpa touch)"]
+        R13["responsive.dynamic-viewport-inconsistency (Pencampuran vh/dvh tak konsisten)"]
     end
 
-    subgraph W4 ["Wave 4: Viewport Dynamics & Keyboard Obstruction (2 Rules)"]
+    subgraph W4 ["Wave 4: Viewport Dynamics & Keyboard Obstruction (1 Rule)"]
         R14["responsive.keyboard-obstruction (Virtual keyboard menutupi input/submit)"]
-        R15["responsive.dynamic-viewport-inconsistency (Pencampuran vh/dvh tak konsisten)"]
     end
 
     subgraph W5 ["Wave 5: Grid & Container Physics (3 Rules)"]
@@ -398,40 +397,105 @@ flowchart TD
 - **Autofix:** No.
 
 ### 2.11. `responsive.desktop-only-content`
-- **Tujuan:** Mendeteksi aksi penting atau navigasi utama yang hanya tersedia di breakpoint desktop (`hidden md:flex`) tanpa alternatif di layar mobile.
-- **Mengapa Lolos Linter Standar:** `hidden md:flex` adalah pola Tailwind resmi. Linter biasa tidak memahami apakah tombol tersebut merupakan aksi penting (seperti "Konfirmasi Pembayaran") yang jika disembunyikan di mobile akan membuat aplikasi tidak bisa digunakan.
-- **In-Scope:** Primary CTA atau navigasi penting yang disembunyikan di mobile tanpa mobile drawer/floating button.
-- **Engine:** JSX/TSX AST.
-- **Severity:** Error untuk aksi primer, Warning untuk konten sekunder.
+### 2.11. `responsive.desktop-only-content`
+- **Design Rationale:** Mobile-First Responsive Web Design Principles (Luke Wroblewski) & WCAG 2.2 SC 3.2.3 (Consistent Navigation).
+- **Konteks Realitas Mobile:**
+  Dalam perancangan mobile-first, menyembunyikan konten sekunder (seperti badge pemasaran atau bilah navigasi samping desktop) pada layar kecil adalah hal lumrah. Namun, menyembunyikan pemicu aksi vital (seperti tombol "Checkout", "Bayar Sekarang", "Kirim Berkas", atau tombol submit formulir) via kelas utilitas `hidden md:flex` atau `hidden lg:block` tanpa menyediakan alternatif di layar ponsel membuat pengguna smartphone terkunci dari alur konversi inti.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen kontrol aksi primer $A$:
+  $$\text{isPrimaryAction}(A) \land \text{isDesktopHidden}(A) \implies \text{Violation (Warn)}$$
+  di mana $\text{isPrimaryAction}$ memeriksa `type="submit"`, kelas warna primer/destruktif (`bg-primary`), atau kata kunci semantik aksi (bayar, simpan, kirim, checkout), dan $\text{isDesktopHidden}$ mendeteksi `hidden` berkombinasi dengan kelas display breakpoint desktop (`md:flex`, `lg:block`, dsb).
+- **Mengapa Lolos Linter Standar:**
+  `hidden md:flex` adalah kelas utilitas Tailwind yang sah secara sintaksis. Linter biasa tidak memahami semantik aksi atau kepentingan fungsional kontrol yang disembunyikan.
+- **Suspicious (Tombol Checkout Vital Disembunyikan di Mobile):**
+  ```tsx
+  {/* Pengguna HP tidak bisa menyelesaikan transaksi karena tombol tersembunyi */}
+  <button type="submit" className="hidden md:flex items-center px-6 py-3 bg-primary text-white">
+    Bayar Sekarang
+  </button>
+  ```
+- **Compliant (Tombol Aksi Tersedia Penuh di Mobile):**
+  ```tsx
+  {/* Terlihat di seluruh breakpoint dengan penyesuaian lebar fluida */}
+  <button type="submit" className="flex w-full md:w-auto items-center justify-center px-6 py-3 bg-primary text-white">
+    Bayar Sekarang
+  </button>
+  ```
+- **Engine:** L1 Syntax + L2 Semantic Action AST (`internal/rules/responsive/desktop_only_content.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 2.12. `responsive.mobile-density-overload`
-- **Tujuan:** Mencegah toolbar atau bilah aksi memadatkan terlalu banyak tombol interaktif ($> 4$ tombol) sejajar di layar smartphone 360px tanpa menu dropdown/collapse.
-- **Mengapa Lolos Linter Standar:** Meletakkan 7 tombol di dalam `<div className="flex">` adalah kode yang valid secara sintaksis, namun secara fisik tombol-tombol tersebut akan saling berhimpitan dan tidak muat di layar HP.
-- **In-Scope:** Sibling interactive buttons $> 4$ dalam satu baris tanpa responsive collapse pada mobile.
-- **Engine:** JSX/TSX AST.
-- **Severity:** Warning.
+- **Design Rationale:** Steven Hoober (Designing for Touch), WCAG 2.2 SC 2.5.8 (Target Size - Minimum & Spacing), & Material Design 3 Mobile App Bar Guidelines.
+- **Konteks Realitas Mobile:**
+  Pada layar ponsel sempit selebar 360px, menjejalkan 5 atau lebih tombol interaktif di dalam satu baris horizontal tanpa kontainer scroll atau dropdown memadatkan lebar setiap tombol di bawah batas aman 44px. Hal ini memicu tingkat salah sentuh (*mis-tap*) yang tinggi karena jari pengguna menimpa tombol yang bersebelahan.
+- **Invariant (Predikat AST):**
+  Untuk setiap kontainer baris horizontal $R$:
+  $$\text{isHorizontalFlexRow}(R) \land \text{countInteractiveChildren}(R) > 4 \implies \text{Violation (Warn)}$$
+  di mana $\text{isHorizontalFlexRow}$ mendeteksi kontainer flex sebaris tanpa `overflow-x-auto`, tanpa `flex-col`, dan tanpa `flex-wrap`.
+- **Mengapa Lolos Linter Standar:**
+  Menempatkan 6 tombol `<button>` di dalam `<div className="flex">` sepenuhnya valid secara sintaksis. Linter biasa buta terhadap kalkulasi lebar target sentuh fisik.
+- **Suspicious (Lima Tombol Berdesakan dalam Satu Baris Rigid):**
+  ```tsx
+  {/* Tombol berhimpitan dan saling tumpang-tindih di layar HP 360px */}
+  <div className="flex items-center gap-2 p-2 bg-surface">
+    <button type="button">Edit</button>
+    <button type="button">Salin</button>
+    <button type="button">Cetak</button>
+    <button type="button">Bagikan</button>
+    <button type="button">Hapus</button>
+  </div>
+  ```
+- **Compliant (Bilah Aksi Dilengkapi Scroll Horizontal Halus):**
+  ```tsx
+  {/* Dapat digulir menyamping dengan mulus tanpa memampatkan ukuran tombol */}
+  <div className="flex items-center gap-2 p-2 bg-surface overflow-x-auto">
+    <button type="button">Edit</button>
+    <button type="button">Salin</button>
+    <button type="button">Cetak</button>
+    <button type="button">Bagikan</button>
+    <button type="button">Hapus</button>
+  </div>
+  ```
+- **Engine:** L1 Syntax + L2 Spatial Density AST (`internal/rules/responsive/mobile_density_overload.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
 
-### 2.13. `responsive.hover-only-interaction`
-- **Tujuan:** Mencegah fungsionalitas penting hanya dapat diakses melalui state `:hover`/`group-hover:`, yang tidak ada pada layar sentuh.
-- **Mengapa Lolos Linter Standar:** `group-hover:opacity-100` adalah kelas Tailwind yang valid. Linter biasa tidak mengetahui bahwa perangkat sentuh tidak dapat memicu efek hover.
-- **In-Scope:** Kontrol aksi yang disembunyikan (`opacity-0`) dan HANYA dimunculkan via `hover:` tanpa alternatif `focus-visible:` atau status tap.
-- **Bad:** `<button className="opacity-0 hover:opacity-100">Hapus</button>`
-- **Good:** `<button className="opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100">Hapus</button>`
-- **Engine:** JSX/TSX AST.
-- **Severity:** Error.
+---
 
-### 2.14. `responsive.keyboard-obstruction`
-- **Tujuan:** Mendeteksi layout form yang berisiko tertutup oleh virtual keyboard mobile saat pengguna mengetik.
-- **Mengapa Lolos Linter Standar:** Tombol `fixed bottom-0` di bawah form adalah pola desktop yang umum. Pada mobile, saat keyboard virtual naik, elemen fixed bottom sering kali menutupi kotak input yang sedang aktif.
-- **In-Scope:** Form di dalam kontainer `h-screen` dengan tombol `fixed bottom-0` tanpa scrollable region.
-- **Engine:** JSX/TSX AST.
-- **Severity:** Warning.
-
-### 2.15. `responsive.dynamic-viewport-inconsistency`
-- **Tujuan:** Mencegah pencampuran unit viewport yang saling bertentangan (`100vh` dengan `100dvh`) pada satu hierarki komponen layout.
-- **Mengapa Lolos Linter Standar:** Masing-masing nilai CSS sah secara individual. Linter biasa tidak memeriksa konsistensi hierarki parent-child viewport units.
-- **Engine:** Relational AST.
-- **Severity:** Warning.
+### 2.13. `responsive.dynamic-viewport-inconsistency`
+- **Design Rationale:** W3C CSS Values and Units Module Level 4 (Small, Large, and Dynamic Viewport Units) & WebKit Dynamic Viewport Sizing.
+- **Konteks Realitas Mobile:**
+  Peramban mobile modern (Safari iOS dan Chrome Android) memiliki bilah alamat dinamis yang membesar dan menyusut saat pengguna menggulir halaman. Unit `dvh` menyesuaikan tinggi aktif viewport secara dinamis, sementara `100vh` atau `h-screen` terpaku pada Large Viewport statis. Ketika kontainer pembungkus menggunakan `min-h-dvh` namun komponen anak di dalamnya menyetel `h-screen` atau `h-[100vh]`, anak akan melebihi area visible kontainer induk saat bilah alamat muncul, memicu scrollbar ganda (*double scrollbar*) dan layout loncat (*viewport jitter*).
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen $E$:
+  $$(\text{hasStatic}(E) \land \text{hasDynamic}(E)) \lor (\text{hasStatic}(E) \land \exists A \in \text{Ancestors}(E): \text{hasDynamic}(A)) \implies \text{Violation (Warn)}$$
+  di mana unit statis mencakup `100vh`, `h-screen`, `min-h-screen`, dan unit dinamis mencakup `dvh`, `svh`.
+- **Catatan Redundansi:**
+  Pemeriksaan paritas interaksi hover murni (*hover without touch/focus-visible*) didelegasikan secara kanonikal ke [`browser.hover-only-interaction`](../expansion/browser.md) sesuai dengan **Prinsip Eliminasi Redundansi** Charites.
+- **Suspicious (Anak Menggunakan h-screen di Dalam Induk min-h-dvh):**
+  ```tsx
+  {/* Anak meluap keluar dari kontainer dvh saat bilah alamat mobile aktif */}
+  <main className="min-h-dvh flex flex-col">
+    <div className="h-screen bg-surface p-6">
+      <h1>Konten Terpotong di Mobile</h1>
+    </div>
+  </main>
+  ```
+- **Compliant (Konsisten Menggunakan Unit Dinamis atau h-full):**
+  ```tsx
+  {/* Tinggi anak mengikuti tinggi kontainer dinamis secara selaras */}
+  <main className="min-h-dvh flex flex-col">
+    <div className="h-full bg-surface p-6">
+      <h1>Konten Selaras Mengikuti Viewport</h1>
+    </div>
+  </main>
+  ```
+- **Engine:** L1 Syntax + L2 Relational Hierarchy AST (`internal/rules/responsive/dynamic_viewport_inconsistency.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
 
 ### 2.16. `responsive.container-overconstraint`
 - **Tujuan:** Mendeteksi kombinasi constraint lebar yang menyebabkan area konten menjadi terlalu sempit di mobile ($< 280$px usable width).
@@ -469,11 +533,10 @@ flowchart TD
 | `responsive.flex-child-overflow` | Gotcha min-width: auto pada flex child | Gotcha CSS flexbox yang tidak dideteksi linter teks | warning | JSX/TSX AST |
 | `responsive.image-overflow` | Media tanpa max-w-full | Atribut width/height besar sah untuk CWV tapi bisa jebol | warning | JSX/TSX AST |
 | `responsive.mobile-text-overflow` | Teks dinamis tanpa break-words | Ekspresi string dinamis valid secara tipe tapi merusak layout | warning | JSX/TSX AST |
-| `responsive.desktop-only-content` | Aksi primer disembunyikan di mobile | Pola hidden md:block sah di Tailwind, tapi fatal di UX | error / warning | JSX/TSX AST |
+| `responsive.desktop-only-content` | Aksi primer disembunyikan di mobile | Pola hidden md:block sah di Tailwind, tapi fatal di UX | warning | JSX/TSX AST |
 | `responsive.mobile-density-overload` | Toolbar > 4 tombol tanpa collapse | Meletakkan banyak button sah di HTML, tapi berdesakan di HP | warning | JSX/TSX AST |
-| `responsive.hover-only-interaction` | Affordance aksi hanya via hover | Kelas hover valid di Tailwind, tapi non-existent di touch | error | JSX/TSX AST |
-| `responsive.keyboard-obstruction` | Submit fixed menutupi input aktif | Linter tidak menganalisis kenaikan virtual keyboard | warning | JSX/TSX AST |
 | `responsive.dynamic-viewport-inconsistency` | Hierarki viewport unit bentrok | Linter biasa tidak membandingkan unit parent vs child | warning | Relational AST |
+| `responsive.keyboard-obstruction` | Submit fixed menutupi input aktif | Linter tidak menganalisis kenaikan virtual keyboard | warning | JSX/TSX AST |
 | `responsive.container-overconstraint` | Konten terjepit < 280px | Butuh kalkulasi total lebar dikurangi padding | advisory | Token Geometry AST |
 | `responsive.grid-min-column` | minmax grid kaku > lebar ponsel | CSS minmax 400px sah secara sintaksis, jebol di layar 360px | warning | CSS/Tailwind AST |
 | `responsive.aspect-ratio-overflow` | Rasio aspek media tak responsif | Aspek rasio statis tidak memperhitungkan viewport sempit | warning | JSX/TSX AST |
@@ -486,3 +549,4 @@ Untuk mencegah duplikasi antar-kategori (*zero redundancy*), aturan-aturan terka
 - **Ukuran target sentuh ($\ge 44\text{px}$):** Didelegasikan ke `a11y.touch-target-size` & `ergonomy.touch-target-too-small`.
 - **Jarak aman miss-tap ($\ge 8\text{px}$):** Didelegasikan ke `a11y.touch-target-spacing`.
 - **Keyboard virtual contextual inputmode:** Didelegasikan ke `ergonomy.missing-inputmode-keyboard`.
+- **Paritas interaksi hover vs touch/keyboard:** Didelegasikan ke `browser.hover-only-interaction`.

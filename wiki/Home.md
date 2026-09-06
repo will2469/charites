@@ -63,7 +63,7 @@ flowchart TD
 | `ergonomy` | 4 | [`ergonomy`](ergonomy) |
 | `mobile` | 5 | [`mobile`](mobile) |
 | `pwa` | 10 | [`pwa`](pwa) |
-| `responsive` | 10 | [`responsive`](responsive) |
+| `responsive` | 13 | [`responsive`](responsive) |
 | `theme` | 32 | [`theme`](theme) |
 
 ---
@@ -119,11 +119,14 @@ flowchart TD
 | `pwa.service-worker-no-offline-fallback` | `pwa` | `WARN` | Warns when a Service Worker intercepts fetch events without providing an offline cache fallback or failure handler | [`pwa.service-worker-no-offline-fallback`](pwa.service-worker-no-offline-fallback) |
 | `pwa.service-worker-registration` | `pwa` | `WARN` | Warns when Service Worker registration lacks feature detection ('serviceWorker' in navigator) or error handling (.catch) | [`pwa.service-worker-registration`](pwa.service-worker-registration) |
 | `pwa.start-url-inconsistency` | `pwa` | `ERROR` | Errors when a Web App Manifest start_url uses an insecure protocol (http://), script scheme (javascript:), or path traversal (../) | [`pwa.start-url-inconsistency`](pwa.start-url-inconsistency) |
+| `responsive.desktop-only-content` | `responsive` | `WARN` | Warns when primary action buttons or form submit controls are hidden on mobile viewports without mobile alternatives | [`responsive.desktop-only-content`](responsive.desktop-only-content) |
+| `responsive.dynamic-viewport-inconsistency` | `responsive` | `WARN` | Warns when static viewport units (100vh, h-screen) and modern dynamic units (dvh, svh) are mixed inconsistently across layout hierarchies | [`responsive.dynamic-viewport-inconsistency`](responsive.dynamic-viewport-inconsistency) |
 | `responsive.fixed-width-overflow` | `responsive` | `ERROR` | Detects static fixed container widths exceeding 320px that cause horizontal overflow on mobile viewports | [`responsive.fixed-width-overflow`](responsive.fixed-width-overflow) |
 | `responsive.flex-child-overflow` | `responsive` | `WARN` | Warns when a flex child containing text or dynamic content lacks min-w-0, causing min-width: auto container blowout | [`responsive.flex-child-overflow`](responsive.flex-child-overflow) |
 | `responsive.horizontal-overflow` | `responsive` | `WARN` | Warns when unconstrained overflow-x-scroll is declared without fluid width boundary or dynamic auto-scrolling | [`responsive.horizontal-overflow`](responsive.horizontal-overflow) |
 | `responsive.image-overflow` | `responsive` | `WARN` | Warns when media elements with large fixed dimensions lack responsive max-w-full scaling | [`responsive.image-overflow`](responsive.image-overflow) |
 | `responsive.missing-breakpoint` | `responsive` | `WARN` | Warns when multi-column grids or giant font sizes are declared on mobile baseline without responsive breakpoint modifiers | [`responsive.missing-breakpoint`](responsive.missing-breakpoint) |
+| `responsive.mobile-density-overload` | `responsive` | `WARN` | Warns when toolbars or action rows cram more than 4 interactive buttons in a single unscrollable row on mobile viewports | [`responsive.mobile-density-overload`](responsive.mobile-density-overload) |
 | `responsive.mobile-text-overflow` | `responsive` | `WARN` | Warns when whitespace-nowrap text or code blocks lack truncation, word breaking, or horizontal scroll wrappers | [`responsive.mobile-text-overflow`](responsive.mobile-text-overflow) |
 | `responsive.safe-area-missing` | `responsive` | `WARN` | Warns when bottom-docked fixed or sticky elements lack safe-area-inset-bottom padding for modern mobile home indicators | [`responsive.safe-area-missing`](responsive.safe-area-missing) |
 | `responsive.unwrapped-table-overflow` | `responsive` | `WARN` | Warns when an HTML table element lacks a responsive horizontal scroll wrapper (overflow-x-auto) or responsive display transformation | [`responsive.unwrapped-table-overflow`](responsive.unwrapped-table-overflow) |
