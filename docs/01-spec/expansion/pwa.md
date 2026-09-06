@@ -202,15 +202,66 @@ flowchart TD
 
 ## 3. Spesifikasi Detail Rule Wave 2: Apple Standalone & Security (2 Rules)
 
+---
+
 ### 3.1. `pwa.apple-meta-missing`
-- **Tujuan:** Safari iOS memerlukan meta tag WebKit khusus agar tampil tanpa bilah alamat dan memakai ikon kustom saat ditambahkan ke Home Screen.
-- **In-Scope:** Root layout (`<head>`) yang memasang manifest tapi tidak menyertakan `<meta name="apple-mobile-web-app-capable">` dan `<link rel="apple-touch-icon">`.
-- **Severity:** Warning.
+- **Design Rationale:** Apple Safari Web Content Guide (Configuring Web Applications) & WebKit PWA Engine.
+- **Konteks Realitas Mobile:**
+  Di ekosistem iOS (iPhone dan iPad), mesin peramban WebKit Safari secara historis mengabaikan konfigurasi `display: "standalone"` dan array `icons` dari berkas Web App Manifest W3C saat pengguna menambahkan pintasan aplikasi ke Home Screen. Agar web app dapat berjalan dalam mode layar penuh imersif tanpa bilah alamat Safari dan menampilkan ikon beresolusi tinggi, dokumen wajib menyertakan tag `<meta name="apple-mobile-web-app-capable" content="yes">` dan `<link rel="apple-touch-icon" href="...">` di dalam elemen `<head>`. Tanpa deklarasi ini, PWA di iOS diluncurkan layaknya tab peramban biasa dengan ikon screenshot kaku.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen `<head>` atau root layout yang memuat deklarasi `<link rel="manifest">`:
+  $$\neg \text{hasAppleCapableMeta}(Head) \lor \neg \text{hasAppleTouchIcon}(Head) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasAppleCapableMeta}$ memeriksa keberadaan `<meta name="apple-mobile-web-app-capable" content="yes">` dan $\text{hasAppleTouchIcon}$ memeriksa `<link rel="apple-touch-icon">` dengan `href` non-kosong.
+- **Mengapa Lolos Linter Standar:**
+  Meta tag WebKit bersifat spesifik platform Apple dan tidak diwajibkan oleh validator skema HTML umum.
+- **Suspicious (PWA Memiliki Manifest Tapi Melewatkan Meta WebKit Apple):**
+  ```tsx
+  <head>
+    <title>Layanan Desa</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+  </head>
+  ```
+- **Compliant (Meta WebKit Apple Dideklarasikan Lengkap):**
+  ```tsx
+  <head>
+    <title>Layanan Desa</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  </head>
+  ```
+- **Engine:** L1 Syntax + L2 HTML Head AST (`internal/rules/pwa/apple_meta_missing.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
+---
 
 ### 3.2. `pwa.insecure-context-resource`
-- **Tujuan:** Memastikan seluruh resource dalam PWA tidak menggunakan protokol HTTP yang tidak aman (`http://`), sesuai standar W3C Secure Contexts.
-- **In-Scope:** URL literal berskema `http://` (bukan localhost) pada atribut atau pemanggilan resource.
-- **Severity:** Error.
+- **Design Rationale:** W3C Secure Contexts Specification & Mixed Content Mitigation Level 2.
+- **Konteks Realitas Mobile:**
+  Aplikasi PWA diwajibkan berjalan secara eksklusif dalam Secure Contexts (HTTPS). Memuat aset eksternal (skrip, stylesheet, font, gambar, video, iframe) menggunakan skema tidak aman `http://` memicu insiden *Mixed Content*. Browser mobile modern akan memblokir secara aktif (*Active Mixed Content Blocking*) aset berbahaya tersebut, menyebabkan tampilan antarmuka hancur dan fungsionalitas aplikasi terputus. Pengecualian hanya berlaku untuk rute loopback pengujian lokal (`http://localhost` dan `http://127.0.0.1`).
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen HTML/JSX yang mendeklarasikan atribut resource URL $U \in \{ \text{src}, \text{href} \}$:
+  $$\text{startsWith}(U, \text{"http://"}) \land \neg \text{isLocalhost}(U) \implies \text{Violation (Error)}$$
+  di mana $\text{isLocalhost}$ memeriksa apakah host URL adalah `localhost` atau `127.0.0.1`.
+- **Mengapa Lolos Linter Standar:**
+  Nilai URL adalah string literal valid. Linter standar tidak memeriksa kepatuhan skema protokol terhadap persyaratan W3C Secure Contexts.
+- **Suspicious (Memuat Skrip atau Aset Menggunakan Protokol HTTP Tidak Aman):**
+  ```tsx
+  {/* Berisiko diblokir browser mobile akibat Mixed Content */}
+  <script src="http://cdn.example.org/tracker.js"></script>
+  <img src="http://assets.desa.id/banner.jpg" alt="Banner Desa" />
+  ```
+- **Compliant (Menggunakan Skema HTTPS yang Aman):**
+  ```tsx
+  {/* Aset dimuat secara aman memenuhi standar Secure Contexts */}
+  <script src="https://cdn.example.org/tracker.js"></script>
+  <img src="https://assets.desa.id/banner.jpg" alt="Banner Desa" />
+  ```
+- **Engine:** L1 Syntax + L2 Element Attribute AST (`internal/rules/pwa/insecure_context_resource.go`).
+- **Severity:** `error`.
+- **Autofix:** No.
 
 ---
 

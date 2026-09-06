@@ -99,6 +99,80 @@ func hasManifestLink(headNode *ir.Node) bool {
 	return false
 }
 
+func hasAppleCapableMeta(headNode *ir.Node) bool {
+	if headNode == nil {
+		return false
+	}
+	for child := range headNode.Walk() {
+		if isAppleCapableMetaNode(child) {
+			return true
+		}
+	}
+	return false
+}
+
+func isAppleCapableMetaNode(node *ir.Node) bool {
+	if node == nil || node.Type != ir.NodeElement || !strings.EqualFold(node.Tag, "meta") {
+		return false
+	}
+	name, ok := node.GetAttr("name")
+	if !ok || !strings.EqualFold(cleanAttrValue(name), "apple-mobile-web-app-capable") {
+		return false
+	}
+	content, ok := node.GetAttr("content")
+	return ok && strings.EqualFold(cleanAttrValue(content), "yes")
+}
+
+func hasAppleTouchIcon(headNode *ir.Node) bool {
+	if headNode == nil {
+		return false
+	}
+	for child := range headNode.Walk() {
+		if isAppleTouchIconNode(child) {
+			return true
+		}
+	}
+	return false
+}
+
+func isAppleTouchIconNode(node *ir.Node) bool {
+	if node == nil || node.Type != ir.NodeElement || !strings.EqualFold(node.Tag, "link") {
+		return false
+	}
+	rel, ok := node.GetAttr("rel")
+	if !ok {
+		return false
+	}
+	cleanRel := strings.ToLower(cleanAttrValue(rel))
+	if !strings.Contains(cleanRel, "apple-touch-icon") {
+		return false
+	}
+	href, ok := node.GetAttr("href")
+	return ok && cleanAttrValue(href) != ""
+}
+
+func isResourceElement(tag string) bool {
+	switch strings.ToLower(tag) {
+	case "script", "link", "img", "iframe", "video", "audio", "source", "track", "embed", "object":
+		return true
+	default:
+		return false
+	}
+}
+
+func isInsecureResourceURL(rawURL string) bool {
+	clean := strings.TrimSpace(cleanAttrValue(rawURL))
+	lower := strings.ToLower(clean)
+	if !strings.HasPrefix(lower, "http://") {
+		return false
+	}
+	rest := lower[len("http://"):]
+	if strings.HasPrefix(rest, "localhost") || strings.HasPrefix(rest, "127.0.0.1") {
+		return false
+	}
+	return true
+}
+
 func extractScriptText(node *ir.Node) string {
 	if node == nil {
 		return ""

@@ -72,10 +72,12 @@
 </details>
 
 <details open>
-<summary><b>Pwa</b> (4 rules)</summary>
+<summary><b>Pwa</b> (6 rules)</summary>
 
 * [**Pwa Overview**](pwa)
+* [`pwa.apple-meta-missing`](pwa.apple-meta-missing)
 * [`pwa.icon-maskable-missing`](pwa.icon-maskable-missing)
+* [`pwa.insecure-context-resource`](pwa.insecure-context-resource)
 * [`pwa.manifest-missing`](pwa.manifest-missing)
 * [`pwa.manifest-required-fields-missing`](pwa.manifest-required-fields-missing)
 * [`pwa.start-url-inconsistency`](pwa.start-url-inconsistency)

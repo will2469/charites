@@ -65,6 +65,10 @@ var (
 	_ Rule = (*pwa.IconMaskableMissingRule)(nil)
 	_ Rule = (*pwa.ManifestMissingRule)(nil)
 	_ Rule = (*pwa.StartURLInconsistencyRule)(nil)
+
+	// pwa Wave 2 (Apple Standalone & Security)
+	_ Rule = (*pwa.AppleMetaMissingRule)(nil)
+	_ Rule = (*pwa.InsecureContextResourceRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -164,6 +168,10 @@ func builtinRules() []Rule {
 		pwa.NewIconMaskableMissingRule(),
 		pwa.NewManifestMissingRule(),
 		pwa.NewStartURLInconsistencyRule(),
+
+		// pwa Wave 2 (Apple Standalone & Security)
+		pwa.NewAppleMetaMissingRule(),
+		pwa.NewInsecureContextResourceRule(),
 	}
 }
 
