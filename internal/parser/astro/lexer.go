@@ -204,6 +204,16 @@ func (l *lexer) parseElementAttributes() parsedAttrs {
 			return res
 		}
 
+		if ch == '{' {
+			start := l.pos
+			l.skipBraceExpression()
+			expr := strings.TrimSpace(string(l.src[start:l.pos]))
+			if strings.HasPrefix(expr, "{...") {
+				res.attrs[expr] = expr
+			}
+			continue
+		}
+
 		attrName := l.readAttributeName()
 		if attrName == "" {
 			l.advance()
@@ -371,6 +381,31 @@ func (l *lexer) handleBraceExpression() {
 		default:
 			l.advance()
 		}
+	}
+}
+
+func (l *lexer) skipBraceExpression() {
+	depth := 0
+	for l.pos < l.len {
+		ch := l.src[l.pos]
+		if ch == '{' {
+			depth++
+			l.advance()
+			continue
+		}
+		if ch == '}' {
+			depth--
+			l.advance()
+			if depth <= 0 {
+				return
+			}
+			continue
+		}
+		if ch == '"' || ch == '\'' || ch == '`' {
+			l.skipStringLiteral(ch)
+			continue
+		}
+		l.advance()
 	}
 }
 

@@ -98,6 +98,12 @@ func builtinRules() []Rule {
 		a11y.NewFormLabelMissingControlRule(),
 		a11y.NewFormLabelCompositeControlRule(),
 		a11y.NewImgMissingAltRule(),
+
+		// a11y Wave 4 (Modal Traps & Semantic Interactions)
+		a11y.NewButtonTypeMissingRule(),
+		a11y.NewKeyboardTrapMissingEscapeRule(),
+		a11y.NewDialogMissingAriaRule(),
+		a11y.NewEmptyInteractiveRule(),
 	}
 }
 

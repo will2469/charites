@@ -1,0 +1,18 @@
+---
+// Astro Component
+---
+
+<!-- Slot projection inside interactive element -->
+<button class="size-11 flex items-center justify-center">
+  <slot />
+</button>
+
+<!-- Spread props forwarding -->
+<button {...Astro.props} class="size-11 flex items-center justify-center">
+  <svg class="size-5" viewBox="0 0 24 24"><path d="M0 0h24v24H0z" /></svg>
+</button>
+
+<!-- Hidden decorative button -->
+<button aria-hidden="true" class="hidden">
+  <svg class="size-5" viewBox="0 0 24 24"><path d="M0 0h24v24H0z" /></svg>
+</button>
