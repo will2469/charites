@@ -66,12 +66,12 @@ go install github.com/will2469/charites/cmd/charites@v1.0.0-beta.1
 
 ### Linux & macOS (Automated Script)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/will2469/charites/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/will2469/charites/main/scripts/install.sh | bash
 ```
 
 ### Windows (PowerShell)
 ```powershell
-irm https://raw.githubusercontent.com/will2469/charites/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/will2469/charites/main/scripts/install.ps1 | iex
 ```
 
 ### Basic Usage

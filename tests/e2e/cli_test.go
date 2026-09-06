@@ -3,6 +3,8 @@ package e2e_test
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -388,9 +390,17 @@ func TestScenario14_ZeroHostFootprintAudit(t *testing.T) {
 
 // Skenario 15: Update & Upgrade Equivalence dan Uninstall Help
 func TestScenario15_UpdateUpgradeEquivalenceAndUninstallHelp(t *testing.T) {
+	// Hermetic mock server returning no update
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	updateEnv := "CHARITES_UPDATE_URL=" + server.URL
+
 	// 1. Update and Upgrade equivalence
-	stdoutUpdate, stderrUpdate, codeUpdate := runBinary(t, []string{"update"})
-	stdoutUpgrade, stderrUpgrade, codeUpgrade := runBinary(t, []string{"upgrade"})
+	stdoutUpdate, stderrUpdate, codeUpdate := runBinary(t, []string{"update"}, updateEnv)
+	stdoutUpgrade, stderrUpgrade, codeUpgrade := runBinary(t, []string{"upgrade"}, updateEnv)
 
 	if codeUpdate != 0 {
 		t.Fatalf("expected update to exit 0, got %d, stderr: %s", codeUpdate, stderrUpdate)

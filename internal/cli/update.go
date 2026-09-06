@@ -28,8 +28,15 @@ type githubAsset struct {
 	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
+func getUpdateURL() string {
+	if envURL := os.Getenv("CHARITES_UPDATE_URL"); envURL != "" {
+		return envURL
+	}
+	return CharitesUpdateURL
+}
+
 func fetchLatestRelease(client *http.Client) (*githubRelease, error) {
-	req, err := http.NewRequest(http.MethodGet, CharitesUpdateURL, nil)
+	req, err := http.NewRequest(http.MethodGet, getUpdateURL(), nil)
 	if err != nil {
 		return nil, err
 	}
