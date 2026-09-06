@@ -1,0 +1,11 @@
+---
+// Negative fixture for inp.hydration-contention: staggered hydration directives
+import HeaderNav from '../components/HeaderNav.tsx';
+import SearchBar from '../components/SearchBar.tsx';
+import PromoBanner from '../components/PromoBanner.tsx';
+---
+<main>
+  <HeaderNav client:load />
+  <SearchBar client:idle />
+  <PromoBanner client:visible />
+</main>

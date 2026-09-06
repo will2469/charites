@@ -83,11 +83,15 @@
 </details>
 
 <details open>
-<summary><b>Inp</b> (4 rules)</summary>
+<summary><b>Inp</b> (8 rules)</summary>
 
 * [**Inp Overview**](inp)
 * [`inp.heavy-event-handler`](inp.heavy-event-handler)
+* [`inp.hydration-contention`](inp.hydration-contention)
+* [`inp.hydration-heavy-island`](inp.hydration-heavy-island)
 * [`inp.layout-thrashing`](inp.layout-thrashing)
+* [`inp.missing-start-transition`](inp.missing-start-transition)
+* [`inp.render-blocking-script`](inp.render-blocking-script)
 * [`inp.repeated-state-update`](inp.repeated-state-update)
 * [`inp.unyielded-long-task`](inp.unyielded-long-task)
 

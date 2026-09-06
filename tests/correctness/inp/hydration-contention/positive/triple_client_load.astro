@@ -1,0 +1,11 @@
+---
+// Positive fixture for inp.hydration-contention: 3 concurrent client:load islands
+import HeaderNav from '../components/HeaderNav.tsx';
+import SearchBar from '../components/SearchBar.tsx';
+import PromoBanner from '../components/PromoBanner.tsx';
+---
+<main>
+  <HeaderNav client:load />
+  <SearchBar client:load />
+  <PromoBanner client:load />
+</main>

@@ -84,7 +84,7 @@ func findFirstLayoutRead(code string) (int, string) {
 // isInteractiveHandlerAttr memeriksa apakah nama atribut merupakan handler event interaktif.
 func isInteractiveHandlerAttr(name string) bool {
 	switch name {
-	case "onClick", "onKeyDown", "onKeyUp", "onKeyPress", "onPointerDown", "onPointerUp", "onSubmit":
+	case "onClick", "onChange", "onInput", "onSelect", "onKeyDown", "onKeyUp", "onKeyPress", "onPointerDown", "onPointerUp", "onSubmit":
 		return true
 	default:
 		return false
@@ -295,4 +295,245 @@ func extractScriptNodeText(node *ir.Node) string {
 		return node.RawClasses
 	}
 	return res
+}
+
+// countClientLoadIslands menghitung jumlah pulau client:load dalam seluruh pohon AST root
+// dan mengembalikan simpul client:load pertama yang ditemukan.
+func countClientLoadIslands(root *ir.Node) (*ir.Node, int) {
+	if root == nil {
+		return nil, 0
+	}
+
+	var firstNode *ir.Node
+	count := 0
+
+	for n := range root.Walk() {
+		if n.Type != ir.NodeElement {
+			continue
+		}
+		if _, ok := n.Attributes["client:load"]; ok {
+			count++
+			if firstNode == nil {
+				firstNode = n
+			}
+		}
+	}
+
+	return firstNode, count
+}
+
+var exemptIslandKeywords = [...]string{
+	"editor",
+	"chart",
+	"graph",
+	"canvas",
+	"richtext",
+	"codemirror",
+	"monaco",
+	"terminal",
+	"map",
+}
+
+func containsSubstringIgnoreCase(s, substrLower string) bool {
+	if len(substrLower) == 0 {
+		return true
+	}
+	if len(s) < len(substrLower) {
+		return false
+	}
+	subLen := len(substrLower)
+	maxIdx := len(s) - subLen
+	for i := 0; i <= maxIdx; i++ {
+		match := true
+		for j := 0; j < subLen; j++ {
+			c := s[i+j]
+			if c >= 'A' && c <= 'Z' {
+				c += 32
+			}
+			if c != substrLower[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
+
+func isExemptIslandTag(tag string) bool {
+	for _, kw := range exemptIslandKeywords {
+		if containsSubstringIgnoreCase(tag, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func isClientDirective(attrName string) bool {
+	return strings.HasPrefix(attrName, "client:")
+}
+
+func hasClientDirective(node *ir.Node) bool {
+	for k := range node.Attributes {
+		if isClientDirective(k) {
+			return true
+		}
+	}
+	return false
+}
+
+var staticElementTags = [...]string{
+	"p", "span", "h1", "h2", "h3", "h4", "h5", "h6",
+	"article", "section", "blockquote", "ul", "ol", "li",
+	"table", "tbody", "tr", "td", "header", "footer", "aside", "nav", "main",
+}
+
+func isStaticElementTag(tag string) bool {
+	for _, t := range staticElementTags {
+		if strings.EqualFold(tag, t) {
+			return true
+		}
+	}
+	return strings.HasPrefix(tag, "Static") || strings.HasPrefix(tag, "static") ||
+		strings.HasPrefix(tag, "Text") || strings.HasPrefix(tag, "text")
+}
+
+// isHydrationHeavyIsland mengevaluasi apakah pulau client membungkus pohon sub-elemen statis yang masif.
+func isHydrationHeavyIsland(node *ir.Node) (int, bool) {
+	if node == nil || node.Type != ir.NodeElement {
+		return 0, false
+	}
+
+	if !hasClientDirective(node) {
+		return 0, false
+	}
+
+	if isExemptIslandTag(node.Tag) {
+		return 0, false
+	}
+
+	totalNodes := 0
+	staticCount := 0
+
+	for child := range node.Walk() {
+		if child == node {
+			continue
+		}
+		totalNodes++
+		if child.Type == ir.NodeElement && isStaticElementTag(child.Tag) {
+			staticCount++
+		}
+	}
+
+	if totalNodes >= 12 || (totalNodes >= 8 && staticCount >= 4) {
+		return totalNodes, true
+	}
+
+	return 0, false
+}
+
+// isRenderBlockingScript memeriksa apakah elemen script eksternal memblokir rendering sinkron.
+func isRenderBlockingScript(node *ir.Node) bool {
+	if node == nil || node.Type != ir.NodeElement || !strings.EqualFold(node.Tag, "script") {
+		return false
+	}
+
+	srcVal, hasSrc := node.Attributes["src"]
+	if !hasSrc || strings.TrimSpace(srcVal) == "" {
+		return false
+	}
+
+	// Pengecualian non-blocking: defer, async, type="module", type="application/ld+json", type="text/partytown"
+	if _, hasDefer := node.Attributes["defer"]; hasDefer {
+		return false
+	}
+	if _, hasAsync := node.Attributes["async"]; hasAsync {
+		return false
+	}
+	if typeVal, hasType := node.Attributes["type"]; hasType {
+		if strings.EqualFold(typeVal, "module") ||
+			strings.EqualFold(typeVal, "application/ld+json") ||
+			strings.EqualFold(typeVal, "text/partytown") {
+			return false
+		}
+	}
+
+	// Dalam Astro, script tanpa is:inline diperlakukan sebagai ESM oleh bundler
+	// Jika ada is:inline, script dieksekusi mentah dan memblokir thread jika eksternal
+	if _, hasIsInline := node.Attributes["is:inline"]; hasIsInline {
+		return true
+	}
+
+	// Jika bukan inline tapi merupakan URL eksternal (http/https/cdn)
+	if strings.HasPrefix(srcVal, "http://") || strings.HasPrefix(srcVal, "https://") || strings.HasPrefix(srcVal, "//") {
+		return true
+	}
+
+	return false
+}
+
+var urgentSetterKeywords = [...]string{
+	"setsearchquery",
+	"setquery",
+	"setinput",
+	"settext",
+	"setvalue",
+	"setsearch",
+	"setkeyword",
+	"setterm",
+}
+
+var secondaryHeavySetterKeywords = [...]string{
+	"setfiltered",
+	"setresults",
+	"setsearchresults",
+	"setlist",
+	"setitems",
+	"setchartdata",
+	"expensivefilter",
+	"filteritems",
+}
+
+// hasMissingStartTransition memeriksa apakah handler interaksi memicu pembaruan state sekunder berat
+// bersamaan dengan input mendesak tanpa dibungkus startTransition.
+func hasMissingStartTransition(code string) (string, bool) {
+	if len(code) == 0 {
+		return "", false
+	}
+
+	// Fast pre-filter: jika tidak ada 'target' dan 'set', tidak mungkin ada benturan state update
+	if !strings.Contains(code, "target") && !strings.Contains(code, "Target") &&
+		!strings.Contains(code, "set") && !strings.Contains(code, "Set") {
+		return "", false
+	}
+
+	// Pengecualian jika sudah menggunakan startTransition, useTransition, atau useDeferredValue
+	if strings.Contains(code, "startTransition") || strings.Contains(code, "useTransition") ||
+		strings.Contains(code, "useDeferredValue") || strings.Contains(code, "debounce") {
+		return "", false
+	}
+
+	hasUrgent := containsSubstringIgnoreCase(code, "target.value")
+	if !hasUrgent {
+		for _, kw := range urgentSetterKeywords {
+			if containsSubstringIgnoreCase(code, kw) {
+				hasUrgent = true
+				break
+			}
+		}
+	}
+
+	if !hasUrgent {
+		return "", false
+	}
+
+	for _, heavy := range secondaryHeavySetterKeywords {
+		if containsSubstringIgnoreCase(code, heavy) {
+			return heavy, true
+		}
+	}
+
+	return "", false
 }

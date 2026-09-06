@@ -158,6 +158,12 @@ var (
 	_ Rule = (*inp.HeavyEventHandlerRule)(nil)
 	_ Rule = (*inp.RepeatedStateUpdateRule)(nil)
 	_ Rule = (*inp.UnyieldedLongTaskRule)(nil)
+
+	// inp Wave 2 (Hydration Contention & Script Execution)
+	_ Rule = (*inp.HydrationContentionRule)(nil)
+	_ Rule = (*inp.HydrationHeavyIslandRule)(nil)
+	_ Rule = (*inp.RenderBlockingScriptRule)(nil)
+	_ Rule = (*inp.MissingStartTransitionRule)(nil)
 )
 
 func builtinRules() []Rule {
@@ -346,6 +352,12 @@ func builtinRules() []Rule {
 		inp.NewHeavyEventHandlerRule(),
 		inp.NewRepeatedStateUpdateRule(),
 		inp.NewUnyieldedLongTaskRule(),
+
+		// inp Wave 2 (Hydration Contention & Script Execution)
+		inp.NewHydrationContentionRule(),
+		inp.NewHydrationHeavyIslandRule(),
+		inp.NewRenderBlockingScriptRule(),
+		inp.NewMissingStartTransitionRule(),
 	}
 }
 

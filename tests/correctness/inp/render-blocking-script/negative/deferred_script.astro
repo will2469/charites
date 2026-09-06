@@ -1,0 +1,10 @@
+---
+// Negative fixture for inp.render-blocking-script: script using defer or module bundling
+---
+<head>
+  <title>Page with deferred and bundled scripts</title>
+  <script is:inline src="https://analytics.example.com/heavy-bundle.js" defer></script>
+  <script>
+    console.log("Astro bundled ESM script");
+  </script>
+</head>

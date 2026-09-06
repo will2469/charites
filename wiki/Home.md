@@ -89,7 +89,7 @@ flowchart TD
 | `browser` | 12 | [`browser`](browser) |
 | `cls` | 16 | [`cls`](cls) |
 | `ergonomy` | 4 | [`ergonomy`](ergonomy) |
-| `inp` | 4 | [`inp`](inp) |
+| `inp` | 8 | [`inp`](inp) |
 | `mobile` | 5 | [`mobile`](mobile) |
 | `pwa` | 10 | [`pwa`](pwa) |
 | `responsive` | 17 | [`responsive`](responsive) |
@@ -151,7 +151,11 @@ flowchart TD
 | `ergonomy.missing-inputmode-keyboard` | `ergonomy` | `INFO` | Enforces contextual virtual keyboard inputmode and type attributes on mobile form inputs (Tesler's Law) | [`ergonomy.missing-inputmode-keyboard`](ergonomy.missing-inputmode-keyboard) |
 | `ergonomy.tap-highlight-not-handled` | `ergonomy` | `INFO` | Flags clickable non-native custom elements lacking tactile tap feedback or tap-highlight management | [`ergonomy.tap-highlight-not-handled`](ergonomy.tap-highlight-not-handled) |
 | `inp.heavy-event-handler` | `inp` | `WARN` | Interactive event handler executes heavy synchronous operations (JSON.parse, Array.sort) without cooperative yields | [`inp.heavy-event-handler`](inp.heavy-event-handler) |
+| `inp.hydration-contention` | `inp` | `WARN` | Concurrently hydrating multiple Astro client:load islands saturates the main thread and spikes input delay | [`inp.hydration-contention`](inp.hydration-contention) |
+| `inp.hydration-heavy-island` | `inp` | `WARN` | Client island wraps excessive static DOM subtree forcing heavy virtual DOM reconciliation on the client | [`inp.hydration-heavy-island`](inp.hydration-heavy-island) |
 | `inp.layout-thrashing` | `inp` | `ERROR` | Sequential DOM style mutation followed by layout geometry reading triggers forced synchronous reflow | [`inp.layout-thrashing`](inp.layout-thrashing) |
+| `inp.missing-start-transition` | `inp` | `INFO` | Secondary non-urgent state update inside interactive handler should be wrapped in startTransition to prevent input lag | [`inp.missing-start-transition`](inp.missing-start-transition) |
+| `inp.render-blocking-script` | `inp` | `WARN` | External script element without defer, async, or type="module" synchronously blocks rendering and input responsiveness | [`inp.render-blocking-script`](inp.render-blocking-script) |
 | `inp.repeated-state-update` | `inp` | `WARN` | Repeated state updater calls inside loops breaking automatic batching trigger cascading re-renders | [`inp.repeated-state-update`](inp.repeated-state-update) |
 | `inp.unyielded-long-task` | `inp` | `WARN` | Long task processing large arrays without cooperative scheduling yields stalls main-thread responsiveness | [`inp.unyielded-long-task`](inp.unyielded-long-task) |
 | `mobile.fixed-action-obstruction` | `mobile` | `WARN` | Warns when fixed bottom elements lack compensating bottom padding on parent or content siblings, risking content obstruction | [`mobile.fixed-action-obstruction`](mobile.fixed-action-obstruction) |
