@@ -4,6 +4,7 @@ import (
 	"github.com/will2469/charites/internal/rules/a11y"
 	"github.com/will2469/charites/internal/rules/browser"
 	"github.com/will2469/charites/internal/rules/ergonomy"
+	"github.com/will2469/charites/internal/rules/mobile"
 	"github.com/will2469/charites/internal/rules/theme"
 )
 
@@ -143,6 +144,13 @@ func builtinRules() []Rule {
 
 		// ergonomy Wave 2 (Thumb Zone & Navigation Ergonomics)
 		ergonomy.NewBottomNavThumbUnreachableRule(),
+
+		// mobile Wave 3 (Mobile Viewport & Obstruction Physics)
+		mobile.NewKeyboardViewportRiskRule(),
+		mobile.NewFixedActionObstructionRule(),
+		mobile.NewModalViewportLockRule(),
+		mobile.NewOrientationLockRiskRule(),
+		mobile.NewPointerEventsBlockRule(),
 	}
 }
 

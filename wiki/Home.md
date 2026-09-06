@@ -61,6 +61,7 @@ flowchart TD
 | `a11y` | 16 | [`a11y`](a11y) |
 | `browser` | 12 | [`browser`](browser) |
 | `ergonomy` | 4 | [`ergonomy`](ergonomy) |
+| `mobile` | 5 | [`mobile`](mobile) |
 | `theme` | 32 | [`theme`](theme) |
 
 ---
@@ -101,6 +102,11 @@ flowchart TD
 | `ergonomy.gesture-without-touch-action` | `ergonomy` | `WARN` | Enforces CSS touch-action declaration on elements with custom gesture swipe/drag event handlers | [`ergonomy.gesture-without-touch-action`](ergonomy.gesture-without-touch-action) |
 | `ergonomy.missing-inputmode-keyboard` | `ergonomy` | `INFO` | Enforces contextual virtual keyboard inputmode and type attributes on mobile form inputs (Tesler's Law) | [`ergonomy.missing-inputmode-keyboard`](ergonomy.missing-inputmode-keyboard) |
 | `ergonomy.tap-highlight-not-handled` | `ergonomy` | `INFO` | Flags clickable non-native custom elements lacking tactile tap feedback or tap-highlight management | [`ergonomy.tap-highlight-not-handled`](ergonomy.tap-highlight-not-handled) |
+| `mobile.fixed-action-obstruction` | `mobile` | `WARN` | Warns when fixed bottom elements lack compensating bottom padding on parent or content siblings, risking content obstruction | [`mobile.fixed-action-obstruction`](mobile.fixed-action-obstruction) |
+| `mobile.keyboard-viewport-risk` | `mobile` | `INFO` | Advises using dynamic viewport units (dvh/svh) on containers with inputs and fixed controls to prevent layout breaking when virtual keyboard appears | [`mobile.keyboard-viewport-risk`](mobile.keyboard-viewport-risk) |
+| `mobile.modal-viewport-lock` | `mobile` | `ERROR` | Detects modal dialog containers locked with overflow-hidden without an internal scrollable region on mobile viewports | [`mobile.modal-viewport-lock`](mobile.modal-viewport-lock) |
+| `mobile.orientation-lock-risk` | `mobile` | `INFO` | Advises against rigid screen orientation locking which restricts accessibility for mounted or assistive mobile setups (WCAG 2.2 SC 1.3.4) | [`mobile.orientation-lock-risk`](mobile.orientation-lock-risk) |
+| `mobile.pointer-events-block` | `mobile` | `WARN` | Warns when an ancestor declares pointer-events-none over interactive children without restoring pointer-events-auto on mobile | [`mobile.pointer-events-block`](mobile.pointer-events-block) |
 | `theme.apply-bloat` | `theme` | `WARN` | Detects excessive use of @apply with more than 8 utility classes in CSS or style blocks | [`theme.apply-bloat`](theme.apply-bloat) |
 | `theme.backdrop-blur-hardcode` | `theme` | `WARN` | Detects hardcoded arbitrary blur and backdrop-blur scalars in Tailwind utility classes | [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode) |
 | `theme.chart-color-hardcode` | `theme` | `ERROR` | Detects hardcoded color values on chart visualization components | [`theme.chart-color-hardcode`](theme.chart-color-hardcode) |

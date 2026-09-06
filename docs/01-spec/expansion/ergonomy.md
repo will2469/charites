@@ -239,85 +239,182 @@ flowchart TD
 
 ## 4. Spesifikasi Detail Rule Wave 3: Mobile Viewport & Obstruction Physics (5 Rules)
 
+---
+
 ### 4.1. `mobile.keyboard-viewport-risk`
-* **Tujuan:** Mendeteksi layout yang berpotensi rusak atau terpotong ketika virtual keyboard perangkat mobile muncul.
-* **In-Scope:**
-  * Fixed bottom controls di dalam container dengan input aktif
-  * Kontainer `100vh` yang terkunci tanpa dynamic units (`dvh` / `svh`)
-  * Input form di dalam modal fixed yang tidak dapat bergulir saat keyboard aktif
-* **Bad:**
+- **Design Rationale:** W3C CSS Values and Units Module Level 4 (Viewport-percentage Lengths: dvh, svh, lvh) & Chromium Virtual Keyboard API.
+- **Konteks Realitas Mobile:**
+  Ketika keyboard virtual muncul di smartphone (mengonsumsi 40-50% tinggi layar), visual viewport browser menyusut seketika. Kontainer formulir yang dikunci dengan tinggi kaku `h-screen` atau `h-[100vh]` (berbasis Large Viewport Height) tidak mengecil secara dinamis, menyebabkan tombol aksi bawah tetap (`fixed bottom-0`) atau field input aktif terdorong ke balik keyboard virtual atau terpotong tanpa bisa digulir.
+- **Invariant (Predikat AST):**
+  Untuk setiap kontainer layout $C$ yang memuat input teks interaktif ($\text{input}, \text{textarea}$):
+  $$\text{hasRigidViewportHeight}(C) \land \text{hasFixedBottomControl}(C) \land \neg \text{hasDynamicViewportUnit}(C) \implies \text{Violation (Info)}$$
+  di mana $\text{hasRigidViewportHeight}$ mencakup kelas `h-screen`, `h-[100vh]`, dan $\text{hasDynamicViewportUnit}$ mencakup unit modern `min-h-dvh`, `h-dvh`, `min-h-svh`, `h-svh`.
+- **Mengapa Lolos Linter Standar:**
+  Linter konvensional menganggap `h-screen` dan `fixed bottom-0` sebagai utilitas layout yang sah dan tidak mengaitkannya dengan perilaku resizing visual viewport saat virtual keyboard aktif.
+- **Suspicious (Layout Terpotong / Tertutup Virtual Keyboard):**
   ```tsx
+  {/* h-screen tidak mengecil saat keyboard virtual muncul, layout terpotong */}
   <div className="fixed inset-0 h-screen flex flex-col justify-between">
-    <input type="text" />
-    <button className="fixed bottom-0">Submit</button>
+    <input type="text" placeholder="Masukkan alamat lengkap" />
+    <button className="fixed bottom-0 w-full py-3 bg-primary text-white">Simpan</button>
   </div>
   ```
-* **Good (Tailwind v4):**
+- **Compliant (Menggunakan Dynamic Viewport Unit dvh):**
   ```tsx
+  {/* min-h-dvh menyesuaikan tinggi secara dinamis saat keyboard virtual aktif */}
   <div className="min-h-dvh flex flex-col justify-between pb-[env(safe-area-inset-bottom)]">
-    <input type="text" />
-    <button className="sticky bottom-4">Submit</button>
+    <input type="text" placeholder="Masukkan alamat lengkap" />
+    <button className="sticky bottom-4 w-full py-3 bg-primary text-white rounded-xl">Simpan</button>
   </div>
   ```
-* **Severity:** Advisory (Heuristic AST).
+- **Engine:** L1 Syntax + L2 Viewport AST (`internal/rules/mobile/keyboard_viewport_risk.go`).
+- **Severity:** `info`.
+- **Autofix:** No (memerlukan penyesuaian unit viewport oleh developer).
+
+---
 
 ### 4.2. `mobile.fixed-action-obstruction`
-* **Tujuan:** Mencegah fixed bottom navigation bar atau floating CTA menutupi konten bawah atau form inputs.
-* **In-Scope:** Elemen `fixed bottom-0` tanpa padding kompensasi (`pb-*`) pada container layout induk atau sibling layout.
-* **Bad:**
+- **Design Rationale:** Apple HIG Bottom Clearance & Google Material Design 3 Bottom App Bar Clearance Guidelines.
+- **Konteks Realitas Mobile:**
+  Elemen navigasi atau aksi bawah tetap (`fixed bottom-0`, seperti bottom app bar, tab bar seluler, atau floating CTA) mengambang secara permanen di atas konten halaman. Jika kontainer konten utama (`<main>`, `<article>`, `<form>`) tidak mendeklarasikan padding bawah kompensasi (`pb-16`, `pb-20`, `pb-24`, `pb-safe`), konten terbawah, tombol aksi submit, atau form input akan tertutup secara permanen oleh bar tetap tersebut.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen fixed bottom $F \in \text{FixedBottomElements}$:
+  $$\neg \text{hasCompensatingBottomPadding}(\text{ParentOrSiblings}(F)) \land \neg \text{isDesktopOnly}(F) \implies \text{Violation (Warn)}$$
+  di mana $\text{hasCompensatingBottomPadding}$ memverifikasi keberadaan kelas `pb-*` (selain `pb-0`) pada kontainer induk atau elemen konten utama saudara.
+- **Mengapa Lolos Linter Standar:**
+  Penetapan `fixed bottom-0` valid secara CSS. Linter standar tidak memeriksa apakah terdapat ruang bebas (*clearance padding*) pada sibling layout untuk mencegah tabrakan visual.
+- **Suspicious (Fixed Bottom Bar Menutupi Konten Terbawah):**
   ```tsx
-  <>
-    <main>Contoh Konten Panjang</main>
-    <nav className="fixed bottom-0 h-16 w-full bg-background">...</nav>
-  </>
+  {/* Konten terbawah di dalam main tertutup oleh bottom bar */}
+  <div className="min-h-screen bg-background">
+    <main className="p-4 space-y-4">
+      <p>Paragraf terakhir formulir warga...</p>
+    </main>
+    <nav className="fixed bottom-0 inset-x-0 h-16 bg-card border-t">
+      <button type="button">Beranda</button>
+    </nav>
+  </div>
   ```
-* **Good:**
+- **Compliant (Padding Kompensasi Disediakan):**
   ```tsx
-  <>
-    <main className="pb-24">Contoh Konten Panjang</main>
-    <nav className="fixed bottom-0 h-16 w-full pb-[env(safe-area-inset-bottom)] bg-background">...</nav>
-  </>
+  {/* pb-24 memberikan ruang bebas sehingga konten tidak tertutup bottom bar */}
+  <div className="min-h-screen bg-background">
+    <main className="p-4 space-y-4 pb-24">
+      <p>Paragraf terakhir formulir warga...</p>
+    </main>
+    <nav className="fixed bottom-0 inset-x-0 h-16 bg-card border-t pb-[env(safe-area-inset-bottom)]">
+      <button type="button">Beranda</button>
+    </nav>
+  </div>
   ```
-* **Severity:** Warning.
+- **Engine:** L1 Syntax + L2 Sibling Clearance AST (`internal/rules/mobile/fixed_action_obstruction.go`).
+- **Severity:** `warning`.
+- **Autofix:** No (memerlukan penentuan nilai pb-* yang proporsional dengan tinggi bottom bar).
+
+---
 
 ### 4.3. `mobile.modal-viewport-lock`
-* **Tujuan:** Mendeteksi modal atau dialog popup yang menggunakan fixed viewport dimensions dan tidak dapat discroll pada layar smartphone pendek.
-* **In-Scope:** Kontainer modal `fixed inset-0` dengan `overflow-hidden` tanpa region scroll vertikal internal (`overflow-y-auto`).
-* **Bad:**
+- **Design Rationale:** WCAG 2.2 SC 2.1.2 (No Keyboard Trap) & W3C ARIA Authoring Practices Guide (Modal Dialog Design Pattern).
+- **Konteks Realitas Mobile:**
+  Dialog modal atau bottom sheet yang menggunakan `fixed inset-0` dengan `overflow-hidden` memotong seluruh konten jika tinggi modal melebihi tinggi layar ponsel (misalnya pada smartphone kecil, resolusi rendah, atau dalam orientasi lanskap). Tanpa region scroll vertikal internal (`overflow-y-auto`), pengguna terjebak dan tidak dapat melihat form input bawah atau menekan tombol aksi konfirmasi/tutup.
+- **Invariant (Predikat AST):**
+  Untuk setiap kontainer modal $M \in \text{ModalContainers}$:
+  $$\text{hasOverflowHidden}(M) \land \neg \text{hasInternalScrollRegion}(M) \implies \text{Violation (Error)}$$
+  di mana $\text{ModalContainers}$ mencakup elemen dengan `role="dialog"`, `role="alertdialog"`, tag `<dialog>`, atau komponen bernama modal/dialog.
+- **Mengapa Lolos Linter Standar:**
+  Linter umum menganggap `overflow-hidden` pada modal sebagai praktik lazim untuk mencegah scroll background, tanpa memeriksa apakah kontainer dialog menyediakan area scroll internal.
+- **Suspicious (Modal Terkunci Tanpa Scroll Internal):**
   ```tsx
-  <div className="fixed inset-0 overflow-hidden">
-    <DialogContent className="h-screen">Form Panjang</DialogContent>
+  {/* Pengguna smartphone pendek tidak dapat menggulir ke tombol Simpan */}
+  <div role="dialog" aria-modal="true" className="fixed inset-0 overflow-hidden flex items-center justify-center p-4">
+    <div className="bg-card p-6 rounded-2xl w-full max-w-md h-screen">
+      <h2>Form Permohonan Bantuan</h2>
+      <div className="space-y-4">...isi form panjang...</div>
+      <button type="submit">Kirim</button>
+    </div>
   </div>
   ```
-* **Good:**
+- **Compliant (Area Scroll Internal Disediakan):**
   ```tsx
-  <div className="fixed inset-0 overflow-y-auto">
-    <DialogContent className="min-h-full py-8">Form Panjang</DialogContent>
+  {/* overflow-y-auto memungkinkan pengguliran mulus pada layar kecil */}
+  <div role="dialog" aria-modal="true" className="fixed inset-0 overflow-y-auto flex items-center justify-center p-4">
+    <div className="bg-card p-6 rounded-2xl w-full max-w-md my-auto">
+      <h2>Form Permohonan Bantuan</h2>
+      <div className="space-y-4">...isi form panjang...</div>
+      <button type="submit">Kirim</button>
+    </div>
   </div>
   ```
-* **Severity:** Error.
+- **Engine:** L1 Syntax + L2 Modal Overflow AST (`internal/rules/mobile/modal_viewport_lock.go`).
+- **Severity:** `error`.
+- **Autofix:** No.
+
+---
 
 ### 4.4. `mobile.orientation-lock-risk`
-* **Tujuan:** Mendeteksi penguncian orientasi layar (*orientation lock*) yang membatasi aksesibilitas bagi pengguna dengan mount holder atau tablet horizontal.
-* **In-Scope:** Penggunaan Screen Orientation API lock (`screen.orientation.lock()`) atau deklarasi manifest `orientation: "portrait"` tanpa justifikasi aplikasi spesifik.
-* **Severity:** Advisory.
+- **Design Rationale:** W3C Web Content Accessibility Guidelines (WCAG) 2.2 Success Criterion 1.3.4 (Orientation - Level AA).
+- **Konteks Realitas Mobile:**
+  Mengunci orientasi tampilan ke mode potret secara kaku (melalui `screen.orientation.lock("portrait")` atau meta tag manifest kaku) membatasi aksesibilitas bagi pengguna difabel yang memasang ponsel secara horizontal di kursi roda, dashboard mobil, atau dudukan meja. Standar WCAG mewajibkan konten dapat diakses baik dalam mode portrait maupun landscape kecuali orientasi khusus mutlak esensial (seperti aplikasi simulator piano atau pemindaian cek bank).
+- **Invariant (Predikat AST):**
+  Untuk setiap pemanggilan Screen Orientation API atau atribut meta orientasi:
+  $$\text{invokesOrientationLock}(Node) \implies \text{Violation (Info)}$$
+  mendeteksi pemanggilan `screen.orientation.lock(` atau properti orientasi kaku.
+- **Mengapa Lolos Linter Standar:**
+  Screen Orientation API adalah Web API standar yang valid di JavaScript/TypeScript. Linter biasa tidak memvalidasi kepatuhan terhadap WCAG 1.3.4 Orientation.
+- **Suspicious (Penguncian Orientasi Kaku):**
+  ```tsx
+  {/* Mengunci paksa ke portrait mengabaikan pengguna dengan mount horizontal */}
+  useEffect(() => {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock("portrait").catch(() => {});
+    }
+  }, []);
+  ```
+- **Compliant (Layout Responsif Adaptif Terhadap Kedua Orientasi):**
+  ```tsx
+  {/* Desain antarmuka beradaptasi mulus dengan orientasi portrait maupun landscape */}
+  <div className="flex flex-col landscape:flex-row gap-4 p-4">
+    <aside className="w-full landscape:w-64">Navigasi</aside>
+    <main className="flex-1">Konten Utama</main>
+  </div>
+  ```
+- **Engine:** L1 Syntax + L2 API Call AST (`internal/rules/mobile/orientation_lock_risk.go`).
+- **Severity:** `info`.
+- **Autofix:** No.
+
+---
 
 ### 4.5. `mobile.pointer-events-block`
-* **Tujuan:** Mencegah kelas `pointer-events-none` pada kontainer induk memblokir seluruh interaksi ketukan sentuh pada elemen anak di perangkat mobile.
-* **In-Scope:** Interaktif descendants (`<button>`, `<a>`, `<input>`) di bawah elemen leluhur ber-`pointer-events-none` tanpa pemulihan eksplisit `pointer-events-auto`.
-* **Bad:**
+- **Design Rationale:** W3C Pointer Events Level 3 & CSS Basic User Interface Module Level 4 (pointer-events property).
+- **Konteks Realitas Mobile:**
+  Menetapkan kelas `pointer-events-none` pada kontainer induk memblokir seluruh pengiriman event pointer (ketukan jari, klik, hover) ke seluruh elemen turunan di bawahnya. Jika di dalam kontainer terdapat elemen interaktif (`<button>`, `<a>`, `<input>`, `<select>`, `<textarea>`) tanpa pemulihan eksplisit `pointer-events-auto`, tombol atau link tersebut menjadi mati total dan tidak dapat disentuh sama sekali di perangkat mobile.
+- **Invariant (Predikat AST):**
+  Untuk setiap elemen interaktif $I \in \text{InteractiveElements}$:
+  $$\text{hasAncestorPointerEventsNone}(I) \land \neg \text{hasPointerEventsAuto}(I) \land \neg \text{isDisabled}(I) \implies \text{Violation (Warn)}$$
+- **Mengapa Lolos Linter Standar:**
+  Kombinasi kelas Tailwind `pointer-events-none` pada pembungkus luar dan elemen `<button>` di dalamnya adalah HTML/JSX yang sah secara sintaksis. Linter biasa tidak menelusuri rantai pewarisan pointer-events antar parent dan child.
+- **Suspicious (Tombol Interaktif Mati Total Karena pointer-events-none Induk):**
   ```tsx
-  <div className="pointer-events-none">
-    <button>Lanjutkan</button>
+  {/* Tombol Simpan tidak dapat diklik atau disentuh sama sekali */}
+  <div className="pointer-events-none opacity-90 p-4">
+    <button onClick={handleSave} className="bg-primary text-white px-4 py-2">
+      Simpan Data
+    </button>
   </div>
   ```
-* **Good:**
+- **Compliant (pointer-events-auto Dipulihkan Secara Eksplisit):**
   ```tsx
-  <div className="pointer-events-none">
-    <button className="pointer-events-auto">Lanjutkan</button>
+  {/* pointer-events-auto memulihkan interaktivitas sentuhan pada tombol */}
+  <div className="pointer-events-none opacity-90 p-4">
+    <button onClick={handleSave} className="pointer-events-auto bg-primary text-white px-4 py-2 rounded-xl">
+      Simpan Data
+    </button>
   </div>
   ```
-* **Severity:** Warning.
+- **Engine:** L1 Syntax + L2 Ancestor Pointer Hierarchy AST (`internal/rules/mobile/pointer_events_block.go`).
+- **Severity:** `warning`.
+- **Autofix:** No.
+
 
 ---
 

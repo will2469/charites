@@ -60,6 +60,18 @@
 </details>
 
 <details open>
+<summary><b>Mobile</b> (5 rules)</summary>
+
+* [**Mobile Overview**](mobile)
+* [`mobile.fixed-action-obstruction`](mobile.fixed-action-obstruction)
+* [`mobile.keyboard-viewport-risk`](mobile.keyboard-viewport-risk)
+* [`mobile.modal-viewport-lock`](mobile.modal-viewport-lock)
+* [`mobile.orientation-lock-risk`](mobile.orientation-lock-risk)
+* [`mobile.pointer-events-block`](mobile.pointer-events-block)
+
+</details>
+
+<details open>
 <summary><b>Theme</b> (32 rules)</summary>
 
 * [**Theme Overview**](theme)
