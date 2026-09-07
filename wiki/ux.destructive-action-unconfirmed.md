@@ -51,6 +51,19 @@ Executing these operations on a single click without confirmation exposes users 
   </button>
 </AlertDialogTrigger>
 ```
+### TSX (Staged deletion flow via local useState and downstream confirmation dialog):
+```tsx
+const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
+
+<Button variant="destructive" onClick={() => setConfirmIndex(index)}>
+  Hapus
+</Button>
+
+<ActionApprovalDialog
+  open={confirmIndex !== null}
+  onConfirm={() => deleteUser(confirmIndex)}
+/>
+```
 
 ---
 

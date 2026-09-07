@@ -84,6 +84,20 @@ func (r *DestructiveActionUnconfirmedRule) Doc() ir.RuleDocumentation {
   </button>
 </AlertDialogTrigger>`,
 			},
+			{
+				Language: "tsx",
+				Comment:  "Staged deletion flow via local useState and downstream confirmation dialog",
+				Code: `const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
+
+<Button variant="destructive" onClick={() => setConfirmIndex(index)}>
+  Hapus
+</Button>
+
+<ActionApprovalDialog
+  open={confirmIndex !== null}
+  onConfirm={() => deleteUser(confirmIndex)}
+/>`,
+			},
 		},
 	}
 }
@@ -109,6 +123,10 @@ func (r *DestructiveActionUnconfirmedRule) Evaluate(node *ir.Node) []ir.Diagnost
 		}
 	}
 
+	if AnalyzeStateGating(node) == StateGateConfirmed {
+		return nil
+	}
+
 	return []ir.Diagnostic{
 		{
 			Line:     node.Span.Line,
@@ -130,11 +148,17 @@ func isInteractiveElement(node *ir.Node) bool {
 	if tagLower == "button" || tagLower == "a" {
 		return true
 	}
+	if strings.HasSuffix(node.Tag, "Button") || strings.HasSuffix(node.Tag, "Link") {
+		return true
+	}
 	if role, ok := getAttrCaseInsensitive(node, "role"); ok {
 		r := cleanAttrValue(role)
 		if r == "button" || r == "link" || r == "menuitem" {
 			return true
 		}
+	}
+	if _, ok := getAttrCaseInsensitive(node, "onclick", "onpress"); ok {
+		return true
 	}
 	return false
 }

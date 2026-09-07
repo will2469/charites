@@ -1120,6 +1120,12 @@ func matchDestructiveKeyword(text string) (string, bool) {
 }
 
 func isDestructiveStyledElement(node *ir.Node) bool {
+	if variant, ok := getAttrCaseInsensitive(node, "variant"); ok {
+		v := strings.ToLower(cleanAttrValue(variant))
+		if v == "destructive" || v == "danger" {
+			return true
+		}
+	}
 	for _, cls := range node.Classes {
 		base := strings.ToLower(StripVariantsOnlyBase(cls))
 		if strings.Contains(base, "destructive") || strings.Contains(base, "danger") ||
@@ -1147,6 +1153,9 @@ func hasConfirmationGating(node *ir.Node, handler string) bool {
 
 func hasConfirmationAttribute(node *ir.Node) bool {
 	for k, v := range node.Attributes {
+		if isEventHandlerOrActionAttr(k) {
+			continue
+		}
 		kLower := strings.ToLower(k)
 		if strings.Contains(kLower, "confirm") {
 			return true
