@@ -16,6 +16,7 @@ const (
 	LayoutOwnerContainerGap                          // flex/grid dengan utility gap-*
 	LayoutOwnerContainerSpace                        // container dengan utility space-x-* atau space-y-*
 	LayoutOwnerMarginSequence                        // block parent terverifikasi dengan sekuens margin sibling homogen tanpa spasi saingan
+	LayoutOwnerPeerContainers                        // parent yang membawahi peer containers homogen dengan gap-*
 )
 
 // SpacingRole mengklasifikasikan peran struktural spasial.
@@ -26,7 +27,7 @@ const (
 	SpacingRoleUnknown   SpacingRole = iota // Peran tidak diketahui
 	SpacingRoleInline                       // Spasi inline (icon <-> teks)
 	SpacingRoleComponent                    // Spasi level komponen (label <-> input)
-	SpacingRoleGroup                        // Spasi level grup (field <-> field, card <-> card)
+	SpacingRoleGroup                        // Spasi level grup (field <-> field, card <-> card, peer <-> peer)
 	SpacingRoleSection                      // Spasi level seksi makro (header <-> konten, seksi <-> seksi)
 )
 
@@ -51,23 +52,9 @@ const (
 	SpacingSourceMargin                       // CSS margin (mb/mt/mr/ml)
 )
 
-// ResponsiveTier merepresentasikan tingkatan breakpoint responsif mobile-first.
-type ResponsiveTier int
-
-// Konstanta tingkatan breakpoint responsif.
-const (
-	ResponsiveTierBaseline ResponsiveTier = iota // Base / mobile default
-	ResponsiveTierSm                             // sm breakpoint (640px)
-	ResponsiveTierMd                             // md breakpoint (768px)
-	ResponsiveTierLg                             // lg breakpoint (1024px)
-	ResponsiveTierXl                             // xl breakpoint (1280px)
-	ResponsiveTier2Xl                            // 2xl breakpoint (1536px)
-)
-
-// ResponsiveState menyimpan breakpoint responsif yang aktif.
+// ResponsiveState menyimpan varian breakpoint/media/container yang aktif.
 type ResponsiveState struct {
-	Tier ResponsiveTier
-	Raw  string
+	Raw string // "base", "sm", "md", "lg", "xl", "2xl", "max-sm", "@md", etc.
 }
 
 // SpatialRelationship merepresentasikan hubungan struktural spasial antara dua node atau container.
@@ -118,24 +105,33 @@ func DefaultRhythmConfig() RhythmConfig {
 	}
 }
 
-// parseResponsiveState memecah prefix breakpoint responsif dari token utility.
-func parseResponsiveState(cls string) (ResponsiveState, string) {
-	if strings.HasPrefix(cls, "sm:") {
-		return ResponsiveState{Tier: ResponsiveTierSm, Raw: "sm"}, cls[3:]
+// isResponsiveVariant memeriksa apakah nama varian merepresentasikan kondisi media/viewport/container.
+func isResponsiveVariant(v string) bool {
+	switch v {
+	case "sm", "md", "lg", "xl", "2xl":
+		return true
 	}
-	if strings.HasPrefix(cls, "md:") {
-		return ResponsiveState{Tier: ResponsiveTierMd, Raw: "md"}, cls[3:]
+	if strings.HasPrefix(v, "max-") || strings.HasPrefix(v, "min-") || strings.HasPrefix(v, "@") {
+		return true
 	}
-	if strings.HasPrefix(cls, "lg:") {
-		return ResponsiveState{Tier: ResponsiveTierLg, Raw: "lg"}, cls[3:]
+	return false
+}
+
+// extractResponsiveState memecah rantai varian Tailwind menggunakan StripVariants
+// untuk mengekstrak modifier breakpoint/media/container yang aktif.
+func extractResponsiveState(token string) (ResponsiveState, string) {
+	variants, base := StripVariants(token)
+	if len(variants) == 0 {
+		return ResponsiveState{Raw: "base"}, base
 	}
-	if strings.HasPrefix(cls, "xl:") {
-		return ResponsiveState{Tier: ResponsiveTierXl, Raw: "xl"}, cls[4:]
+
+	for _, v := range variants {
+		if isResponsiveVariant(v) {
+			return ResponsiveState{Raw: v}, base
+		}
 	}
-	if strings.HasPrefix(cls, "2xl:") {
-		return ResponsiveState{Tier: ResponsiveTier2Xl, Raw: "2xl"}, cls[5:]
-	}
-	return ResponsiveState{Tier: ResponsiveTierBaseline, Raw: "base"}, cls
+
+	return ResponsiveState{Raw: "base"}, base
 }
 
 // isBlockContainerTag mengecek apakah tag HTML/JSX merupakan block container yang valid untuk sekuens margin.
@@ -177,7 +173,7 @@ func hasCompetingContainerSpacing(node *ir.Node) bool {
 // extractChildMarginToken mengekstrak token margin (misal: "mb-4") dari elemen child.
 func extractChildMarginToken(child *ir.Node, prefix string) (string, float64, ResponsiveState, bool) {
 	for _, cls := range child.Classes {
-		resp, base := parseResponsiveState(cls)
+		resp, base := extractResponsiveState(cls)
 		cleanBase := StripVariantsOnlyBase(base)
 		if strings.HasPrefix(cleanBase, prefix) {
 			valStr := cleanBase[len(prefix):]
@@ -238,10 +234,64 @@ func verifyContiguousMargins(children []*ir.Node, prefix string) (int, bool) {
 	return count, true
 }
 
+// extractContainerGapToken mengekstrak token gap pada suatu container child peer.
+func extractContainerGapToken(node *ir.Node) (string, float64, SpacingAxis, ResponsiveState, bool) {
+	isCol := isFlexColumn(node)
+	for _, cls := range node.Classes {
+		resp, base := extractResponsiveState(cls)
+		cleanBase := StripVariantsOnlyBase(base)
+
+		axis, valStr, ok := parseGapUtility(cleanBase, isCol)
+		if !ok {
+			continue
+		}
+
+		val, ok := parseTailwindSpacingNumber(valStr)
+		if ok {
+			return cleanBase, val, axis, resp, true
+		}
+	}
+	return "", 0, AxisUnknown, ResponsiveState{}, false
+}
+
+// checkPeerContainersProof memeriksa apakah anak-anak direct merupakan peer containers yang masing-masing mendeklarasikan gap.
+func checkPeerContainersProof(children []*ir.Node) bool {
+	if len(children) < 3 {
+		return false
+	}
+
+	var firstAxis SpacingAxis
+	count := 0
+
+	for _, c := range children {
+		if c == nil || c.Type != ir.NodeElement {
+			return false
+		}
+		_, _, axis, _, ok := extractContainerGapToken(c)
+		if ok {
+			if firstAxis == AxisUnknown {
+				firstAxis = axis
+			} else if firstAxis != axis {
+				return false
+			}
+			count++
+		}
+	}
+
+	return count >= 3 && count == len(children)
+}
+
 // ClassifyLayoutOwner menentukan jenis ownership tata letak suatu node.
 func ClassifyLayoutOwner(node *ir.Node) LayoutOwnerKind {
 	if node == nil || node.Type != ir.NodeElement {
 		return LayoutOwnerNone
+	}
+
+	children := getElementChildren(node)
+
+	// Cek apakah node membawahi sekelompok peer container dengan gap-*
+	if checkPeerContainersProof(children) {
+		return LayoutOwnerPeerContainers
 	}
 
 	hasGap := false
@@ -263,24 +313,11 @@ func ClassifyLayoutOwner(node *ir.Node) LayoutOwnerKind {
 		return LayoutOwnerContainerSpace
 	}
 
-	children := getElementChildren(node)
 	if _, ok := checkMarginSequenceProof(node, children); ok {
 		return LayoutOwnerMarginSequence
 	}
 
 	return LayoutOwnerNone
-}
-
-func isFieldLikeTag(tag string) bool {
-	switch strings.ToLower(tag) {
-	case "field", "input", "select", "textarea", "button", "group", "formitem", "formfield", "card", "li":
-		return true
-	}
-	switch tag {
-	case "Field", "Input", "TextField", "Select", "Checkbox", "Radio", "Textarea", "Button", "Group", "FormItem", "FormField", "Card", "ListItem", "Item":
-		return true
-	}
-	return false
 }
 
 func isMacroLandmarkTag(tag string) bool {
@@ -307,7 +344,13 @@ func isInputLikeTag(tag string) bool {
 	return false
 }
 
-// ClassifyRelationship mengklasifikasikan peran spasial murni berdasarkan relasi From/To dan topologi.
+func isLabelTag(tag string) bool {
+	return strings.EqualFold(tag, "label")
+}
+
+// ClassifyRelationship mengklasifikasikan peran spasial.
+// Memprioritaskan keterbandingan struktural secara umum (SpacingRoleGroup),
+// dan menggunakan semantik murni sebagai penghalusan (refinement).
 func ClassifyRelationship(rel *SpatialRelationship) SpacingRole {
 	if rel == nil || rel.From == nil {
 		return SpacingRoleUnknown
@@ -319,35 +362,18 @@ func ClassifyRelationship(rel *SpatialRelationship) SpacingRole {
 		tagTo = rel.To.Tag
 	}
 
-	// 1. Label <-> Input adalah Component
-	if (strings.EqualFold(tagFrom, "label") || tagFrom == "Label") && isInputLikeTag(tagTo) {
+	// 1. Refinement: Komponen kontrol (label <-> input)
+	if isLabelTag(tagFrom) && isInputLikeTag(tagTo) {
 		return SpacingRoleComponent
 	}
 
-	// 2. Field/Form control pairs
-	if isFieldLikeTag(tagFrom) && (tagTo == "" || isFieldLikeTag(tagTo)) {
-		return SpacingRoleGroup
-	}
-
-	// 3. Macro structural landmarks
-	if isMacroLandmarkTag(tagFrom) && (tagTo == "" || isMacroLandmarkTag(tagTo)) {
+	// 2. Refinement: Batas makro struktural yang berbeda (header <-> footer, dll)
+	if isMacroLandmarkTag(tagFrom) && isMacroLandmarkTag(tagTo) && tagFrom != tagTo {
 		return SpacingRoleSection
 	}
 
-	// 4. Identical custom component peers
-	if tagTo != "" && tagFrom == tagTo {
-		return SpacingRoleGroup
-	}
-
-	// 5. Single element with known structural signature
-	if tagTo == "" && (isFieldLikeTag(tagFrom) || isMacroLandmarkTag(tagFrom)) {
-		if isMacroLandmarkTag(tagFrom) {
-			return SpacingRoleSection
-		}
-		return SpacingRoleGroup
-	}
-
-	return SpacingRoleUnknown
+	// 3. Baseline: Semua sibling di bawah layout owner yang sama memiliki keterbandingan struktural
+	return SpacingRoleGroup
 }
 
 // BuildRhythmGroups mengekstrak observasi spasi dan membaginya ke dalam partisi yang aman.
@@ -360,13 +386,16 @@ func BuildRhythmGroups(owner *ir.Node, kind LayoutOwnerKind) []RhythmGroup {
 	ownerID := fmt.Sprintf("%p_%d_%d", owner, owner.Span.Line, owner.Span.Column)
 	groupMap := make(map[string]*RhythmGroup)
 
+	if kind == LayoutOwnerPeerContainers || checkPeerContainersProof(children) {
+		buildPeerGapOccurrences(owner, children, ownerID, groupMap)
+	}
+
 	switch kind {
 	case LayoutOwnerMarginSequence:
 		prefix, ok := checkMarginSequenceProof(owner, children)
-		if !ok {
-			return nil
+		if ok {
+			buildMarginOccurrences(owner, children, prefix, ownerID, groupMap)
 		}
-		buildMarginOccurrences(owner, children, prefix, ownerID, groupMap)
 	case LayoutOwnerContainerGap:
 		buildContainerGapOccurrences(owner, children, ownerID, groupMap)
 	case LayoutOwnerContainerSpace:
@@ -382,18 +411,59 @@ func BuildRhythmGroups(owner *ir.Node, kind LayoutOwnerKind) []RhythmGroup {
 	return result
 }
 
-func buildMarginOccurrences(owner *ir.Node, children []*ir.Node, prefix string, ownerID string, groupMap map[string]*RhythmGroup) {
+func buildPeerGapOccurrences(owner *ir.Node, children []*ir.Node, ownerID string, groupMap map[string]*RhythmGroup) {
 	for i, c := range children {
+		token, val, axis, resp, ok := extractContainerGapToken(c)
+		if !ok {
+			continue
+		}
+
+		var nextPeer *ir.Node
+		if i+1 < len(children) {
+			nextPeer = children[i+1]
+		}
+
+		rel := SpatialRelationship{
+			From:   c,
+			To:     nextPeer,
+			Parent: owner,
+			Axis:   axis,
+			Role:   SpacingRoleGroup,
+		}
+
+		key := RhythmPartitionKey{
+			OwnerID:    ownerID + "_peers",
+			Axis:       axis,
+			Source:     SpacingSourceGap,
+			Role:       SpacingRoleGroup,
+			Responsive: resp,
+		}
+		keyStr := fmt.Sprintf("%s_%d_%d_%d_%s", key.OwnerID, key.Axis, key.Source, key.Role, key.Responsive.Raw)
+
+		if _, exists := groupMap[keyStr]; !exists {
+			groupMap[keyStr] = &RhythmGroup{Key: key}
+		}
+		groupMap[keyStr].Occurrences = append(groupMap[keyStr].Occurrences, SpacingOccurrence{
+			Node:         c,
+			Relationship: rel,
+			Value:        val,
+			RawToken:     token,
+			Source:       SpacingSourceGap,
+			Responsive:   resp,
+		})
+	}
+}
+
+func buildMarginOccurrences(owner *ir.Node, children []*ir.Node, prefix string, ownerID string, groupMap map[string]*RhythmGroup) {
+	// Occurrence margin hanya valid jika memiliki next sibling di dalam layout group (child terakhir diabaikan).
+	for i := 0; i < len(children)-1; i++ {
+		c := children[i]
 		token, val, resp, ok := extractChildMarginToken(c, prefix)
 		if !ok {
 			continue
 		}
 
-		var nextChild *ir.Node
-		if i+1 < len(children) {
-			nextChild = children[i+1]
-		}
-
+		nextChild := children[i+1]
 		rel := SpatialRelationship{
 			From:   c,
 			To:     nextChild,
@@ -507,7 +577,7 @@ func buildContainerGapOccurrences(owner *ir.Node, children []*ir.Node, ownerID s
 
 	isCol := isFlexColumn(owner)
 	for _, cls := range owner.Classes {
-		resp, base := parseResponsiveState(cls)
+		resp, base := extractResponsiveState(cls)
 		cleanBase := StripVariantsOnlyBase(base)
 
 		axis, valStr, ok := parseGapUtility(cleanBase, isCol)
@@ -530,7 +600,7 @@ func buildContainerSpaceOccurrences(owner *ir.Node, children []*ir.Node, ownerID
 	}
 
 	for _, cls := range owner.Classes {
-		resp, base := parseResponsiveState(cls)
+		resp, base := extractResponsiveState(cls)
 		cleanBase := StripVariantsOnlyBase(base)
 
 		axis, valStr, ok := parseSpaceUtility(cleanBase)

@@ -36,18 +36,23 @@ Diagnostic MUST NOT perform classification.
 | base `gap-4`, md `gap-6` | 0 | 0 | 0 | Different responsive states partition into separate rhythm pools; no drift flagged. |
 | `4, 4, 6, 6` (tie) | 0 | 0 | 0 | No clear dominant rhythm established ($50\% < 60\%$ threshold, tie policy). |
 | `margin` + parent `gap-4` | 0 | 0 | 0 | Competing parent layout invalidates margin ownership (`LayoutOwnerNone`). |
+| `gap-4` + `gap-7` peer containers | 0 | 0 |  | Peer container layout detects outlier gap among equivalent structural peers. |
 
 ---
 
-## 3. Locked Architectural Contracts
+## 3. Locked Architectural & Semantic Contracts
 
 1. **Typed `LayoutOwnerKind`:**
-   Layout ownership is explicitly classified into `LayoutOwnerContainerGap`, `LayoutOwnerContainerSpace`, `LayoutOwnerMarginSequence`, or `LayoutOwnerNone`. A node is `LayoutOwnerMarginSequence` only if 5 structural proofs hold (valid block container, zero competing gap/space, $\ge 3$ adjacent element children, same margin direction, and homogeneous tags).
-2. **Relationship-Driven Spatial Role Classification:**
-   Spatial role is derived from `From + To` primary relationship evidence and layout topology, independent of ambient parent container tags.
-3. **Pure KISS Majority Outlier Evaluation:**
+   Layout ownership is explicitly classified into `LayoutOwnerContainerGap`, `LayoutOwnerContainerSpace`, `LayoutOwnerMarginSequence`, `LayoutOwnerPeerContainers`, or `LayoutOwnerNone`.
+2. **N-1 Sibling Relationships Model:**
+   A spacing sequence represents relationships between consecutive peers. For $N$ items, there are $N-1$ sibling intervals:
+   - For container `gap-*`/`space-*`, $N$ children yield $N-1$ spatial relationships.
+   - For margin sequences, `child[i]` only represents a relationship if `child[i+1]` exists; trailing margins on the last child (`nextChild == nil`) are strictly excluded.
+3. **Structural Comparability First:**
+   Sibling peers under a layout owner default to `SpacingRoleGroup`. Semantic classification acts as an intentional boundary refinement (`SpacingRoleComponent` for label/input pairs, `SpacingRoleSection` for distinct macro landmarks), preventing lexical lockout on custom design system components (`<Widget />`, `<Row />`, etc.).
+4. **Canonical Variant Infrastructure:**
+   Reuses Charites `StripVariants` engine and general responsive variant matching (`sm`, `md`, `lg`, `xl`, `2xl`, `max-*`, `@*`) without hardcoded or redundant breakpoint tier parsers.
+5. **Peer Container Gap Evaluation:**
+   When homogeneous structural peers under a common parent declare gaps on the same axis (e.g. 4 peer rows with `gap-4, gap-4, gap-7, gap-4`), the parent evaluates the peer rhythm and emits exactly 1 diagnostic on the deviant peer container.
+6. **Pure KISS Majority Outlier Evaluation:**
    `MinOccurrences = 3`, `MinDominance = 0.60`. Invariant: Dominant established ($\text{count} \ge 2$, $\text{ratio} \ge 0.60$) $+$ minority value $\ne$ dominant $\implies$ outlier.
-4. **Strict Partitioning Key & Responsive State:**
-   Partitions are keyed by `(OwnerID, Axis, SpacingSource, SpacingRole, ResponsiveState)`. Gaps, spaces, and margins are never mixed in the same pool.
-5. **Zero-Noise Margin Guards:**
-   Proved through adversarial tests: competing parent gap, competing parent space-y, non-adjacent margins, mixed semantics, and inline wrappers without layout proof all yield 0 diagnostics.

@@ -55,13 +55,14 @@ export function RepeatedGroupOutlier() {
       <Field className="mb-3" />
       <Field className="mb-3" />
       <Field className="mb-6" />
+      <Field className="mb-3" />
     </div>
   );
 }`,
 			wantDiags: 1,
 		},
 		{
-			name: "Case 4: Majority three items (4, 4, 5)",
+			name: "Case 4: Majority three intervals (4, 4, 5)",
 			code: `
 export function MajorityThreeItems() {
   return (
@@ -69,6 +70,7 @@ export function MajorityThreeItems() {
       <Field className="mb-4" />
       <Field className="mb-4" />
       <Field className="mb-5" />
+      <Field className="mb-4" />
     </div>
   );
 }`,
@@ -186,17 +188,19 @@ export function TieSpacing() {
       <Field className="mb-4" />
       <Field className="mb-6" />
       <Field className="mb-6" />
+      <Field className="mb-6" />
     </div>
   );
 }`,
 			wantDiags: 0,
 		},
 		{
-			name: "Case 13: Multiple outliers (4, 4, 7, 9, 4)",
+			name: "Case 13: Multiple outliers (4, 4, 4, 7, 9)",
 			code: `
 export function MultipleOutliers() {
   return (
     <div>
+      <Field className="mb-4" />
       <Field className="mb-4" />
       <Field className="mb-4" />
       <Field className="mb-7" />
@@ -280,6 +284,48 @@ export function MarginNoLayoutProof() {
   );
 }`,
 			wantDiags: 0,
+		},
+		{
+			name: "Case 19: Regression - gap-4 and gap-7 equivalent structural peers (exactly 1 diagnostic)",
+			code: `
+export function PeerContainerGapOutlier() {
+  return (
+    <div className="flex flex-col">
+      <div className="flex gap-4">
+        <Field />
+        <Field />
+      </div>
+      <div className="flex gap-4">
+        <Field />
+        <Field />
+      </div>
+      <div className="flex gap-7">
+        <Field />
+        <Field />
+      </div>
+      <div className="flex gap-4">
+        <Field />
+        <Field />
+      </div>
+    </div>
+  );
+}`,
+			wantDiags: 1,
+		},
+		{
+			name: "Case 20: Custom components without lexical taxonomy (structural comparability first)",
+			code: `
+export function CustomComponentsDrift() {
+  return (
+    <div>
+      <Widget className="mb-4" />
+      <Widget className="mb-4" />
+      <Widget className="mb-7" />
+      <Widget className="mb-4" />
+    </div>
+  );
+}`,
+			wantDiags: 1,
 		},
 	}
 

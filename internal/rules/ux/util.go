@@ -7,6 +7,37 @@ import (
 	"github.com/will2469/charites/internal/ir"
 )
 
+// StripVariants memisahkan rantai varian Tailwind (misal: "sm:focus:outline-none")
+// menjadi daftar varian ["sm", "focus"] dan utility dasar "outline-none".
+func StripVariants(token string) ([]string, string) {
+	if !strings.Contains(token, ":") {
+		return nil, token
+	}
+
+	var variants []string
+	curr := token
+	inBracket := false
+
+	for i := 0; i < len(curr); i++ {
+		b := curr[i]
+		switch b {
+		case '[':
+			inBracket = true
+		case ']':
+			inBracket = false
+		case ':':
+			if !inBracket {
+				variant := curr[:i]
+				variants = append(variants, variant)
+				curr = curr[i+1:]
+				i = -1
+			}
+		}
+	}
+
+	return variants, curr
+}
+
 // StripVariantsOnlyBase mengembalikan utility dasar tanpa mengalokasikan slice varian.
 // Mengembalikan substring langsung tanpa alokasi memori (0 B/op, 0 allocs/op).
 func StripVariantsOnlyBase(token string) string {
