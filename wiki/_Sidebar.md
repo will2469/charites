@@ -261,7 +261,7 @@
 </details>
 
 <details open>
-<summary><b>Ux</b> (18 rules)</summary>
+<summary><b>Ux</b> (19 rules)</summary>
 
 * [**Ux Overview**](ux)
 * [`ux.camouflaged-link`](ux.camouflaged-link)
@@ -271,6 +271,7 @@
 * [`ux.empty-collection-unhandled`](ux.empty-collection-unhandled)
 * [`ux.missing-autofill`](ux.missing-autofill)
 * [`ux.monolithic-form-bloat`](ux.monolithic-form-bloat)
+* [`ux.multiline-input-misuse`](ux.multiline-input-misuse)
 * [`ux.nav-overflow-chunking`](ux.nav-overflow-chunking)
 * [`ux.number-input-identity-misuse`](ux.number-input-identity-misuse)
 * [`ux.number-input-missing-bounds`](ux.number-input-missing-bounds)

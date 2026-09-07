@@ -126,3 +126,98 @@ func TestClassifyIdentifier(t *testing.T) {
 		})
 	}
 }
+
+func TestTokenizeTextWords(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected []string
+	}{
+		{"Catatan tambahan (bila ada)", []string{"catatan", "tambahan", "bila", "ada"}},
+		{"Tuliskan alasan pembatalan...", []string{"tuliskan", "alasan", "pembatalan"}},
+		{"Keterangan: detail pengiriman #123", []string{"keterangan", "detail", "pengiriman", "123"}},
+		{"", nil},
+	}
+
+	for _, c := range cases {
+		tokens := form.TokenizeTextWords(c.input)
+		if len(tokens) != len(c.expected) {
+			t.Fatalf("TokenizeTextWords(%q) = %v, want %v", c.input, tokens, c.expected)
+		}
+		for i := range tokens {
+			if tokens[i] != c.expected[i] {
+				t.Errorf("TokenizeTextWords(%q)[%d] = %q, want %q", c.input, i, tokens[i], c.expected[i])
+			}
+		}
+	}
+}
+
+func TestClassifyContentIntent(t *testing.T) {
+	tests := []struct {
+		name           string
+		raw            string
+		isText         bool
+		expectedIntent form.ContentIntent
+		expectedMatch  string
+	}{
+		// Pure Multiline (Bahasa Indonesia)
+		{"Keterangan", "keterangan", false, form.ContentIntentMultiline, "keterangan"},
+		{"Catatan", "catatan", false, form.ContentIntentMultiline, "catatan"},
+		{"Deskripsi", "deskripsi", false, form.ContentIntentMultiline, "deskripsi"},
+		{"Alasan Penolakan", "alasan_penolakan", false, form.ContentIntentMultiline, "alasan"},
+		{"Komentar", "komentar", false, form.ContentIntentMultiline, "komentar"},
+		{"Uraian Singkat Masalah", "uraian_masalah", false, form.ContentIntentMultiline, "uraian"},
+		{"Tanggapan", "tanggapan", false, form.ContentIntentMultiline, "tanggapan"},
+		{"Masukan Pengguna", "masukan_pengguna", false, form.ContentIntentMultiline, "masukan"},
+
+		// Pure Multiline (English)
+		{"Notes", "notes", false, form.ContentIntentMultiline, "notes"},
+		{"Note", "customer_note", false, form.ContentIntentMultiline, "note"},
+		{"Description", "description", false, form.ContentIntentMultiline, "description"},
+		{"Comment", "user_comment", false, form.ContentIntentMultiline, "comment"},
+		{"Reason", "cancellation_reason", false, form.ContentIntentMultiline, "reason"},
+		{"Feedback", "user_feedback", false, form.ContentIntentMultiline, "feedback"},
+
+		// SingleLine Safeguards: Strong qualifiers
+		{"Reason Code", "reason_code", false, form.ContentIntentSingleLine, "code"},
+		{"Note ID", "note_id", false, form.ContentIntentSingleLine, "id"},
+		{"Catatan Nomor", "catatan_nomor", false, form.ContentIntentSingleLine, "nomor"},
+		{"Catatan Tanggal", "catatan_tanggal", false, form.ContentIntentSingleLine, "tanggal"},
+		{"Note Date", "note_date", false, form.ContentIntentSingleLine, "date"},
+		{"Note URL", "note_url", false, form.ContentIntentSingleLine, "url"},
+
+		// SingleLine Safeguards: Contextual qualifiers
+		{"Note Title", "note_title", false, form.ContentIntentSingleLine, "title"},
+		{"Judul Catatan", "judul_catatan", false, form.ContentIntentSingleLine, "judul"},
+		{"Short Description", "short_description", false, form.ContentIntentSingleLine, "short"},
+		{"Brief Note", "brief_note", false, form.ContentIntentSingleLine, "brief"},
+		{"Keterangan Singkat", "keterangan_singkat", false, form.ContentIntentSingleLine, "singkat"},
+		{"Notes Count", "notes_count", false, form.ContentIntentSingleLine, "count"},
+		{"Total Komentar", "total_komentar", false, form.ContentIntentSingleLine, "total"},
+
+		// Unknown / Ambiguous (not multiline)
+		{"Desc alone (omitted)", "desc", false, form.ContentIntentUnknown, ""},
+		{"Sort Desc", "sort_desc", false, form.ContentIntentUnknown, ""},
+		{"API Desc", "api_desc", false, form.ContentIntentUnknown, ""},
+		{"User Name", "user_name", false, form.ContentIntentUnknown, ""},
+		{"Postal Code", "postal_code", false, form.ContentIntentUnknown, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var tokens []string
+			if tt.isText {
+				tokens = form.TokenizeTextWords(tt.raw)
+			} else {
+				tokens = form.TokenizeIdentifier(tt.raw)
+			}
+
+			intent, matched := form.ClassifyContentIntent(tokens)
+			if intent != tt.expectedIntent {
+				t.Errorf("ClassifyContentIntent(%v) intent = %v, want %v", tokens, intent, tt.expectedIntent)
+			}
+			if tt.expectedMatch != "" && matched != tt.expectedMatch {
+				t.Errorf("ClassifyContentIntent(%v) matched = %q, want %q", tokens, matched, tt.expectedMatch)
+			}
+		})
+	}
+}

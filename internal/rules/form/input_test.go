@@ -271,3 +271,164 @@ func TestExtractInputFacts(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractInputFacts_ContentEvidence(t *testing.T) {
+	tests := []struct {
+		name          string
+		node          *ir.Node
+		wantTypeClass form.InputTypeClass
+		wantIntent    form.ContentIntent
+		wantSource    form.IdentifierSource
+		wantMatched   string
+	}{
+		{
+			name: "Astrades specimen: id=keterangan-input and placeholder=Catatan tambahan",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "Input",
+				Attributes: map[string]string{
+					"id":          `"keterangan-input"`,
+					"placeholder": `"Catatan tambahan (bila ada)"`,
+				},
+			},
+			wantTypeClass: form.InputTypeText,
+			wantIntent:    form.ContentIntentMultiline,
+			wantSource:    form.IdentifierSourceID,
+			wantMatched:   "keterangan",
+		},
+		{
+			name: "Multi-channel resolution: name=user_name (unknown) and placeholder=Catatan tambahan (multiline)",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "input",
+				Attributes: map[string]string{
+					"name":        `"user_name"`,
+					"placeholder": `"Catatan tambahan"`,
+				},
+			},
+			wantTypeClass: form.InputTypeText,
+			wantIntent:    form.ContentIntentMultiline,
+			wantSource:    form.IdentifierSourcePlaceholder,
+			wantMatched:   "catatan",
+		},
+		{
+			name: "Qualifier override: name=description (multiline) and placeholder=Short description (single-line)",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "Input",
+				Attributes: map[string]string{
+					"name":        `"description"`,
+					"placeholder": `"Short description"`,
+				},
+			},
+			wantTypeClass: form.InputTypeText,
+			wantIntent:    form.ContentIntentSingleLine,
+			wantSource:    form.IdentifierSourcePlaceholder,
+			wantMatched:   "short",
+		},
+		{
+			name: "Aria-label channel: name=foo and aria-label=Catatan tambahan",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "input",
+				Attributes: map[string]string{
+					"name":       `"foo"`,
+					"aria-label": `"Catatan tambahan"`,
+				},
+			},
+			wantTypeClass: form.InputTypeText,
+			wantIntent:    form.ContentIntentMultiline,
+			wantSource:    form.IdentifierSourceAriaLabel,
+			wantMatched:   "catatan",
+		},
+		{
+			name: "Rejection reason on input with omitted type",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "input",
+				Attributes: map[string]string{
+					"name": `"rejection_reason"`,
+				},
+			},
+			wantTypeClass: form.InputTypeText,
+			wantIntent:    form.ContentIntentMultiline,
+			wantSource:    form.IdentifierSourceName,
+			wantMatched:   "reason",
+		},
+		{
+			name: "Single-line safeguard: note_title",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "Input",
+				Attributes: map[string]string{
+					"name": `"note_title"`,
+				},
+			},
+			wantTypeClass: form.InputTypeText,
+			wantIntent:    form.ContentIntentSingleLine,
+			wantSource:    form.IdentifierSourceName,
+			wantMatched:   "title",
+		},
+		{
+			name: "Non-text type: password with name=notes",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "input",
+				Attributes: map[string]string{
+					"type": `"password"`,
+					"name": `"notes"`,
+				},
+			},
+			wantTypeClass: form.InputTypeOther,
+			wantIntent:    form.ContentIntentMultiline,
+			wantSource:    form.IdentifierSourceName,
+			wantMatched:   "notes",
+		},
+		{
+			name: "Dynamic type expression: type={customType} with name=notes",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "input",
+				Attributes: map[string]string{
+					"type": `{customType}`,
+					"name": `"notes"`,
+				},
+			},
+			wantTypeClass: form.InputTypeUnknown,
+			wantIntent:    form.ContentIntentMultiline,
+			wantSource:    form.IdentifierSourceName,
+			wantMatched:   "notes",
+		},
+		{
+			name: "Data-testid excluded from v1: data-testid=notes-field and name=user_name",
+			node: &ir.Node{
+				Type: ir.NodeElement,
+				Tag:  "input",
+				Attributes: map[string]string{
+					"data-testid": `"notes-field"`,
+					"name":        `"user_name"`,
+				},
+			},
+			wantTypeClass: form.InputTypeText,
+			wantIntent:    form.ContentIntentUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			facts := form.ExtractInputFacts(tt.node)
+			if facts.TypeClass != tt.wantTypeClass {
+				t.Errorf("TypeClass = %v, want %v", facts.TypeClass, tt.wantTypeClass)
+			}
+			if facts.Content.Intent != tt.wantIntent {
+				t.Errorf("Content.Intent = %v, want %v", facts.Content.Intent, tt.wantIntent)
+			}
+			if tt.wantSource != 0 && facts.Content.Source != tt.wantSource {
+				t.Errorf("Content.Source = %v, want %v", facts.Content.Source, tt.wantSource)
+			}
+			if tt.wantMatched != "" && facts.Content.Matched != tt.wantMatched {
+				t.Errorf("Content.Matched = %q, want %q", facts.Content.Matched, tt.wantMatched)
+			}
+		})
+	}
+}

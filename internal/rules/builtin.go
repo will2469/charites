@@ -137,6 +137,7 @@ var (
 	// ux Wave 5 (Form Input Semantic Integrity & Bounded Precision)
 	_ Rule = (*ux.NumberInputIdentityMisuseRule)(nil)
 	_ Rule = (*ux.NumberInputMissingBoundsRule)(nil)
+	_ Rule = (*ux.MultilineInputMisuseRule)(nil)
 
 	// semantic Wave 1 (Document Structure & Content Semantics)
 	_ Rule = (*semantic.ConsecutiveBRSpacingRule)(nil)
@@ -409,6 +410,7 @@ func builtinRules() []Rule {
 		// ux Wave 5 (Form Input Semantic Integrity & Bounded Precision)
 		ux.NewNumberInputIdentityMisuseRule(),
 		ux.NewNumberInputMissingBoundsRule(),
+		ux.NewMultilineInputMisuseRule(),
 
 		// semantic Wave 1 (Document Structure & Content Semantics)
 		semantic.NewConsecutiveBRSpacingRule(),

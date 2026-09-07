@@ -98,7 +98,7 @@ flowchart TD
 | `responsive` | 17 | [`responsive`](responsive) |
 | `semantic` | 1 | [`semantic`](semantic) |
 | `theme` | 32 | [`theme`](theme) |
-| `ux` | 18 | [`ux`](ux) |
+| `ux` | 19 | [`ux`](ux) |
 
 ---
 
@@ -276,6 +276,7 @@ flowchart TD
 | `ux.empty-collection-unhandled` | `ux` | `INFO` | Advises handling empty collection state when mapping dynamic items to avoid zero-state blindness | [`ux.empty-collection-unhandled`](ux.empty-collection-unhandled) |
 | `ux.missing-autofill` | `ux` | `WARN` | Enforces W3C Living Standard autocomplete attributes on personal identity, credential, and payment form inputs (Tesler's Law) | [`ux.missing-autofill`](ux.missing-autofill) |
 | `ux.monolithic-form-bloat` | `ux` | `WARN` | Warns when a monolithic form contains excessive unchunked inputs (> 9 total or > 7 per chunk), violating Cognitive Load Theory | [`ux.monolithic-form-bloat`](ux.monolithic-form-bloat) |
+| `ux.multiline-input-misuse` | `ux` | `WARN` | Flags single-line <Input> elements used for open-ended commentary, notes, or descriptions instead of <Textarea> | [`ux.multiline-input-misuse`](ux.multiline-input-misuse) |
 | `ux.nav-overflow-chunking` | `ux` | `WARN` | Warns when a navigation landmark contains more than 7 direct navigation links without chunking mechanisms | [`ux.nav-overflow-chunking`](ux.nav-overflow-chunking) |
 | `ux.number-input-identity-misuse` | `ux` | `WARN` | Flags type="number" on discrete identity codes and serial identifiers where mathematical operations are meaningless | [`ux.number-input-identity-misuse`](ux.number-input-identity-misuse) |
 | `ux.number-input-missing-bounds` | `ux` | `WARN` | Flags mathematical number inputs lacking explicit domain lower bounds (min) to prevent accidental out-of-range submissions | [`ux.number-input-missing-bounds`](ux.number-input-missing-bounds) |

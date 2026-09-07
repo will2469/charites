@@ -57,11 +57,42 @@ func (s IdentifierSource) String() string {
 	}
 }
 
-// IdentifierEvidence menyimpan informasi rinci bukti semantik yang ditemukan pada elemen input.
+// IdentifierEvidence menyimpan informasi rinci bukti semantik identitas yang ditemukan pada elemen input.
 type IdentifierEvidence struct {
 	Value   string
 	Source  IdentifierSource
 	Class   IdentifierClass
+	Matched string
+}
+
+// ContentIntent merepresentasikan intensi bentuk konten dari input (apakah satu baris atau multiline).
+type ContentIntent int
+
+const (
+	// ContentIntentUnknown menandakan tidak ada indikasi jelas mengenai bentuk konten.
+	ContentIntentUnknown ContentIntent = iota
+	// ContentIntentSingleLine menandakan field ditujukan untuk nilai teks ringkas satu baris (misal: title, code, number, date).
+	ContentIntentSingleLine
+	// ContentIntentMultiline menandakan field ditujukan untuk teks bebas/komentar/catatan multiline (misal: notes, keterangan, alasan).
+	ContentIntentMultiline
+)
+
+func (c ContentIntent) String() string {
+	switch c {
+	case ContentIntentSingleLine:
+		return "single-line"
+	case ContentIntentMultiline:
+		return "multiline"
+	default:
+		return "unknown"
+	}
+}
+
+// ContentEvidence menyimpan informasi rinci bukti intensi bentuk konten yang ditemukan.
+type ContentEvidence struct {
+	Value   string
+	Source  IdentifierSource
+	Intent  ContentIntent
 	Matched string
 }
 
@@ -300,4 +331,131 @@ func ClassifyIdentifier(tokens []string) (IdentifierClass, string) {
 	}
 
 	return IdentifierUnknown, ""
+}
+
+// strongMultilineTokens adalah token semantik yang menandakan teks bebas/komentar/catatan/penjelasan multiline.
+// Catatan arsitektural: token ambigu 'desc' sengaja ditiadakan untuk menghindari collision dengan sort_desc/api_desc.
+var strongMultilineTokens = map[string]struct{}{
+	// Bahasa Indonesia
+	"keterangan": {},
+	"catatan":    {},
+	"deskripsi":  {},
+	"alasan":     {},
+	"komentar":   {},
+	"uraian":     {},
+	"tanggapan":  {},
+	"masukan":    {},
+
+	// Bahasa Inggris
+	"notes":       {},
+	"note":        {},
+	"description": {},
+	"comment":     {},
+	"comments":    {},
+	"commentary":  {},
+	"reason":      {},
+	"reasons":     {},
+	"remarks":     {},
+	"remark":      {},
+	"feedback":    {},
+	"explanation": {},
+}
+
+// strongSingleLineTokens adalah pengubah berkekuatan tinggi yang secara tak bersyarat
+// menetapkan intensi sebagai SingleLine jika disandingkan dengan token multiline.
+var strongSingleLineTokens = map[string]struct{}{
+	"id":      {},
+	"code":    {},
+	"kode":    {},
+	"number":  {},
+	"no":      {},
+	"nomor":   {},
+	"date":    {},
+	"tanggal": {},
+	"time":    {},
+	"waktu":   {},
+	"url":     {},
+	"link":    {},
+	"email":   {},
+	"phone":   {},
+	"telepon": {},
+}
+
+// contextualSingleLineTokens adalah pengubah kualifikasi yang menandakan nilai ringkas satu baris
+// ketika disandingkan dengan token multiline (misal: note_title, short_description, notes_count).
+var contextualSingleLineTokens = map[string]struct{}{
+	"title":   {},
+	"judul":   {},
+	"subject": {},
+	"subjek":  {},
+	"short":   {},
+	"brief":   {},
+	"singkat": {},
+	"ringkas": {},
+	"count":   {},
+	"total":   {},
+	"jumlah":  {},
+}
+
+// TokenizeTextWords memecah teks natural language (misal placeholder atau aria-label)
+// menjadi daftar kata huruf kecil tanpa tanda baca.
+func TokenizeTextWords(s string) []string {
+	var tokens []string
+	var curr []rune
+
+	flush := func() {
+		if len(curr) > 0 {
+			tokens = append(tokens, strings.ToLower(string(curr)))
+			curr = curr[:0]
+		}
+	}
+
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			curr = append(curr, r)
+		} else {
+			flush()
+		}
+	}
+	flush()
+
+	return tokens
+}
+
+// ClassifyContentIntent mengklasifikasikan intensi bentuk konten (Multiline vs SingleLine vs Unknown)
+// dari sekumpulan token dengan hierarki presedensi:
+// 1. Strong Single-Line Qualifier (id, code, date, url, dll.) -> ContentIntentSingleLine
+// 2. Contextual Single-Line Qualifier (title, short, count, dll.) -> ContentIntentSingleLine
+// 3. Pure Strong Multiline Token -> ContentIntentMultiline
+// 4. Default -> ContentIntentUnknown
+func ClassifyContentIntent(tokens []string) (ContentIntent, string) {
+	if len(tokens) == 0 {
+		return ContentIntentUnknown, ""
+	}
+
+	var matchedMultiline string
+	for _, tok := range tokens {
+		if _, ok := strongMultilineTokens[tok]; ok {
+			matchedMultiline = tok
+			break
+		}
+	}
+
+	if matchedMultiline == "" {
+		return ContentIntentUnknown, ""
+	}
+
+	// Jika ada multiline token, periksa apakah terdapat single-line qualifier (strong lalu contextual)
+	for _, tok := range tokens {
+		if _, ok := strongSingleLineTokens[tok]; ok {
+			return ContentIntentSingleLine, tok
+		}
+	}
+	for _, tok := range tokens {
+		if _, ok := contextualSingleLineTokens[tok]; ok {
+			return ContentIntentSingleLine, tok
+		}
+	}
+
+	return ContentIntentMultiline, matchedMultiline
 }

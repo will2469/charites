@@ -7,16 +7,41 @@ import (
 	"github.com/will2469/charites/internal/ir"
 )
 
+// InputTypeClass merepresentasikan klasifikasi jenis atribut type pada elemen input.
+type InputTypeClass int
+
+const (
+	// InputTypeUnknown menandakan tipe input tidak dapat ditentukan secara statis (misal: binding dinamis type={foo}).
+	InputTypeUnknown InputTypeClass = iota
+	// InputTypeText menandakan generic single-line text input (type="text", type="", atau type tidak dideklarasikan).
+	InputTypeText
+	// InputTypeOther menandakan kontrol input dengan tipe khusus (misal: number, password, email, tel, checkbox, radio, dll.).
+	InputTypeOther
+)
+
+func (t InputTypeClass) String() string {
+	switch t {
+	case InputTypeText:
+		return "text"
+	case InputTypeOther:
+		return "other"
+	default:
+		return "unknown"
+	}
+}
+
 // InputFacts merangkum fakta semantik dan interaksi dari sebuah elemen form input.
 type InputFacts struct {
 	IsInputTag      bool
-	IsNumberType    bool
+	IsNumberType    bool // Dipertahankan untuk kompatibilitas penuh dengan rule Issue #5
+	TypeClass       InputTypeClass
 	IsDisabled      bool
 	IsReadOnly      bool
 	HasWheelHandler bool
 	HasDeclaredMin  bool
 
 	Identifier IdentifierEvidence
+	Content    ContentEvidence
 }
 
 // getAttrCI mengambil nilai atribut dari map node.Attributes secara case-insensitive.
@@ -39,31 +64,44 @@ func cleanAttrVal(val string) string {
 	return strings.Trim(strings.TrimSpace(val), "\"'`{}")
 }
 
-// isNumberTypeAttr memeriksa apakah atribut type bernilai static "number".
-// Mengabaikan ekspresi dinamis (misal: type={inputType} atau type={cond ? "number" : "text"})
-// untuk menjaga kepastian statis (static certainty).
-func isNumberTypeAttr(rawVal string) bool {
-	raw := strings.TrimSpace(rawVal)
-	if raw == "" {
-		return false
+// classifyInputType mengklasifikasikan atribut type ke dalam InputTypeClass dan mengembalikan flag isNumberType.
+func classifyInputType(rawVal string, present bool) (InputTypeClass, bool) {
+	if !present {
+		return InputTypeText, false
 	}
 
-	// Jika JSX brace expression: type={"number"} vs type={dynamicVar}
+	raw := strings.TrimSpace(rawVal)
+	if raw == "" {
+		return InputTypeText, false
+	}
+
+	// Jika JSX brace expression: type={"text"} vs type={dynamicVar}
 	if strings.HasPrefix(raw, "{") && strings.HasSuffix(raw, "}") {
 		inner := strings.TrimSpace(raw[1 : len(raw)-1])
-		// Periksa apakah inner adalah string literal yang diapit tanda kutip
 		if (strings.HasPrefix(inner, "\"") && strings.HasSuffix(inner, "\"")) ||
 			(strings.HasPrefix(inner, "'") && strings.HasSuffix(inner, "'")) ||
 			(strings.HasPrefix(inner, "`") && strings.HasSuffix(inner, "`")) {
-			clean := cleanAttrVal(inner)
-			return strings.EqualFold(clean, "number")
+			clean := strings.ToLower(cleanAttrVal(inner))
+			if clean == "" || clean == "text" {
+				return InputTypeText, false
+			}
+			if clean == "number" {
+				return InputTypeOther, true
+			}
+			return InputTypeOther, false
 		}
-		// Ekspresi dinamis diabaikan
-		return false
+		// Ekspresi dinamis non-literal (type={dynamicVar})
+		return InputTypeUnknown, false
 	}
 
-	clean := cleanAttrVal(raw)
-	return strings.EqualFold(clean, "number")
+	clean := strings.ToLower(cleanAttrVal(raw))
+	if clean == "" || clean == "text" {
+		return InputTypeText, false
+	}
+	if clean == "number" {
+		return InputTypeOther, true
+	}
+	return InputTypeOther, false
 }
 
 // hasDeclaredMinAttr memeriksa apakah developer telah mendeklarasikan batas bawah domain yang valid.
@@ -200,6 +238,99 @@ func extractIdentifierEvidence(attrs map[string]string) IdentifierEvidence {
 	return IdentifierEvidence{}
 }
 
+type contentChannelDef struct {
+	source IdentifierSource
+	key    string
+	isText bool
+}
+
+var contentChannels = []contentChannelDef{
+	{source: IdentifierSourceName, key: "name", isText: false},
+	{source: IdentifierSourceID, key: "id", isText: false},
+	{source: IdentifierSourcePlaceholder, key: "placeholder", isText: true},
+	{source: IdentifierSourceAriaLabel, key: "aria-label", isText: true},
+}
+
+type channelFinding struct {
+	source  IdentifierSource
+	value   string
+	tokens  []string
+	intent  ContentIntent
+	matched string
+}
+
+// extractContentEvidence mengevaluasi seluruh channel atribut secara independen untuk menentukan intensi bentuk konten.
+// Precedence intent:
+// Strong Single-Line Qualifier > Strong Multiline Token > Contextual Single-Line Qualifier > Unknown.
+func extractContentEvidence(attrs map[string]string) ContentEvidence {
+	if attrs == nil {
+		return ContentEvidence{}
+	}
+
+	findings := make([]channelFinding, 0, len(contentChannels))
+	for _, ch := range contentChannels {
+		_, rawVal, ok := getAttrCI(attrs, ch.key)
+		if !ok {
+			continue
+		}
+		cleanVal := cleanAttrVal(rawVal)
+		if cleanVal == "" {
+			continue
+		}
+
+		var tokens []string
+		if ch.isText {
+			tokens = TokenizeTextWords(cleanVal)
+		} else {
+			tokens = TokenizeIdentifier(cleanVal)
+		}
+
+		intent, matched := ClassifyContentIntent(tokens)
+		findings = append(findings, channelFinding{
+			source:  ch.source,
+			value:   cleanVal,
+			tokens:  tokens,
+			intent:  intent,
+			matched: matched,
+		})
+	}
+
+	if len(findings) == 0 {
+		return ContentEvidence{}
+	}
+
+	// 1. Evaluasi apakah ada channel yang menghasilkan SingleLine (qualifier menang atas multiline)
+	for _, f := range findings {
+		if f.intent == ContentIntentSingleLine {
+			return ContentEvidence{
+				Value:   f.value,
+				Source:  f.source,
+				Intent:  ContentIntentSingleLine,
+				Matched: f.matched,
+			}
+		}
+	}
+
+	// 2. Evaluasi apakah ada channel yang menghasilkan Multiline
+	for _, f := range findings {
+		if f.intent == ContentIntentMultiline {
+			return ContentEvidence{
+				Value:   f.value,
+				Source:  f.source,
+				Intent:  ContentIntentMultiline,
+				Matched: f.matched,
+			}
+		}
+	}
+
+	// 3. Fallback ke temuan pertama dengan intent Unknown
+	return ContentEvidence{
+		Value:  findings[0].value,
+		Source: findings[0].source,
+		Intent: ContentIntentUnknown,
+	}
+}
+
 // ExtractInputFacts mengekstraksi metadata semantik dan interaksi dari sebuah node IR secara murni.
 func ExtractInputFacts(node *ir.Node) InputFacts {
 	var facts InputFacts
@@ -215,10 +346,9 @@ func ExtractInputFacts(node *ir.Node) InputFacts {
 
 	attrs := node.Attributes
 
-	// 2. Evaluasi Tipe Input ("number")
-	if _, typeVal, ok := getAttrCI(attrs, "type"); ok {
-		facts.IsNumberType = isNumberTypeAttr(typeVal)
-	}
+	// 2. Evaluasi Tipe Input
+	_, typeVal, typePresent := getAttrCI(attrs, "type")
+	facts.TypeClass, facts.IsNumberType = classifyInputType(typeVal, typePresent)
 
 	// 3. Evaluasi Pengecualian Interaksi (disabled & readOnly)
 	facts.IsDisabled, facts.IsReadOnly = extractInteractionFacts(attrs)
@@ -234,6 +364,9 @@ func ExtractInputFacts(node *ir.Node) InputFacts {
 
 	// 6. Evaluasi Identifier Berdasarkan Bobot Otoritas (Ranked Evidence)
 	facts.Identifier = extractIdentifierEvidence(attrs)
+
+	// 7. Evaluasi Intensi Bentuk Konten (Multiline vs SingleLine)
+	facts.Content = extractContentEvidence(attrs)
 
 	return facts
 }
