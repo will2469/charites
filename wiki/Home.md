@@ -95,7 +95,7 @@ flowchart TD
 | `mobile` | 5 | [`mobile`](mobile) |
 | `performance` | 16 | [`performance`](performance) |
 | `pwa` | 10 | [`pwa`](pwa) |
-| `responsive` | 17 | [`responsive`](responsive) |
+| `responsive` | 18 | [`responsive`](responsive) |
 | `semantic` | 1 | [`semantic`](semantic) |
 | `theme` | 32 | [`theme`](theme) |
 | `ux` | 19 | [`ux`](ux) |
@@ -225,6 +225,7 @@ flowchart TD
 | `responsive.dynamic-viewport-inconsistency` | `responsive` | `WARN` | Warns when static viewport units (100vh, h-screen) and modern dynamic units (dvh, svh) are mixed inconsistently across layout hierarchies | [`responsive.dynamic-viewport-inconsistency`](responsive.dynamic-viewport-inconsistency) |
 | `responsive.fixed-width-overflow` | `responsive` | `ERROR` | Detects static fixed container widths exceeding 320px that cause horizontal overflow on mobile viewports | [`responsive.fixed-width-overflow`](responsive.fixed-width-overflow) |
 | `responsive.flex-child-overflow` | `responsive` | `WARN` | Warns when a flex child containing text or dynamic content lacks min-w-0, causing min-width: auto container blowout | [`responsive.flex-child-overflow`](responsive.flex-child-overflow) |
+| `responsive.fractional-width-gap-drift` | `responsive` | `WARN` | Warns when flex container declares a horizontal gap alongside fractional-width children totaling >= 100% with flex-wrap or disabled shrinking, causing unexpected wrapping or container blowout | [`responsive.fractional-width-gap-drift`](responsive.fractional-width-gap-drift) |
 | `responsive.grid-min-column` | `responsive` | `WARN` | Warns against CSS grid minmax column definitions with rigid minimum sizes (> 320px) that cause horizontal overflow on mobile viewports | [`responsive.grid-min-column`](responsive.grid-min-column) |
 | `responsive.horizontal-overflow` | `responsive` | `WARN` | Warns when unconstrained overflow-x-scroll is declared without fluid width boundary or dynamic auto-scrolling | [`responsive.horizontal-overflow`](responsive.horizontal-overflow) |
 | `responsive.image-overflow` | `responsive` | `WARN` | Warns when media elements with large fixed dimensions lack responsive max-w-full scaling | [`responsive.image-overflow`](responsive.image-overflow) |

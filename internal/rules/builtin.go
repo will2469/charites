@@ -110,6 +110,9 @@ var (
 	_ Rule = (*responsive.GridMinColumnRule)(nil)
 	_ Rule = (*responsive.AspectRatioOverflowRule)(nil)
 
+	// responsive Wave 5 (Fluid Proportions & Grid-Flex Spacing Geometry)
+	_ Rule = (*responsive.FractionalWidthGapDriftRule)(nil)
+
 	// ux Wave 1 (Spatial Hierarchy, Navigation Chunking & CTA Clarity)
 	_ Rule = (*ux.SpacingInversionRule)(nil)
 	_ Rule = (*ux.NavOverflowChunkingRule)(nil)
@@ -382,6 +385,9 @@ func builtinRules() []Rule {
 		responsive.NewContainerOverconstraintRule(),
 		responsive.NewGridMinColumnRule(),
 		responsive.NewAspectRatioOverflowRule(),
+
+		// responsive Wave 5 (Fluid Proportions & Grid-Flex Spacing Geometry)
+		responsive.NewFractionalWidthGapDriftRule(),
 
 		// ux Wave 1 (Spatial Hierarchy, Navigation Chunking & CTA Clarity)
 		ux.NewSpacingInversionRule(),

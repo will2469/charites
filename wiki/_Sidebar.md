@@ -190,7 +190,7 @@
 </details>
 
 <details open>
-<summary><b>Responsive</b> (17 rules)</summary>
+<summary><b>Responsive</b> (18 rules)</summary>
 
 * [**Responsive Overview**](responsive)
 * [`responsive.aspect-ratio-overflow`](responsive.aspect-ratio-overflow)
@@ -199,6 +199,7 @@
 * [`responsive.dynamic-viewport-inconsistency`](responsive.dynamic-viewport-inconsistency)
 * [`responsive.fixed-width-overflow`](responsive.fixed-width-overflow)
 * [`responsive.flex-child-overflow`](responsive.flex-child-overflow)
+* [`responsive.fractional-width-gap-drift`](responsive.fractional-width-gap-drift)
 * [`responsive.grid-min-column`](responsive.grid-min-column)
 * [`responsive.horizontal-overflow`](responsive.horizontal-overflow)
 * [`responsive.image-overflow`](responsive.image-overflow)
