@@ -38,3 +38,15 @@ rules:
 #     "8": ["-subtle"]
 #   fallbacks:
 #     secondary: ["muted"]
+
+# Component-Scoped Style Drift Analyzer configuration (optional)
+# Controls statistical thresholds and component-specific exceptions for design.component-style-drift
+# drift:
+#   dominance_threshold: 80 # Canonical token must achieve >= 80% representation
+#   outlier_threshold: 10   # Variants with <= 10% representation flagged as rogue drift
+#   min_cluster_occurrences: 10 # Minimum occurrences required before evaluating statistical drift
+#   exceptions:
+#     Button:
+#       rounded: ["rounded-full"] # Allow circular icon buttons
+#     Card:
+#       rounded: ["rounded-2xl"]  # Allow hero card outer radius

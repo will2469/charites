@@ -15,6 +15,7 @@ import (
 
 	"github.com/will2469/charites/internal/analyzer"
 	"github.com/will2469/charites/internal/config"
+	"github.com/will2469/charites/internal/drift"
 	"github.com/will2469/charites/internal/ir"
 	"github.com/will2469/charites/internal/reporter"
 	"github.com/will2469/charites/internal/rules"
@@ -42,93 +43,128 @@ func (c *countingAnalyzer) AnalyzeFile(path string) ([]ir.Diagnostic, error) {
 	return c.inner.AnalyzeFile(path)
 }
 
+func (c *countingAnalyzer) AnalyzeFileWithOccurrences(path string) ([]ir.Diagnostic, []drift.StyleOccurrence, error) {
+	c.count.Add(1)
+	if oa, ok := c.inner.(scanner.OccurrencesAnalyzer); ok {
+		return oa.AnalyzeFileWithOccurrences(path)
+	}
+	diags, err := c.inner.AnalyzeFile(path)
+	return diags, nil, err
+}
+
 // RunScan mengorkestrasi pipeline pemindaian kode frontend sesuai kontrak SPEC-05-CLI.
-func RunScan(args []string, stdout, stderr io.Writer) int {
+type scanCLIOptions struct {
+	format           string
+	outputFile       string
+	category         string
+	rule             string
+	configPath       string
+	noColor          bool
+	failOnWarn       bool
+	extFlags         stringSliceFlag
+	ignoreFlags      stringSliceFlag
+	target           string
+	positionalArgs   []string
+	isExplicitConfig bool
+}
+
+func parseScanCLIOptions(args []string, stdout, stderr io.Writer) (*scanCLIOptions, int) {
 	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	fs.Usage = func() {}
 
-	var format string
-	var outputFile string
-	var category string
-	var rule string
-	var configPath string
-	var noColor bool
-	var failOnWarn bool
-	var extFlags stringSliceFlag
-	var ignoreFlags stringSliceFlag
+	opts := &scanCLIOptions{format: "inline", configPath: "charites.yaml", target: "."}
 
-	fs.StringVar(&format, "format", "inline", "Output format: inline, json, or markdown (alias: md)")
-	fs.StringVar(&format, "f", "inline", "Output format (shorthand)")
+	fs.StringVar(&opts.format, "format", "inline", "Output format: inline, json, or markdown (alias: md)")
+	fs.StringVar(&opts.format, "f", "inline", "Output format (shorthand)")
+	fs.StringVar(&opts.outputFile, "output", "", "Path to output report file (e.g. report.md)")
+	fs.StringVar(&opts.outputFile, "o", "", "Path to output report file (shorthand)")
+	fs.Var(&opts.extFlags, "ext", "Filter extensions: astro, tsx, jsx")
+	fs.Var(&opts.extFlags, "e", "Filter extensions (shorthand)")
+	fs.StringVar(&opts.category, "category", "", "Filter by rule category")
+	fs.StringVar(&opts.category, "c", "", "Filter by rule category (shorthand)")
+	fs.StringVar(&opts.rule, "rule", "", "Filter by canonical rule ID")
+	fs.StringVar(&opts.rule, "r", "", "Filter by canonical rule ID (shorthand)")
+	fs.StringVar(&opts.configPath, "config", "charites.yaml", "Path to config file")
+	fs.Var(&opts.ignoreFlags, "ignore", "Additional custom ignore patterns")
+	fs.BoolVar(&opts.noColor, "no-color", false, "Disable ANSI color formatting")
+	fs.BoolVar(&opts.failOnWarn, "fail-on-warn", false, "Exit with code 1 on warnings")
 
-	fs.StringVar(&outputFile, "output", "", "Path to output report file (e.g. report.md)")
-	fs.StringVar(&outputFile, "o", "", "Path to output report file (shorthand)")
-
-	fs.Var(&extFlags, "ext", "Filter extensions: astro, tsx, jsx")
-	fs.Var(&extFlags, "e", "Filter extensions (shorthand)")
-
-	fs.StringVar(&category, "category", "", "Filter by rule category")
-	fs.StringVar(&category, "c", "", "Filter by rule category (shorthand)")
-
-	fs.StringVar(&rule, "rule", "", "Filter by canonical rule ID")
-	fs.StringVar(&rule, "r", "", "Filter by canonical rule ID (shorthand)")
-
-	fs.StringVar(&configPath, "config", "charites.yaml", "Path to config file")
-
-	fs.Var(&ignoreFlags, "ignore", "Additional custom ignore patterns")
-
-	fs.BoolVar(&noColor, "no-color", false, "Disable ANSI color formatting")
-	fs.BoolVar(&failOnWarn, "fail-on-warn", false, "Exit with code 1 on warnings")
-
-	// 1. Reorder argumen untuk fleksibilitas POSIX/GNU
 	reorderedArgs, positionalArgs := partitionArgs(args)
+	opts.positionalArgs = positionalArgs
+	opts.isExplicitConfig = isFlagPassed(args, "-config", "--config")
 
 	if err := fs.Parse(reorderedArgs); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			_, _ = fmt.Fprint(stdout, UsageString())
-			return ExitClean
+			return nil, ExitClean
 		}
 		_, _ = fmt.Fprintf(stderr, "charites: error: %v. Run 'charites --help' for usage.\n", err)
-		return ExitOperational
+		return nil, ExitOperational
 	}
 
-	target := "."
 	if len(positionalArgs) == 1 {
-		target = positionalArgs[0]
+		opts.target = positionalArgs[0]
 	}
 
-	isExplicitConfig := isFlagPassed(args, "-config", "--config")
-	cfg, ok := resolveScanConfig(target, configPath, isExplicitConfig, stderr)
+	return opts, -1
+}
+
+func runDriftAnalysisIfActive(activeRules []config.ActiveRule, occurrences []drift.StyleOccurrence, cfg *config.Config, diags []ir.Diagnostic) []ir.Diagnostic {
+	if !isDriftRuleActive(activeRules) || len(occurrences) == 0 {
+		return diags
+	}
+	driftOpts := drift.DefaultOptions()
+	if cfg != nil {
+		driftOpts = cfg.Drift.ToDriftOptions()
+	}
+	driftAnalyzer := drift.NewAnalyzer(driftOpts)
+	report := driftAnalyzer.Analyze(occurrences)
+	driftDiags := drift.SynthesizeDiagnostics(report)
+	if len(driftDiags) > 0 {
+		diags = append(diags, driftDiags...)
+		diags = ir.SortDiagnostics(diags)
+	}
+	return diags
+}
+
+// RunScan mengorkestrasi pipeline pemindaian kode frontend sesuai kontrak SPEC-05-CLI.
+func RunScan(args []string, stdout, stderr io.Writer) int {
+	cliOpts, exitCode := parseScanCLIOptions(args, stdout, stderr)
+	if cliOpts == nil {
+		return exitCode
+	}
+
+	cfg, ok := resolveScanConfig(cliOpts.target, cliOpts.configPath, cliOpts.isExplicitConfig, stderr)
 	if !ok {
 		return ExitOperational
 	}
 
 	if !isFlagPassed(args, "-f", "--format") && cfg != nil && cfg.Format != "" {
-		format = cfg.Format
+		cliOpts.format = cfg.Format
 	}
 	if !isFlagPassed(args, "-o", "--output") && cfg != nil && cfg.Output != "" {
-		outputFile = cfg.Output
+		cliOpts.outputFile = cfg.Output
 	}
 
-	format = resolveReportFormat(format, outputFile)
-
-	if !validateScanTargetAndFormat(target, format, positionalArgs, stderr) {
+	cliOpts.format = resolveReportFormat(cliOpts.format, cliOpts.outputFile)
+	if !validateScanTargetAndFormat(cliOpts.target, cliOpts.format, cliOpts.positionalArgs, stderr) {
 		return ExitOperational
 	}
 
-	normalizedExts, extErr := normalizeExtensions(extFlags)
+	normalizedExts, extErr := normalizeExtensions(cliOpts.extFlags)
 	if extErr != nil {
 		_, _ = fmt.Fprintln(stderr, extErr.Error())
 		return ExitOperational
 	}
 
 	reg := rules.DefaultRegistry()
-	if !validateCategoryAndRule(reg, category, rule, stderr) {
+	if !validateCategoryAndRule(reg, cliOpts.category, cliOpts.rule, stderr) {
 		return ExitOperational
 	}
 
-	activeRules := cfg.ResolveActiveRules(reg, category, rule)
-	matcher, ok := buildScanMatcher(target, cfg, ignoreFlags, stderr)
+	activeRules := cfg.ResolveActiveRules(reg, cliOpts.category, cliOpts.rule)
+	matcher, ok := buildScanMatcher(cliOpts.target, cfg, cliOpts.ignoreFlags, stderr)
 	if !ok {
 		return ExitOperational
 	}
@@ -136,12 +172,11 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 	walker := scanner.NewWalker(matcher, normalizedExts)
 	eng := analyzer.NewEngine(activeRules)
 	ca := &countingAnalyzer{inner: eng}
-
 	pool := scanner.NewPool(0)
 	ctx := context.Background()
 
 	startTime := time.Now()
-	diags, err := pool.Run(ctx, walker, target, ca)
+	diags, occurrences, err := pool.RunWithOccurrences(ctx, walker, cliOpts.target, ca)
 	durationMS := time.Since(startTime).Milliseconds()
 
 	if ctx.Err() != nil {
@@ -152,16 +187,18 @@ func RunScan(args []string, stdout, stderr io.Writer) int {
 		return ExitOperational
 	}
 
-	result := buildScanResult(ca, diags, durationMS, failOnWarn, activeRules, target, startTime)
-	if outputFile != "" {
-		if code := saveReportToFile(outputFile, result, format, noColor, stdout, stderr); code != -1 {
+	diags = runDriftAnalysisIfActive(activeRules, occurrences, cfg, diags)
+
+	result := buildScanResult(ca, diags, durationMS, cliOpts.failOnWarn, activeRules, cliOpts.target, startTime)
+	if cliOpts.outputFile != "" {
+		if code := saveReportToFile(cliOpts.outputFile, result, cliOpts.format, cliOpts.noColor, stdout, stderr); code != -1 {
 			return code
 		}
 	} else {
-		renderScanResult(stdout, result, format, noColor)
+		renderScanResult(stdout, result, cliOpts.format, cliOpts.noColor)
 	}
 
-	return ResolveExitCode(&result.Summary, failOnWarn)
+	return ResolveExitCode(&result.Summary, cliOpts.failOnWarn)
 }
 
 func resolveReportFormat(format, outputFile string) string {
@@ -459,4 +496,13 @@ func normalizeExtensions(extFlags []string) ([]string, error) {
 	}
 
 	return result, nil
+}
+
+func isDriftRuleActive(activeRules []config.ActiveRule) bool {
+	for _, ar := range activeRules {
+		if ar.Rule.ID() == drift.RuleID {
+			return true
+		}
+	}
+	return false
 }

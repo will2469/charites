@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/will2469/charites/internal/drift"
 	"github.com/will2469/charites/internal/ir"
 )
 
@@ -12,6 +13,18 @@ import (
 // Mengurangi kopling langsung antara paket scanner dan analyzer.
 type FileAnalyzer interface {
 	AnalyzeFile(path string) ([]ir.Diagnostic, error)
+}
+
+// FileAnalysisResult merepresentasikan temuan diagnostik dan kemunculan gaya dari satu berkas.
+type FileAnalysisResult struct {
+	Diagnostics []ir.Diagnostic
+	Occurrences []drift.StyleOccurrence
+}
+
+// OccurrencesAnalyzer mendefinisikan interface pemrosesan analisis berkas yang mengekstrak StyleOccurrence.
+type OccurrencesAnalyzer interface {
+	FileAnalyzer
+	AnalyzeFileWithOccurrences(path string) ([]ir.Diagnostic, []drift.StyleOccurrence, error)
 }
 
 // Pool mengelola konkurensi pemrosesan berkas menggunakan goroutine worker pool.
@@ -42,16 +55,21 @@ func (p *Pool) Workers() int {
 	return p.workers
 }
 
-// Run mengeksekusi pipeline pemindaian paralel dengan invarian Single Producer = Single Closer:
-// 1. Walker goroutine memproduksi dan menutup channel jobs.
-// 2. N Worker goroutines mengonsumsi jobs dan memproduksi hasil ke channel results.
-// 3. Coordinator goroutine tersinkronisasi sync.WaitGroup menutup channel results.
-// 4. Aggregator mengumpulkan temuan dan mengurutkan secara total ordering (ir.SortDiagnostics).
-// Pada saat pembatalan context (SIGINT/SIGTERM), temuan parsial dibuang dan mengembalikan ctx.Err().
+// Run mengeksekusi pipeline pemindaian paralel standar.
 func (p *Pool) Run(ctx context.Context, walker *Walker, target string, analyzer FileAnalyzer) ([]ir.Diagnostic, error) {
+	diags, _, err := p.RunWithOccurrences(ctx, walker, target, analyzer)
+	return diags, err
+}
+
+// RunWithOccurrences mengeksekusi pipeline pemindaian paralel dengan transfer kepemilikan data (race-free by ownership):
+// 1. Walker goroutine memproduksi path berkas ke channel jobs.
+// 2. N Worker goroutines mengonsumsi jobs dan mengirim FileAnalysisResult ke channel results.
+// 3. Coordinator goroutine tersinkronisasi sync.WaitGroup menutup channel results.
+// 4. Aggregator tunggal mengumpulkan diagnostik dan style occurrences tanpa shared mutex.
+func (p *Pool) RunWithOccurrences(ctx context.Context, walker *Walker, target string, analyzer FileAnalyzer) ([]ir.Diagnostic, []drift.StyleOccurrence, error) {
 	bufferSize := p.workers * 2
 	jobs := make(chan string, bufferSize)
-	results := make(chan []ir.Diagnostic, bufferSize)
+	results := make(chan FileAnalysisResult, bufferSize)
 
 	var wg sync.WaitGroup
 
@@ -74,28 +92,36 @@ func (p *Pool) Run(ctx context.Context, walker *Walker, target string, analyzer 
 		close(results)
 	}()
 
-	// 4. Aggregator: Kumpulkan seluruh diagnostic
+	// 4. Aggregator: Kumpulkan seluruh diagnostic dan occurrences
 	var allDiags []ir.Diagnostic
-	for diags := range results {
-		allDiags = append(allDiags, diags...)
+	var allOccurrences []drift.StyleOccurrence
+	for res := range results {
+		if len(res.Diagnostics) > 0 {
+			allDiags = append(allDiags, res.Diagnostics...)
+		}
+		if len(res.Occurrences) > 0 {
+			allOccurrences = append(allOccurrences, res.Occurrences...)
+		}
 	}
 
 	walkErr := <-walkErrChan
 
 	// Jika terjadi pembatalan context, buang hasil parsial demi integritas laporan
 	if ctx.Err() != nil {
-		return nil, ctx.Err()
+		return nil, nil, ctx.Err()
 	}
 
 	if walkErr != nil {
-		return nil, walkErr
+		return nil, nil, walkErr
 	}
 
-	return ir.SortDiagnostics(allDiags), nil
+	return ir.SortDiagnostics(allDiags), allOccurrences, nil
 }
 
-func (p *Pool) startWorker(ctx context.Context, wg *sync.WaitGroup, jobs <-chan string, results chan<- []ir.Diagnostic, analyzer FileAnalyzer) {
+func (p *Pool) startWorker(ctx context.Context, wg *sync.WaitGroup, jobs <-chan string, results chan<- FileAnalysisResult, analyzer FileAnalyzer) {
 	defer wg.Done()
+	occAnalyzer, hasOcc := analyzer.(OccurrencesAnalyzer)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -104,10 +130,20 @@ func (p *Pool) startWorker(ctx context.Context, wg *sync.WaitGroup, jobs <-chan 
 			if !ok {
 				return
 			}
-			diags, err := analyzer.AnalyzeFile(path)
-			if err == nil && len(diags) > 0 {
+
+			var diags []ir.Diagnostic
+			var occs []drift.StyleOccurrence
+			var err error
+
+			if hasOcc {
+				diags, occs, err = occAnalyzer.AnalyzeFileWithOccurrences(path)
+			} else {
+				diags, err = analyzer.AnalyzeFile(path)
+			}
+
+			if err == nil && (len(diags) > 0 || len(occs) > 0) {
 				select {
-				case results <- diags:
+				case results <- FileAnalysisResult{Diagnostics: diags, Occurrences: occs}:
 				case <-ctx.Done():
 					return
 				}

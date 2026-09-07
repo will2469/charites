@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/will2469/charites/internal/config"
+	"github.com/will2469/charites/internal/drift"
 	"github.com/will2469/charites/internal/ir"
 	"github.com/will2469/charites/internal/parser/astro"
 	"github.com/will2469/charites/internal/parser/tsx"
@@ -34,9 +35,16 @@ func (e *Engine) ActiveRules() []config.ActiveRule {
 // AnalyzeFile membaca berkas dari disk, mengekstrak direktif inline ignore,
 // mem-parse ke pohon IR terpadu (*ir.Node), dan mengevaluasi active rules.
 func (e *Engine) AnalyzeFile(path string) ([]ir.Diagnostic, error) {
+	diags, _, err := e.AnalyzeFileWithOccurrences(path)
+	return diags, err
+}
+
+// AnalyzeFileWithOccurrences membaca berkas, mem-parse IR satu kali, mengevaluasi active rules,
+// dan mengekstrak StyleOccurrences untuk repository-level drift analysis.
+func (e *Engine) AnalyzeFileWithOccurrences(path string) ([]ir.Diagnostic, []drift.StyleOccurrence, error) {
 	src, err := os.ReadFile(filepath.Clean(path)) //nolint:gosec // controlled scan target path
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	inlineIgnores := ParseDirectives(src)
@@ -52,14 +60,16 @@ func (e *Engine) AnalyzeFile(path string) ([]ir.Diagnostic, error) {
 		root, parseErr = tsx.Extract(src)
 	default:
 		// Format tidak didukung: kembalikan tanpa error
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if parseErr != nil {
-		return nil, parseErr
+		return nil, nil, parseErr
 	}
 
-	return e.AnalyzeTree(path, root, inlineIgnores), nil
+	diags := e.AnalyzeTree(path, root, inlineIgnores)
+	occs := drift.ExtractTreeOccurrences(path, root)
+	return diags, occs, nil
 }
 
 // AnalyzeTree mengevaluasi active rules pada pohon IR in-memory.

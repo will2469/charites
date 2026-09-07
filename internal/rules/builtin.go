@@ -4,6 +4,7 @@ import (
 	"github.com/will2469/charites/internal/rules/a11y"
 	"github.com/will2469/charites/internal/rules/browser"
 	"github.com/will2469/charites/internal/rules/cls"
+	"github.com/will2469/charites/internal/rules/design"
 	"github.com/will2469/charites/internal/rules/ergonomy"
 	"github.com/will2469/charites/internal/rules/inp"
 	"github.com/will2469/charites/internal/rules/lcp"
@@ -17,6 +18,7 @@ import (
 
 // Invariant static compile-time check: seluruh rule wajib mengimplementasikan interface Rule.
 var (
+	_ Rule = (*design.ComponentStyleDriftRule)(nil)
 	_ Rule = (*theme.HardcodeOpacityColorRule)(nil)
 	_ Rule = (*theme.HardcodeColorRule)(nil)
 	_ Rule = (*theme.PrimitiveInComponentRule)(nil)
@@ -230,6 +232,7 @@ var (
 
 func builtinRules() []Rule {
 	return []Rule{
+		design.NewComponentStyleDriftRule(),
 		theme.NewHardcodeOpacityColorRule(),
 		theme.NewHardcodeColorRule(),
 		theme.NewPrimitiveInComponentRule(),

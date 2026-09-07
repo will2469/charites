@@ -88,6 +88,7 @@ flowchart TD
 | `a11y` | 16 | [`a11y`](a11y) |
 | `browser` | 12 | [`browser`](browser) |
 | `cls` | 16 | [`cls`](cls) |
+| `design` | 1 | [`design`](design) |
 | `ergonomy` | 4 | [`ergonomy`](ergonomy) |
 | `inp` | 16 | [`inp`](inp) |
 | `lcp` | 16 | [`lcp`](lcp) |
@@ -148,6 +149,7 @@ flowchart TD
 | `cls.unsized-embed-frame` | `cls` | `WARN` | Warns when embedded media frames lack explicit dimensions or an aspect-ratio container wrapper | [`cls.unsized-embed-frame`](cls.unsized-embed-frame) |
 | `cls.unsized-image` | `cls` | `WARN` | Warns when image elements lack explicit dimensions, aspect-ratio, or Tailwind box sizing | [`cls.unsized-image`](cls.unsized-image) |
 | `cls.unstable-scrollbar-gutter` | `cls` | `INFO` | Root document scroller declares overflow-y: auto without scrollbar-gutter: stable, risking horizontal layout shifts | [`cls.unstable-scrollbar-gutter`](cls.unstable-scrollbar-gutter) |
+| `design.component-style-drift` | `design` | `WARN` | Clusters and flags design system style sprawl, rogue geometric outliers, and chromatic color drift per UI component | [`design.component-style-drift`](design.component-style-drift) |
 | `ergonomy.bottom-nav-thumb-unreachable` | `ergonomy` | `INFO` | Warns when primary call-to-action (CTA) buttons are exclusively located in the top mobile header without reachable alternatives in the bottom thumb zone | [`ergonomy.bottom-nav-thumb-unreachable`](ergonomy.bottom-nav-thumb-unreachable) |
 | `ergonomy.gesture-without-touch-action` | `ergonomy` | `WARN` | Enforces CSS touch-action declaration on elements with custom gesture swipe/drag event handlers | [`ergonomy.gesture-without-touch-action`](ergonomy.gesture-without-touch-action) |
 | `ergonomy.missing-inputmode-keyboard` | `ergonomy` | `INFO` | Enforces contextual virtual keyboard inputmode and type attributes on mobile form inputs (Tesler's Law) | [`ergonomy.missing-inputmode-keyboard`](ergonomy.missing-inputmode-keyboard) |

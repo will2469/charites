@@ -15,6 +15,7 @@ func UsageString() string {
 Available Commands:
   scan        Pindai berkas frontend untuk audit kualitas dan token semantik (Default)
               Aliases: check, run
+  drift       Analisis repositori untuk style sprawl, entropi desain, dan rona kromatik
   mcp         Mulai server Model Context Protocol (MCP) berbasis Stdio JSON-RPC 2.0
   wiki        Generate ensiklopedia dokumentasi Markdown untuk seluruh rule terdaftar
   update      Periksa dan perbarui biner Charites ke versi terbaru
@@ -60,6 +61,8 @@ func ExecuteWithStreams(args []string, stdin io.Reader, stdout, stderr io.Writer
 	switch first {
 	case "scan", "check", "run":
 		return RunScan(args[1:], stdout, stderr)
+	case "drift":
+		return RunDrift(args[1:], stdout, stderr)
 	case "mcp":
 		return RunMCP(args[1:], stdin, stdout, stderr)
 	case "wiki":

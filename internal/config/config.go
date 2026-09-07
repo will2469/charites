@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"github.com/will2469/charites/internal/drift"
 	"github.com/will2469/charites/internal/ir"
 	"github.com/will2469/charites/internal/rules"
 	"github.com/will2469/charites/internal/token"
@@ -22,6 +24,32 @@ type ActiveRule struct {
 // ConventionConfig merepresentasikan konfigurasi inferensi semantik token di charites.yaml.
 type ConventionConfig = token.ConventionConfig
 
+// DriftConfig merepresentasikan konfigurasi kebijakan statistik analisis style drift.
+type DriftConfig struct {
+	DominanceThreshold    float64                                        `json:"dominance_threshold" yaml:"dominance_threshold"`
+	OutlierThreshold      float64                                        `json:"outlier_threshold" yaml:"outlier_threshold"`
+	MinClusterOccurrences int                                            `json:"min_cluster_occurrences" yaml:"min_cluster_occurrences"`
+	Exceptions            map[string]map[string][]drift.ContextException `json:"exceptions" yaml:"exceptions"`
+}
+
+// ToDriftOptions mengonversi DriftConfig menjadi drift.Options untuk engine clusterer.
+func (dc DriftConfig) ToDriftOptions() drift.Options {
+	opts := drift.DefaultOptions()
+	if dc.DominanceThreshold > 0 {
+		opts.DominanceThreshold = dc.DominanceThreshold
+	}
+	if dc.OutlierThreshold > 0 {
+		opts.OutlierThreshold = dc.OutlierThreshold
+	}
+	if dc.MinClusterOccurrences > 0 {
+		opts.MinClusterOccurrences = dc.MinClusterOccurrences
+	}
+	if len(dc.Exceptions) > 0 {
+		opts.Exceptions = dc.Exceptions
+	}
+	return opts
+}
+
 // Config merepresentasikan konfigurasi proyek dari charites.yaml.
 type Config struct {
 	Format     string            `json:"format" yaml:"format"`
@@ -30,6 +58,7 @@ type Config struct {
 	ScanPath   string            `json:"scan_path" yaml:"scan_path"`
 	Theme      string            `json:"theme" yaml:"theme"`           // Custom path ke SSOT tema (CSS/JSON) jika di luar path standar
 	Convention ConventionConfig  `json:"convention" yaml:"convention"` // Konfigurasi konvensi semantik token
+	Drift      DriftConfig       `json:"drift" yaml:"drift"`           // Konfigurasi ambang batas dan exception style drift
 	Rules      map[string]string `json:"rules" yaml:"rules"`           // "rule-id": "off" | "warn" | "error" | "info"
 	Ignore     []string          `json:"ignore" yaml:"ignore"`         // Pola path tambahan
 }
@@ -70,6 +99,12 @@ func Parse(data []byte) (*Config, error) {
 			Fallbacks:       make(map[string][]string),
 			Prefixes:        make([]string, 0),
 		},
+		Drift: DriftConfig{
+			DominanceThreshold:    80.0,
+			OutlierThreshold:      10.0,
+			MinClusterOccurrences: 10,
+			Exceptions:            make(map[string]map[string][]drift.ContextException),
+		},
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -78,7 +113,6 @@ func Parse(data []byte) (*Config, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// Buang komentar dan spasi di ujung
 		if idx := strings.IndexByte(line, '#'); idx != -1 {
 			line = line[:idx]
 		}
@@ -87,30 +121,18 @@ func Parse(data []byte) (*Config, error) {
 			continue
 		}
 
-		// Hitung indentasi spasi
 		indent := len(line) - len(strings.TrimLeft(line, " "))
-
 		if indent == 0 {
 			parseTopLevel(trimmed, cfg, &currentSection)
-		} else {
-			if strings.HasSuffix(trimmed, ":") && strings.HasPrefix(currentSection, "convention") {
-				sub := cleanValue(strings.TrimSuffix(trimmed, ":"))
-				if indent <= 2 {
-					currentSection = "convention." + sub
-				} else {
-					switch {
-					case strings.HasPrefix(currentSection, "convention.opacity_mappings"):
-						currentSection = "convention.opacity_mappings." + sub
-					case strings.HasPrefix(currentSection, "convention.fallbacks"):
-						currentSection = "convention.fallbacks." + sub
-					default:
-						currentSection = "convention." + sub
-					}
-				}
-				continue
-			}
-			parseIndentedSection(trimmed, currentSection, cfg)
+			continue
 		}
+
+		if nextSec, ok := resolveSubSection(trimmed, currentSection, indent); ok {
+			currentSection = nextSec
+			continue
+		}
+
+		parseIndentedSection(trimmed, currentSection, cfg)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -118,6 +140,49 @@ func Parse(data []byte) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func resolveSubSection(trimmed, currentSection string, indent int) (string, bool) {
+	if !strings.HasSuffix(trimmed, ":") {
+		return currentSection, false
+	}
+	sub := cleanValue(strings.TrimSuffix(trimmed, ":"))
+	if strings.HasPrefix(currentSection, "convention") {
+		return resolveConventionSubSection(sub, currentSection, indent), true
+	}
+	if strings.HasPrefix(currentSection, "drift") {
+		return resolveDriftSubSection(sub, currentSection, indent), true
+	}
+	return currentSection, false
+}
+
+func resolveConventionSubSection(sub, currentSection string, indent int) string {
+	if indent <= 2 {
+		return "convention." + sub
+	}
+	switch {
+	case strings.HasPrefix(currentSection, "convention.opacity_mappings"):
+		return "convention.opacity_mappings." + sub
+	case strings.HasPrefix(currentSection, "convention.fallbacks"):
+		return "convention.fallbacks." + sub
+	default:
+		return "convention." + sub
+	}
+}
+
+func resolveDriftSubSection(sub, currentSection string, indent int) string {
+	switch {
+	case indent <= 2:
+		return "drift." + sub
+	case indent <= 4 && strings.HasPrefix(currentSection, "drift.exceptions"):
+		return "drift.exceptions." + sub
+	case indent <= 6 && strings.HasPrefix(currentSection, "drift.exceptions."):
+		parts := strings.Split(currentSection, ".")
+		if len(parts) >= 3 {
+			return "drift.exceptions." + parts[2] + "." + sub
+		}
+	}
+	return currentSection
 }
 
 func parseTopLevel(trimmed string, cfg *Config, currentSection *string) {
@@ -170,6 +235,8 @@ func parseIndentedSection(trimmed, currentSection string, cfg *Config) {
 		}
 	case strings.HasPrefix(currentSection, "convention"):
 		parseConventionSection(trimmed, currentSection, cfg)
+	case strings.HasPrefix(currentSection, "drift"):
+		parseDriftSection(trimmed, currentSection, cfg)
 	}
 }
 
@@ -246,6 +313,84 @@ func parseConventionPrefixes(trimmed string, cfg *Config) {
 		return
 	}
 	cfg.Convention.Prefixes = parseStringList(trimmed)
+}
+
+func parseDriftSection(trimmed, currentSection string, cfg *Config) {
+	if cfg.Drift.Exceptions == nil {
+		cfg.Drift.Exceptions = make(map[string]map[string][]drift.ContextException)
+	}
+
+	if currentSection == "drift" {
+		parseDriftRoot(trimmed, cfg)
+		return
+	}
+
+	if strings.HasPrefix(currentSection, "drift.exceptions.") {
+		parseDriftExceptions(trimmed, currentSection, cfg)
+	}
+}
+
+func parseDriftRoot(trimmed string, cfg *Config) {
+	k, v, found := strings.Cut(trimmed, ":")
+	if !found {
+		return
+	}
+	key := strings.TrimSpace(k)
+	val := cleanValue(v)
+	switch key {
+	case "dominance_threshold":
+		if f, err := strconv.ParseFloat(val, 64); err == nil {
+			cfg.Drift.DominanceThreshold = f
+		}
+	case "outlier_threshold", "threshold_percentage":
+		if f, err := strconv.ParseFloat(val, 64); err == nil {
+			cfg.Drift.OutlierThreshold = f
+		}
+	case "min_cluster_occurrences", "min_occurrences":
+		if n, err := strconv.Atoi(val); err == nil {
+			cfg.Drift.MinClusterOccurrences = n
+		}
+	}
+}
+
+func parseDriftExceptions(trimmed, currentSection string, cfg *Config) {
+	rem := strings.TrimPrefix(currentSection, "drift.exceptions.")
+	parts := strings.Split(rem, ".")
+	if len(parts) == 1 {
+		parseDriftExceptionCategoryList(parts[0], trimmed, cfg)
+		return
+	}
+	if len(parts) == 2 && strings.HasPrefix(trimmed, "-") {
+		comp := parts[0]
+		cat := parts[1]
+		val := cleanValue(strings.TrimPrefix(trimmed, "-"))
+		if val != "" {
+			addDriftException(cfg, comp, cat, drift.ContextException{Token: val})
+		}
+	}
+}
+
+func parseDriftExceptionCategoryList(comp, trimmed string, cfg *Config) {
+	k, v, found := strings.Cut(trimmed, ":")
+	if !found {
+		return
+	}
+	cat := cleanValue(k)
+	val := strings.TrimSpace(v)
+	if val == "" {
+		return
+	}
+	tokens := parseStringList(val)
+	for _, tok := range tokens {
+		addDriftException(cfg, comp, cat, drift.ContextException{Token: tok})
+	}
+}
+
+func addDriftException(cfg *Config, comp, cat string, ex drift.ContextException) {
+	if cfg.Drift.Exceptions[comp] == nil {
+		cfg.Drift.Exceptions[comp] = make(map[string][]drift.ContextException)
+	}
+	cfg.Drift.Exceptions[comp][cat] = append(cfg.Drift.Exceptions[comp][cat], ex)
 }
 
 func parseStringList(raw string) []string {

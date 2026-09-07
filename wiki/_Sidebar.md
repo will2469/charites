@@ -72,6 +72,14 @@
 </details>
 
 <details open>
+<summary><b>Design</b> (1 rules)</summary>
+
+* [**Design Overview**](design)
+* [`design.component-style-drift`](design.component-style-drift)
+
+</details>
+
+<details open>
 <summary><b>Ergonomy</b> (4 rules)</summary>
 
 * [**Ergonomy Overview**](ergonomy)

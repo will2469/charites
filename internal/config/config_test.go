@@ -324,3 +324,50 @@ func TestConfig_Telemetry(t *testing.T) {
 		}
 	}
 }
+
+func TestConfig_ParseDrift(t *testing.T) {
+	rawYAML := `
+rules:
+  design.component-style-drift: warn
+
+drift:
+  dominance_threshold: 85
+  outlier_threshold: 8
+  min_cluster_occurrences: 15
+  exceptions:
+    Button:
+      rounded: ["rounded-full"]
+    Card:
+      rounded:
+        - "rounded-2xl"
+`
+	cfg, err := config.Parse([]byte(rawYAML))
+	if err != nil {
+		t.Fatalf("failed parsing drift config: %v", err)
+	}
+
+	if cfg.Drift.DominanceThreshold != 85 {
+		t.Errorf("expected DominanceThreshold=85, got %v", cfg.Drift.DominanceThreshold)
+	}
+	if cfg.Drift.OutlierThreshold != 8 {
+		t.Errorf("expected OutlierThreshold=8, got %v", cfg.Drift.OutlierThreshold)
+	}
+	if cfg.Drift.MinClusterOccurrences != 15 {
+		t.Errorf("expected MinClusterOccurrences=15, got %v", cfg.Drift.MinClusterOccurrences)
+	}
+
+	buttonExceptions := cfg.Drift.Exceptions["Button"]["rounded"]
+	if len(buttonExceptions) != 1 || buttonExceptions[0].Token != "rounded-full" {
+		t.Errorf("expected Button.rounded exception 'rounded-full', got %+v", buttonExceptions)
+	}
+
+	cardExceptions := cfg.Drift.Exceptions["Card"]["rounded"]
+	if len(cardExceptions) != 1 || cardExceptions[0].Token != "rounded-2xl" {
+		t.Errorf("expected Card.rounded exception 'rounded-2xl', got %+v", cardExceptions)
+	}
+
+	opts := cfg.Drift.ToDriftOptions()
+	if opts.DominanceThreshold != 85 || opts.OutlierThreshold != 8 || opts.MinClusterOccurrences != 15 {
+		t.Errorf("ToDriftOptions mismatch: %+v", opts)
+	}
+}
