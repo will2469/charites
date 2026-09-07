@@ -3,7 +3,6 @@ package reporter
 import (
 	"encoding/json"
 	"io"
-	"path/filepath"
 	"strings"
 )
 
@@ -15,48 +14,67 @@ func NewJSONReporter() *JSONReporter {
 	return &JSONReporter{}
 }
 
-type jsonDiagnostic struct {
-	File     string `json:"file"`
-	Line     int    `json:"line"`
-	Column   int    `json:"column"`
-	Rule     string `json:"rule"`
-	Category string `json:"category"`
-	Severity string `json:"severity"`
-	Message  string `json:"message"`
-	Hint     string `json:"hint,omitempty"`
-	DocURL   string `json:"doc_url"`
-}
-
-type jsonDocument struct {
-	Version     string           `json:"version"`
-	Summary     ScanSummary      `json:"summary"`
-	Diagnostics []jsonDiagnostic `json:"diagnostics"`
-}
-
 // Render menulis laporan hasil pemindaian ke io.Writer dalam format dokumen JSON tunggal lengkap.
 func (r *JSONReporter) Render(w io.Writer, result *ScanResult) error {
 	if result == nil {
 		result = &ScanResult{}
 	}
 
+	version := result.Version
+	if version == "" {
+		version = DefaultReportVersion
+	}
+
+	sortedDiags := SortDiagnosticsCanonical(result.Diagnostics)
+	fileGroups := GroupByFile(sortedDiags)
+	NormalizeSummary(&result.Summary, fileGroups, result.Summary.ScannedFiles)
+
 	doc := jsonDocument{
-		Version:     result.Version,
+		Version:     version,
 		Summary:     result.Summary,
-		Diagnostics: make([]jsonDiagnostic, 0, len(result.Diagnostics)),
+		Files:       make([]jsonFileGroup, 0, len(fileGroups)),
+		Diagnostics: make([]jsonDiagnostic, 0, len(sortedDiags)),
 	}
 
-	if doc.Version == "" {
-		doc.Version = "1.0.0"
+	for _, fg := range fileGroups {
+		violations := make([]jsonViolationItem, 0, len(fg.Diagnostics))
+		for _, d := range fg.Diagnostics {
+			cat := ""
+			if idx := strings.IndexByte(d.Rule, '.'); idx != -1 {
+				cat = d.Rule[:idx]
+			}
+
+			violations = append(violations, jsonViolationItem{
+				Line:        d.Line,
+				Column:      d.Column,
+				Rule:        d.Rule,
+				Category:    cat,
+				Severity:    string(d.Severity),
+				Message:     d.Message,
+				Hint:        d.Hint,
+				DocURL:      "https://github.com/will2469/charites/wiki/" + d.Rule,
+				Suppression: SuppressionDirective(fg.File, d.Rule),
+			})
+		}
+
+		doc.Files = append(doc.Files, jsonFileGroup{
+			File:         fg.File,
+			ErrorCount:   fg.ErrorCount,
+			WarningCount: fg.WarningCount,
+			InfoCount:    fg.InfoCount,
+			TotalIssues:  fg.TotalIssues,
+			Violations:   violations,
+		})
 	}
 
-	for _, d := range result.Diagnostics {
+	for _, d := range sortedDiags {
 		cat := ""
 		if idx := strings.IndexByte(d.Rule, '.'); idx != -1 {
 			cat = d.Rule[:idx]
 		}
 
 		doc.Diagnostics = append(doc.Diagnostics, jsonDiagnostic{
-			File:     filepath.ToSlash(d.File),
+			File:     normalizePOSIXPath(d.File),
 			Line:     d.Line,
 			Column:   d.Column,
 			Rule:     d.Rule,

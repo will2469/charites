@@ -57,8 +57,8 @@ func TestMarkdownReporter_Clean(t *testing.T) {
 	if !strings.Contains(out, "## Detailed Info") {
 		t.Errorf("expected Detailed Info section")
 	}
-	if !strings.Contains(out, "## Result") {
-		t.Errorf("expected Result section")
+	if !strings.Contains(out, "## Results by File") {
+		t.Errorf("expected Results by File section")
 	}
 	if !strings.Contains(out, "No known design token or ergonomics violations found") {
 		t.Errorf("expected clean message in Result")
@@ -68,7 +68,7 @@ func TestMarkdownReporter_Clean(t *testing.T) {
 func TestMarkdownReporter_WithViolations(t *testing.T) {
 	fixedTime := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 	violations := &reporter.ScanResult{
-		Version:   "1.0.0",
+		Version:   "1.1.0",
 		Timestamp: fixedTime,
 		RootDir:   "/workspace/project",
 		Summary: reporter.ScanSummary{
@@ -125,46 +125,53 @@ func TestMarkdownReporter_WithViolations(t *testing.T) {
 	if !strings.Contains(out, "**Status:** FAILED (Violations Found)") {
 		t.Errorf("expected FAILED status")
 	}
-	if !strings.Contains(out, "Found 3 violations across scanned components:") {
-		t.Errorf("expected 3 violations header")
+	if !strings.Contains(out, "Found 3 violations across 3 files:") {
+		t.Errorf("expected 3 violations across 3 files header, got:\n%s", out)
 	}
 
-	// Cek grouping per rule
-	if !strings.Contains(out, "### theme.hardcode-opacity-color") {
-		t.Errorf("expected theme.hardcode-opacity-color header")
+	// Cek grouping per file terurut alfabetis
+	if !strings.Contains(out, "### [src/components/Button.astro](file:///workspace/project/src/components/Button.astro#L8) (1 issue: 0 errors, 1 warning)") {
+		t.Errorf("expected Button.astro file header")
 	}
-	if !strings.Contains(out, "### theme.hardcode-size") {
-		t.Errorf("expected theme.hardcode-size header")
+	if !strings.Contains(out, "### [src/components/Card.tsx](file:///workspace/project/src/components/Card.tsx#L42) (1 issue: 0 errors, 1 warning)") {
+		t.Errorf("expected Card.tsx file header")
+	}
+	if !strings.Contains(out, "### [src/pages/index.astro](file:///workspace/project/src/pages/index.astro#L15) (1 issue: 1 error, 0 warnings)") {
+		t.Errorf("expected index.astro file header")
 	}
 
-	// Cek metadata rule
-	if !strings.Contains(out, "[theme.hardcode-opacity-color Documentation](https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color)") {
-		t.Errorf("expected wiki link for theme.hardcode-opacity-color")
-	}
+	// Cek Detailed Info table tetap memuat rule
 	if !strings.Contains(out, "| [theme.hardcode-opacity-color](https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color) |") {
 		t.Errorf("expected linked rule ID in Detailed Info table for theme.hardcode-opacity-color")
 	}
 
-	// Cek supresi cerdas:
-	// theme.hardcode-opacity-color hanya ada di .astro -> <!-- charites:ignore -->
+	// Cek supresi per berkas:
+	// Button.astro -> <!-- charites:ignore theme.hardcode-size <reason> -->
+	if !strings.Contains(out, "`<!-- charites:ignore theme.hardcode-size <reason> -->`") {
+		t.Errorf("expected astro suppression directive for theme.hardcode-size in Button.astro")
+	}
+	// Card.tsx -> // charites:ignore theme.hardcode-size <reason>
+	if !strings.Contains(out, "`// charites:ignore theme.hardcode-size <reason>`") {
+		t.Errorf("expected tsx suppression directive for theme.hardcode-size in Card.tsx")
+	}
+	// index.astro -> <!-- charites:ignore theme.hardcode-opacity-color <reason> -->
 	if !strings.Contains(out, "`<!-- charites:ignore theme.hardcode-opacity-color <reason> -->`") {
-		t.Errorf("expected astro suppression directive for theme.hardcode-opacity-color")
-	}
-	// theme.hardcode-size ada di .tsx dan .astro -> both
-	if !strings.Contains(out, "`<!-- charites:ignore theme.hardcode-size <reason> -->` (Astro) or `// charites:ignore theme.hardcode-size <reason>` (TSX/JSX)") {
-		t.Errorf("expected dual suppression directive for theme.hardcode-size")
+		t.Errorf("expected astro suppression directive for theme.hardcode-opacity-color in index.astro")
 	}
 
-	// Cek file links dan hash baris
-	if !strings.Contains(out, "**[src/pages/index.astro:15:7](file:///workspace/project/src/pages/index.astro#L15)**") {
-		t.Errorf("expected file link for index.astro with line 15")
+	// Cek file links dan posisi baris
+	if !strings.Contains(out, "**[L15:C7](file:///workspace/project/src/pages/index.astro#L15)** • `[ERROR]` • [`theme.hardcode-opacity-color`](https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color)") {
+		t.Errorf("expected line anchor, severity, and rule link for index.astro")
 	}
-	if !strings.Contains(out, "**[src/components/Card.tsx:42:12](file:///workspace/project/src/components/Card.tsx#L42)**") {
-		t.Errorf("expected file link for Card.tsx with line 42")
+	if !strings.Contains(out, "**[L42:C12](file:///workspace/project/src/components/Card.tsx#L42)** • `[WARN]` • [`theme.hardcode-size`](https://github.com/will2469/charites/wiki/theme.hardcode-size)") {
+		t.Errorf("expected line anchor, severity, and rule link for Card.tsx")
 	}
 
-	// Cek hint
-	if !strings.Contains(out, "*Hint:* Use semantic token \"primary-light\".") {
+	// Cek message dan hint
+	if !strings.Contains(out, "**Message:** Hardcode opacity color: \"bg-primary/10\"") {
+		t.Errorf("expected message for opacity violation")
+	}
+	if !strings.Contains(out, "**Hint:** Use semantic token \"primary-light\".") {
 		t.Errorf("expected hint for opacity violation")
 	}
 }

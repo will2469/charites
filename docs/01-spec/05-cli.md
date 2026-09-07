@@ -165,20 +165,76 @@ Pewarnaan ANSI escape codes dikendalikan oleh resolusi deterministik:
 - Selain kondisi di atas, pewarnaan ANSI diaktifkan secara otomatis (`ColorAuto`).
 
 ### 3.3. JSON Document Reporter (`--format=json`)
-Format dokumen JSON tunggal lengkap (*complete JSON document*) yang dicetak di akhir pemindaian untuk konsumsi mesin, PR bot, atau pipeline CI/CD:
+Format dokumen JSON tunggal lengkap (*complete JSON document*) yang dicetak di akhir pemindaian untuk konsumsi mesin, PR bot, AI coding agent, atau pipeline CI/CD. Format ini mengadopsi hierarki *File-First* (`files: [...]`) di samping flat stream `diagnostics: [...]` untuk kompatibilitas penuh:
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "summary": {
     "scanned_files": 28,
+    "files_with_issues": 2,
+    "clean_files": 26,
     "duration_ms": 18,
     "error_count": 1,
     "warning_count": 1,
     "info_count": 0,
+    "total_issues": 2,
     "passed": false
   },
+  "files": [
+    {
+      "file": "src/components/Card.tsx",
+      "error_count": 0,
+      "warning_count": 1,
+      "info_count": 0,
+      "total_issues": 1,
+      "violations": [
+        {
+          "line": 42,
+          "column": 12,
+          "rule": "theme.hardcode-color",
+          "category": "theme",
+          "severity": "warn",
+          "message": "Hardcode hex color: \"#2563eb\"",
+          "hint": "Use semantic token \"bg-primary\".",
+          "doc_url": "https://github.com/will2469/charites/wiki/theme.hardcode-color",
+          "suppression": "// charites:ignore theme.hardcode-color <reason>"
+        }
+      ]
+    },
+    {
+      "file": "src/pages/index.astro",
+      "error_count": 1,
+      "warning_count": 0,
+      "info_count": 0,
+      "total_issues": 1,
+      "violations": [
+        {
+          "line": 14,
+          "column": 8,
+          "rule": "theme.hardcode-opacity-color",
+          "category": "theme",
+          "severity": "error",
+          "message": "Hardcode opacity color: \"bg-primary/10\"",
+          "hint": "Use semantic token \"primary-light\".",
+          "doc_url": "https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color",
+          "suppression": "<!-- charites:ignore theme.hardcode-opacity-color <reason> -->"
+        }
+      ]
+    }
+  ],
   "diagnostics": [
+    {
+      "file": "src/components/Card.tsx",
+      "line": 42,
+      "column": 12,
+      "rule": "theme.hardcode-color",
+      "category": "theme",
+      "severity": "warn",
+      "message": "Hardcode hex color: \"#2563eb\"",
+      "hint": "Use semantic token \"bg-primary\".",
+      "doc_url": "https://github.com/will2469/charites/wiki/theme.hardcode-color"
+    },
     {
       "file": "src/pages/index.astro",
       "line": 14,
@@ -187,22 +243,24 @@ Format dokumen JSON tunggal lengkap (*complete JSON document*) yang dicetak di a
       "category": "theme",
       "severity": "error",
       "message": "Hardcode opacity color: \"bg-primary/10\"",
-      "hint": "Use semantic token \"primary-light\"."
+      "hint": "Use semantic token \"primary-light\".",
+      "doc_url": "https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color"
     }
   ]
 }
 ```
 
-- **Skema Waktu:** Durasi pemindaian dicatat dalam field `"duration_ms"` sebagai integer milidetik.
-- **Determinis Biner:** Urutan isi slice `diagnostics` mengikuti *total ordering* Fase 4 (`File` $\rightarrow$ `Line` $\rightarrow$ `Col` $\rightarrow$ `RuleID` $\rightarrow$ `Severity` $\rightarrow$ `Message` $\rightarrow$ `Hint`).
+- **Invarian Flatten Consistency (I3):** `diagnostics` merupakan derived flat projection dari `files[].violations`. Seluruh item dijamin identik secara kanonikal tanpa filter atau modifikasi sekunder.
+- **Skema Waktu & Metrik:** Durasi pemindaian dicatat dalam field `"duration_ms"` sebagai integer milidetik, dilengkapi `"files_with_issues"`, `"clean_files"`, dan `"total_issues"`.
+- **Determinis Biner:** Urutan berkas diurutkan secara leksikografis POSIX, dan pelanggaran internal mengikuti *total ordering* 7-dimensi (`File ASC` $\to$ `Line ASC` $\to$ `Col ASC` $\to$ `Rule ASC` $\to$ `Severity ASC` $\to$ `Message ASC` $\to$ `Hint ASC`).
 
 ### 3.4. Markdown Audit Reporter (`--format=markdown`, `--format=md`)
-Format dokumen Markdown lengkap bertaraf industri yang mengadopsi standar tata letak dan hierarki dari Argus Audit Engine, ideal untuk ringkasan PR GitHub, audit berkala, dan dokumentasi kepatuhan tim:
+Format dokumen Markdown lengkap bertaraf industri dengan hierarki *File-First* (`## Results by File`), memudahkan developer dan agen AI menyelesaikan perbaikan berkas-demi-berkas dalam satu sesi tanpa bolak-balik:
 
 ```markdown
 # Charites Frontend Static Analysis & UI Ergonomics Audit Report
 
-**Timestamp:** 2026-09-06T12:00:00.000Z
+**Timestamp:** 2026-09-07T12:00:00.000Z
 **Status:** FAILED (Violations Found)
 
 ## Summary
@@ -210,6 +268,8 @@ Format dokumen Markdown lengkap bertaraf industri yang mengadopsi standar tata l
 | Metric | Jumlah |
 | :--- | :--- |
 | Total Berkas | 28 |
+| Berkas Bermasalah | 2 |
+| Berkas Bersih | 26 |
 | Durasi Pemindaian | 18ms |
 | Rules Attached | 35 |
 | Total Issues | 2 |
@@ -221,29 +281,32 @@ Format dokumen Markdown lengkap bertaraf industri yang mengadopsi standar tata l
 
 | ID | Category | Description | Issues Found | Status |
 | :--- | :--- | :--- | :---: | :---: |
-| theme.hardcode-color | theme | Detects hardcoded hex/rgb colors... | 1 | FAILED |
-| theme.hardcode-opacity-color | theme | Detects hardcoded slash opacity... | 1 | FAILED |
-...
+| [theme.hardcode-color](https://github.com/will2469/charites/wiki/theme.hardcode-color) | theme | Detects hardcoded hex/rgb colors... | 1 | FAILED |
+| [theme.hardcode-opacity-color](https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color) | theme | Detects hardcoded slash opacity... | 1 | FAILED |
 
-## Result
+## Results by File
 
-Found 2 violations across scanned components:
+Found 2 violations across 2 files:
 
-### theme.hardcode-opacity-color
+### [src/components/Card.tsx](file:///workspace/project/src/components/Card.tsx#L42) (1 issue: 0 errors, 1 warning)
 
-- **Severity:** error
-- **Category:** theme
-- **Description:** Detects utility classes with hardcoded slash opacity modifiers that have official semantic token replacements
-- **Wiki:** [theme.hardcode-opacity-color Documentation](https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color)
-- **Suppression:** `<!-- charites:ignore theme.hardcode-opacity-color <reason> -->` (Astro) or `// charites:ignore theme.hardcode-opacity-color <reason>` (TSX/JSX)
+- **[L42:C12](file:///workspace/project/src/components/Card.tsx#L42)** • `[WARN]` • [`theme.hardcode-color`](https://github.com/will2469/charites/wiki/theme.hardcode-color)
+  - **Message:** Hardcode hex color: "#2563eb"
+  - **Hint:** Use semantic token "bg-primary".
+  - **Suppression:** `// charites:ignore theme.hardcode-color <reason>`
 
-- **[src/pages/index.astro:14:8](file:///path/to/src/pages/index.astro#L14)**
-  - *Message:* Hardcode opacity color: "bg-primary/10"
-  - *Hint:* Use semantic token "primary-light".
+---
+
+### [src/pages/index.astro](file:///workspace/project/src/pages/index.astro#L14) (1 issue: 1 error, 0 warnings)
+
+- **[L14:C8](file:///workspace/project/src/pages/index.astro#L14)** • `[ERROR]` • [`theme.hardcode-opacity-color`](https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color)
+  - **Message:** Hardcode opacity color: "bg-primary/10"
+  - **Hint:** Use semantic token "primary-light".
+  - **Suppression:** `<!-- charites:ignore theme.hardcode-opacity-color <reason> -->`
 ```
 
-- **Fitur Cerdas Supresi:** Menyarankan sintaks komentar supresi yang relevan secara otomatis berdasarkan ekstensi berkas pelanggar (`<!-- charites:ignore -->` untuk berkas `.astro`, `// charites:ignore` untuk berkas `.tsx`/`.jsx`).
-- **Tautan Berkas Interaktif:** Seluruh lokasi temuan diformat sebagai tautan markdown dengan skema `file:///` dan hash baris `#L<line>` sehingga dapat langsung diklik oleh developer di editor atau viewer markdown.
+- **Fitur Cerdas Supresi:** Menyarankan sintaks komentar supresi yang relevan secara otomatis berdasarkan ekstensi berkas pelanggar (`<!-- charites:ignore -->` untuk berkas `.astro`, `/* charites:ignore */` untuk `.css`, `// charites:ignore` untuk berkas `.tsx`/`.jsx`).
+- **Tautan Berkas Interaktif:** Seluruh judul berkas dan nomor baris pelanggaran diformat sebagai tautan markdown dengan skema `file:///` dan hash baris `#L<line>` sehingga dapat langsung diklik oleh developer di editor atau viewer markdown.
 - **Penyimpanan Berkas Laporan:** Dapat ditulis langsung ke berkas via flag `-o` / `--output` (misal: `charites scan -f md -o charites-report.md`). Jika `--output` berakhiran `.md` tanpa menyertakan flag `--format`, format markdown dipilih secara otomatis.
 
 ---

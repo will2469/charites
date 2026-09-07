@@ -373,17 +373,32 @@ func buildScanResult(ca *countingAnalyzer, diags []ir.Diagnostic, durationMS int
 		absRoot = cwd
 	}
 
+	fileSet := make(map[string]struct{})
+	for _, d := range diags {
+		fileSet[d.File] = struct{}{}
+	}
+	filesWithIssues := len(fileSet)
+	scannedFiles := int(ca.count.Load())
+	cleanFiles := scannedFiles - filesWithIssues
+	if cleanFiles < 0 {
+		cleanFiles = 0
+	}
+	totalIssues := len(diags)
+
 	return &reporter.ScanResult{
 		Version:   Version,
 		Timestamp: startTime,
 		RootDir:   absRoot,
 		Summary: reporter.ScanSummary{
-			ScannedFiles: int(ca.count.Load()),
-			DurationMS:   durationMS,
-			ErrorCount:   errCount,
-			WarningCount: warnCount,
-			InfoCount:    infoCount,
-			Passed:       passed,
+			ScannedFiles:    scannedFiles,
+			FilesWithIssues: filesWithIssues,
+			CleanFiles:      cleanFiles,
+			DurationMS:      durationMS,
+			ErrorCount:      errCount,
+			WarningCount:    warnCount,
+			InfoCount:       infoCount,
+			TotalIssues:     totalIssues,
+			Passed:          passed,
 		},
 		Diagnostics:   diags,
 		AttachedRules: attached,

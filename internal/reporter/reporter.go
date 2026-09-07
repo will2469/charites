@@ -7,6 +7,9 @@ import (
 	"github.com/will2469/charites/internal/ir"
 )
 
+// DefaultReportVersion mendefinisikan versi kanonikal skema laporan Charites saat ini.
+const DefaultReportVersion = "1.1.0"
+
 // RuleAuditInfo merepresentasikan status audit per-rule untuk pelaporan detil.
 type RuleAuditInfo struct {
 	ID          string `json:"id"`
@@ -19,12 +22,15 @@ type RuleAuditInfo struct {
 
 // ScanSummary merepresentasikan ringkasan agregasi metrik dari eksekusi pemindaian.
 type ScanSummary struct {
-	ScannedFiles int   `json:"scanned_files"`
-	DurationMS   int64 `json:"duration_ms"`
-	ErrorCount   int   `json:"error_count"`
-	WarningCount int   `json:"warning_count"`
-	InfoCount    int   `json:"info_count"`
-	Passed       bool  `json:"passed"`
+	ScannedFiles    int   `json:"scanned_files"`
+	FilesWithIssues int   `json:"files_with_issues"`
+	CleanFiles      int   `json:"clean_files"`
+	DurationMS      int64 `json:"duration_ms"`
+	ErrorCount      int   `json:"error_count"`
+	WarningCount    int   `json:"warning_count"`
+	InfoCount       int   `json:"info_count"`
+	TotalIssues     int   `json:"total_issues"`
+	Passed          bool  `json:"passed"`
 }
 
 // ScanResult merepresentasikan struktur dokumen lengkap hasil analisis kode.

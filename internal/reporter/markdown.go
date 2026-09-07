@@ -14,7 +14,7 @@ import (
 )
 
 // MarkdownReporter memformat temuan analisis dalam format laporan audit Markdown terstruktur,
-// mengadopsi standar tata letak dan hierarki dari Argus audit engine.
+// mengadopsi standar hierarki file-first (File -> Violations).
 type MarkdownReporter struct {
 	rootDir   string
 	timestamp time.Time
@@ -66,6 +66,10 @@ func (r *MarkdownReporter) Render(w io.Writer, result *ScanResult) error {
 	timeStr, status := r.resolveTimeAndStatus(result)
 	rootDir := r.resolveRootDir(result)
 
+	sortedDiags := SortDiagnosticsCanonical(result.Diagnostics)
+	fileGroups := GroupByFile(sortedDiags)
+	NormalizeSummary(&result.Summary, fileGroups, result.Summary.ScannedFiles)
+
 	attachedRules := result.AttachedRules
 	if len(attachedRules) == 0 {
 		attachedRules = r.buildDynamicRuleAuditInfo(result)
@@ -73,9 +77,9 @@ func (r *MarkdownReporter) Render(w io.Writer, result *ScanResult) error {
 
 	var sb strings.Builder
 	r.renderHeader(&sb, timeStr, status)
-	r.renderSummary(&sb, result.Summary, len(attachedRules), len(result.Diagnostics))
+	r.renderSummary(&sb, result.Summary, len(attachedRules), len(sortedDiags))
 	r.renderDetailedInfo(&sb, attachedRules)
-	r.renderResults(&sb, result.Diagnostics, rootDir)
+	r.renderResults(&sb, fileGroups, len(sortedDiags), rootDir)
 
 	_, err := io.WriteString(w, sb.String())
 	return err
@@ -119,6 +123,10 @@ func (r *MarkdownReporter) renderSummary(sb *strings.Builder, s ScanSummary, att
 	sb.WriteString("| Metric | Jumlah |\n")
 	sb.WriteString("| :--- | :--- |\n")
 	sb.WriteString(fmt.Sprintf("| Total Berkas | %d |\n", s.ScannedFiles))
+	if s.FilesWithIssues > 0 || s.CleanFiles > 0 {
+		sb.WriteString(fmt.Sprintf("| Berkas Bermasalah | %d |\n", s.FilesWithIssues))
+		sb.WriteString(fmt.Sprintf("| Berkas Bersih | %d |\n", s.CleanFiles))
+	}
 	sb.WriteString(fmt.Sprintf("| Durasi Pemindaian | %dms |\n", s.DurationMS))
 	sb.WriteString(fmt.Sprintf("| Rules Attached | %d |\n", attachedCount))
 	sb.WriteString(fmt.Sprintf("| Total Issues | %d |\n", issuesCount))
@@ -138,144 +146,114 @@ func (r *MarkdownReporter) renderDetailedInfo(sb *strings.Builder, rules []RuleA
 	sb.WriteString("\n")
 }
 
-func (r *MarkdownReporter) renderResults(sb *strings.Builder, diags []ir.Diagnostic, rootDir string) {
-	sb.WriteString("## Result\n\n")
-	if len(diags) == 0 {
+func (r *MarkdownReporter) renderResults(sb *strings.Builder, fileGroups []FileGroup, totalViolations int, rootDir string) {
+	sb.WriteString("## Results by File\n\n")
+	if len(fileGroups) == 0 {
 		sb.WriteString("No known design token or ergonomics violations found\n")
 		return
 	}
 
-	sb.WriteString(fmt.Sprintf("Found %d violations across scanned components:\n\n", len(diags)))
-
-	grouped := make(map[string][]ir.Diagnostic)
-	for _, d := range diags {
-		grouped[d.Rule] = append(grouped[d.Rule], d)
+	totalFiles := len(fileGroups)
+	violationWord := "violations"
+	if totalViolations == 1 {
+		violationWord = "violation"
+	}
+	fileWord := "files"
+	if totalFiles == 1 {
+		fileWord = "file"
 	}
 
-	sortedRules := make([]string, 0, len(grouped))
-	for ruleID := range grouped {
-		sortedRules = append(sortedRules, ruleID)
-	}
-	sort.Strings(sortedRules)
+	sb.WriteString(fmt.Sprintf("Found %d %s across %d %s:\n\n", totalViolations, violationWord, totalFiles, fileWord))
 
-	for _, ruleID := range sortedRules {
-		r.renderRuleGroup(sb, ruleID, grouped[ruleID], rootDir)
+	for i, fg := range fileGroups {
+		if i > 0 {
+			sb.WriteString("---\n\n")
+		}
+		r.renderFileGroup(sb, fg, rootDir)
 	}
 }
 
-func (r *MarkdownReporter) renderRuleGroup(sb *strings.Builder, ruleID string, diags []ir.Diagnostic, rootDir string) {
-	firstDiag := diags[0]
-	category, desc, severity := r.resolveRuleMeta(ruleID, firstDiag)
-
-	sb.WriteString(fmt.Sprintf("### %s\n\n", ruleID))
-	sb.WriteString(fmt.Sprintf("- **Severity:** %s\n", severity))
-	sb.WriteString(fmt.Sprintf("- **Category:** %s\n", category))
-	if desc != "" {
-		sb.WriteString(fmt.Sprintf("- **Description:** %s\n", desc))
+func (r *MarkdownReporter) renderFileGroup(sb *strings.Builder, fg FileGroup, rootDir string) {
+	posixRel, posixAbs := resolveAbsAndRelPath(fg.File, rootDir)
+	firstLine := 1
+	if len(fg.Diagnostics) > 0 && fg.Diagnostics[0].Line > 0 {
+		firstLine = fg.Diagnostics[0].Line
 	}
-	sb.WriteString(fmt.Sprintf("- **Wiki:** [%s Documentation](https://github.com/will2469/charites/wiki/%s)\n", ruleID, ruleID))
+	firstLink := fmt.Sprintf("file://%s#L%d", posixAbs, firstLine)
 
-	hasAstro, hasJSX, allSameMessage := inspectDiagnostics(diags)
-	sb.WriteString(determineSuppressionHint(ruleID, hasAstro, hasJSX))
+	issueWord := "issues"
+	if fg.TotalIssues == 1 {
+		issueWord = "issue"
+	}
+	errorWord := "errors"
+	if fg.ErrorCount == 1 {
+		errorWord = "error"
+	}
+	warnWord := "warnings"
+	if fg.WarningCount == 1 {
+		warnWord = "warning"
+	}
 
-	if allSameMessage && firstDiag.Message != "" {
-		sb.WriteString(fmt.Sprintf("- **Message:** %s\n", firstDiag.Message))
+	sb.WriteString(fmt.Sprintf("### [%s](%s) (%d %s: %d %s, %d %s)\n\n",
+		posixRel, firstLink, fg.TotalIssues, issueWord, fg.ErrorCount, errorWord, fg.WarningCount, warnWord))
+
+	for _, d := range fg.Diagnostics {
+		r.renderFileViolation(sb, d, posixAbs)
+	}
+}
+
+func (r *MarkdownReporter) renderFileViolation(sb *strings.Builder, d ir.Diagnostic, posixAbs string) {
+	link := fmt.Sprintf("file://%s#L%d", posixAbs, d.Line)
+	posStr := fmt.Sprintf("L%d", d.Line)
+	if d.Column > 0 {
+		posStr = fmt.Sprintf("L%d:C%d", d.Line, d.Column)
+	}
+
+	sevTag := strings.ToUpper(string(d.Severity))
+	if sevTag == "" {
+		sevTag = "WARN"
+	}
+
+	sb.WriteString(fmt.Sprintf("- **[%s](%s)** • `[%s]` • [`%s`](https://github.com/will2469/charites/wiki/%s)\n",
+		posStr, link, sevTag, d.Rule, d.Rule))
+
+	if d.Message != "" {
+		sb.WriteString(fmt.Sprintf("  - **Message:** %s\n", d.Message))
+	}
+	if d.Hint != "" {
+		sb.WriteString(fmt.Sprintf("  - **Hint:** %s\n", d.Hint))
+	}
+	supp := SuppressionDirective(d.File, d.Rule)
+	if supp != "" {
+		sb.WriteString(fmt.Sprintf("  - **Suppression:** `%s`\n", supp))
 	}
 	sb.WriteString("\n")
-
-	for _, d := range diags {
-		renderOccurrence(sb, d, rootDir, !allSameMessage)
-	}
-	sb.WriteString("\n")
 }
 
-func (r *MarkdownReporter) resolveRuleMeta(ruleID string, fallback ir.Diagnostic) (category, desc, severity string) {
-	severity = string(fallback.Severity)
-	if r.reg != nil {
-		if ruleObj, ok := r.reg.Get(ruleID); ok {
-			category = ruleObj.Category()
-			desc = ruleObj.Description()
-			if severity == "" {
-				severity = string(ruleObj.DefaultSeverity())
-			}
-		}
-	}
-	if category == "" {
-		if idx := strings.IndexByte(ruleID, '.'); idx != -1 {
-			category = ruleID[:idx]
-		} else {
-			category = "general"
-		}
-	}
-	return category, desc, severity
-}
-
-func inspectDiagnostics(diags []ir.Diagnostic) (hasAstro, hasJSX, allSameMessage bool) {
-	allSameMessage = true
-	firstMsg := diags[0].Message
-
-	for _, d := range diags {
-		ext := strings.ToLower(filepath.Ext(d.File))
-		if ext == ".astro" {
-			hasAstro = true
-		} else {
-			hasJSX = true
-		}
-		if d.Message != firstMsg {
-			allSameMessage = false
-		}
-	}
-	return hasAstro, hasJSX, allSameMessage
-}
-
-func determineSuppressionHint(ruleID string, hasAstro, hasJSX bool) string {
-	switch {
-	case hasAstro && hasJSX:
-		return fmt.Sprintf("- **Suppression:** `<!-- charites:ignore %s <reason> -->` (Astro) or `// charites:ignore %s <reason>` (TSX/JSX)\n", ruleID, ruleID)
-	case hasAstro:
-		return fmt.Sprintf("- **Suppression:** `<!-- charites:ignore %s <reason> -->`\n", ruleID)
-	default:
-		return fmt.Sprintf("- **Suppression:** `// charites:ignore %s <reason>`\n", ruleID)
-	}
-}
-
-func renderOccurrence(sb *strings.Builder, d ir.Diagnostic, rootDir string, printMessage bool) {
-	absPath := d.File
+func resolveAbsAndRelPath(filePath, rootDir string) (posixRel, posixAbs string) {
+	absPath := filePath
 	if !filepath.IsAbs(absPath) {
-		if _, err := os.Stat(d.File); err == nil {
-			if p, err := filepath.Abs(d.File); err == nil {
+		if _, err := os.Stat(filePath); err == nil {
+			if p, err := filepath.Abs(filePath); err == nil {
 				absPath = p
 			} else {
-				absPath = filepath.Join(rootDir, d.File)
+				absPath = filepath.Join(rootDir, filePath)
 			}
 		} else {
-			absPath = filepath.Join(rootDir, d.File)
+			absPath = filepath.Join(rootDir, filePath)
 		}
 	}
 
-	relPath := d.File
+	relPath := filePath
 	if filepath.IsAbs(relPath) {
 		if rel, err := filepath.Rel(rootDir, relPath); err == nil {
 			relPath = rel
 		}
 	}
 
-	posixRel := filepath.ToSlash(relPath)
-	posixAbs := "/" + strings.TrimPrefix(filepath.ToSlash(absPath), "/")
-	link := fmt.Sprintf("file://%s#L%d", posixAbs, d.Line)
-
-	if d.Column > 0 {
-		sb.WriteString(fmt.Sprintf("- **[%s:%d:%d](%s)**\n", posixRel, d.Line, d.Column, link))
-	} else {
-		sb.WriteString(fmt.Sprintf("- **[%s:%d](%s)**\n", posixRel, d.Line, link))
-	}
-
-	if printMessage && d.Message != "" {
-		sb.WriteString(fmt.Sprintf("  - *Message:* %s\n", d.Message))
-	}
-	if d.Hint != "" {
-		sb.WriteString(fmt.Sprintf("  - *Hint:* %s\n", d.Hint))
-	}
+	posixRel = normalizePOSIXPath(relPath)
+	posixAbs = "/" + strings.TrimPrefix(normalizePOSIXPath(absPath), "/")
+	return posixRel, posixAbs
 }
 
 func (r *MarkdownReporter) buildDynamicRuleAuditInfo(result *ScanResult) []RuleAuditInfo {

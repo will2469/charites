@@ -283,8 +283,11 @@ func TestRunScan_MarkdownFormat(t *testing.T) {
 	if !strings.Contains(out, "FAILED (Violations Found)") {
 		t.Errorf("expected FAILED status in markdown report")
 	}
-	if !strings.Contains(out, "### theme.hardcode-opacity-color") {
-		t.Errorf("expected theme.hardcode-opacity-color section in markdown report")
+	if !strings.Contains(out, "## Results by File") {
+		t.Errorf("expected Results by File section in markdown report")
+	}
+	if !strings.Contains(out, "theme.hardcode-opacity-color") {
+		t.Errorf("expected theme.hardcode-opacity-color in markdown report")
 	}
 }
 
@@ -312,8 +315,11 @@ func TestRunScan_OutputFile(t *testing.T) {
 	if !strings.Contains(out, "# Charites Frontend Static Analysis & UI Ergonomics Audit Report") {
 		t.Errorf("expected markdown report in written file, got:\n%s", out)
 	}
-	if !strings.Contains(out, "### theme.hardcode-opacity-color") {
-		t.Errorf("expected rule section in written file")
+	if !strings.Contains(out, "## Results by File") {
+		t.Errorf("expected Results by File section in written file")
+	}
+	if !strings.Contains(out, "theme.hardcode-opacity-color") {
+		t.Errorf("expected rule in written file")
 	}
 }
 
