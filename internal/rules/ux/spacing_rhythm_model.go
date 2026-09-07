@@ -19,6 +19,25 @@ const (
 	LayoutOwnerPeerContainers                        // parent yang membawahi peer containers homogen dengan gap-*
 )
 
+// LayoutMechanism mengklasifikasikan mekanisme tata letak kontainer (flex vs grid).
+type LayoutMechanism int
+
+// Konstanta mekanisme tata letak.
+const (
+	LayoutMechanismUnknown LayoutMechanism = iota
+	LayoutMechanismFlex
+	LayoutMechanismGrid
+)
+
+// SpacingObservationKind membedakan antara interval spasial sibling (N-1) dan komparasi properti peer container (N).
+type SpacingObservationKind int
+
+// Konstanta jenis observasi spasi.
+const (
+	ObservationKindInterval     SpacingObservationKind = iota // Sibling spatial interval (From -> To, N-1)
+	ObservationKindPeerProperty                               // Peer container property declaration (N)
+)
+
 // SpacingRole mengklasifikasikan peran struktural spasial.
 type SpacingRole int
 
@@ -68,8 +87,10 @@ type SpatialRelationship struct {
 
 // SpacingOccurrence merepresentasikan satu titik observasi spasi.
 type SpacingOccurrence struct {
-	Node         *ir.Node // AST node yang menyandang sintaks / target diagnostik
-	Relationship SpatialRelationship
+	Kind         SpacingObservationKind
+	Node         *ir.Node             // AST node yang menyandang sintaks / target diagnostik
+	Relationship *SpatialRelationship // Populated untuk sibling intervals; nil untuk peer properties
+	PeerGroupID  string               // Group ID untuk peer properties; kosong untuk intervals
 	Value        float64
 	RawToken     string
 	Source       SpacingSource
@@ -234,51 +255,236 @@ func verifyContiguousMargins(children []*ir.Node, prefix string) (int, bool) {
 	return count, true
 }
 
-// extractContainerGapToken mengekstrak token gap pada suatu container child peer.
-func extractContainerGapToken(node *ir.Node) (string, float64, SpacingAxis, ResponsiveState, bool) {
+// detectLayoutMechanism mengidentifikasi apakah suatu node menggunakan display flex atau grid.
+func detectLayoutMechanism(node *ir.Node) LayoutMechanism {
+	for _, cls := range node.Classes {
+		base := StripVariantsOnlyBase(cls)
+		switch base {
+		case "flex", "inline-flex":
+			return LayoutMechanismFlex
+		case "grid", "inline-grid":
+			return LayoutMechanismGrid
+		}
+	}
+	return LayoutMechanismUnknown
+}
+
+// isFlexColumn mengecek apakah container flex memiliki varian flex-col.
+func isFlexColumn(node *ir.Node) bool {
+	for _, cls := range node.Classes {
+		if StripVariantsOnlyBase(cls) == "flex-col" {
+			return true
+		}
+	}
+	return false
+}
+
+// computeChildSignature constructs the exact direct-child tag topology (e.g. "Field,Field").
+// Exact direct-child tag equality is an intentional conservative syntactic boundary for v1 to avoid hallucinated semantic classification.
+func computeChildSignature(elements []*ir.Node) string {
+	if len(elements) == 0 {
+		return ""
+	}
+	var tags []string
+	for _, el := range elements {
+		if el != nil {
+			tags = append(tags, el.Tag)
+		}
+	}
+	return strings.Join(tags, ",")
+}
+
+// parseGapUtility menguraikan utility gap Tailwind menjadi sumbu dan nilai numerik string.
+func parseGapUtility(cleanBase string, isCol bool, mech LayoutMechanism) (SpacingAxis, string, bool) {
+	switch {
+	case strings.HasPrefix(cleanBase, "gap-y-"):
+		return AxisVertical, cleanBase[len("gap-y-"):], true
+	case strings.HasPrefix(cleanBase, "gap-x-"):
+		return AxisHorizontal, cleanBase[len("gap-x-"):], true
+	case strings.HasPrefix(cleanBase, "gap-"):
+		if mech == LayoutMechanismFlex {
+			if isCol {
+				return AxisVertical, cleanBase[len("gap-"):], true
+			}
+			return AxisHorizontal, cleanBase[len("gap-"):], true
+		}
+		// In CSS Grid, shorthand gap-* affects both row and column simultaneously.
+		// It has no single primary axis, so it is classified as AxisUnknown to prevent false single-axis assumptions.
+		return AxisUnknown, cleanBase[len("gap-"):], true
+	default:
+		return AxisUnknown, "", false
+	}
+}
+
+type containerGapToken struct {
+	token string
+	val   float64
+	axis  SpacingAxis
+	resp  ResponsiveState
+}
+
+// extractAllContainerGaps mengekstrak semua deklarasi gap pada suatu node.
+// Jika terjadi deklarasi berkonflik pada sumbu dan breakpoint yang sama (misal "gap-4 gap-6"),
+// deklarasi tersebut ditandai ambigu dan dikecualikan agar tidak merusak denominasi analisis ritme.
+func extractAllContainerGaps(node *ir.Node) []containerGapToken {
+	mech := detectLayoutMechanism(node)
 	isCol := isFlexColumn(node)
+
+	type declKey struct {
+		axis SpacingAxis
+		resp string
+	}
+
+	seenVals := make(map[declKey][]float64)
+	candidates := make([]containerGapToken, 0, len(node.Classes))
+
 	for _, cls := range node.Classes {
 		resp, base := extractResponsiveState(cls)
 		cleanBase := StripVariantsOnlyBase(base)
 
-		axis, valStr, ok := parseGapUtility(cleanBase, isCol)
-		if !ok {
+		axis, valStr, ok := parseGapUtility(cleanBase, isCol, mech)
+		if !ok || axis == AxisUnknown {
 			continue
 		}
 
 		val, ok := parseTailwindSpacingNumber(valStr)
-		if ok {
-			return cleanBase, val, axis, resp, true
+		if !ok {
+			continue
 		}
+
+		k := declKey{axis: axis, resp: resp.Raw}
+		seenVals[k] = append(seenVals[k], val)
+		candidates = append(candidates, containerGapToken{
+			token: cleanBase,
+			val:   val,
+			axis:  axis,
+			resp:  resp,
+		})
 	}
-	return "", 0, AxisUnknown, ResponsiveState{}, false
+
+	valid := make([]containerGapToken, 0, len(candidates))
+	for _, c := range candidates {
+		k := declKey{axis: c.axis, resp: c.resp.Raw}
+		vals := seenVals[k]
+		if len(vals) > 1 {
+			conflict := false
+			for _, v := range vals {
+				if v != vals[0] {
+					conflict = true
+					break
+				}
+			}
+			if conflict {
+				continue // Ambiguous conflict excluded
+			}
+		}
+		valid = append(valid, c)
+	}
+
+	return valid
 }
 
-// checkPeerContainersProof memeriksa apakah anak-anak direct merupakan peer containers yang masing-masing mendeklarasikan gap.
+// hasBaseGapOnAxis mengecek apakah container mendeklarasikan base gap pada sumbu target.
+func hasBaseGapOnAxis(node *ir.Node, targetAxis SpacingAxis) bool {
+	gaps := extractAllContainerGaps(node)
+	for _, g := range gaps {
+		if g.axis == targetAxis && g.resp.Raw == "base" {
+			return true
+		}
+	}
+	return false
+}
+
+type peerFingerprint struct {
+	tag          string
+	mech         LayoutMechanism
+	isCol        bool
+	childCount   int
+	childSig     string
+	expectedAxis SpacingAxis
+}
+
+func extractPeerFingerprint(node *ir.Node) (peerFingerprint, bool) {
+	if node == nil || node.Type != ir.NodeElement {
+		return peerFingerprint{}, false
+	}
+
+	mech := detectLayoutMechanism(node)
+	if mech == LayoutMechanismUnknown {
+		return peerFingerprint{}, false
+	}
+
+	isCol := isFlexColumn(node)
+	elem := getElementChildren(node)
+	if len(elem) == 0 {
+		return peerFingerprint{}, false
+	}
+
+	var axis SpacingAxis
+	if mech == LayoutMechanismFlex {
+		if isCol {
+			axis = AxisVertical
+		} else {
+			axis = AxisHorizontal
+		}
+	} else {
+		axis = AxisUnknown
+	}
+
+	if axis == AxisUnknown || !hasBaseGapOnAxis(node, axis) {
+		return peerFingerprint{}, false
+	}
+
+	return peerFingerprint{
+		tag:          node.Tag,
+		mech:         mech,
+		isCol:        isCol,
+		childCount:   len(elem),
+		childSig:     computeChildSignature(elem),
+		expectedAxis: axis,
+	}, true
+}
+
+func matchesPeerFingerprint(node *ir.Node, fp peerFingerprint) bool {
+	if node == nil || node.Type != ir.NodeElement || node.Tag != fp.tag {
+		return false
+	}
+	if detectLayoutMechanism(node) != fp.mech {
+		return false
+	}
+	if fp.mech == LayoutMechanismFlex && isFlexColumn(node) != fp.isCol {
+		return false
+	}
+	elem := getElementChildren(node)
+	if len(elem) != fp.childCount || computeChildSignature(elem) != fp.childSig {
+		return false
+	}
+	return hasBaseGapOnAxis(node, fp.expectedAxis)
+}
+
+// checkPeerContainersProof memverifikasi bahwa direct children memenuhi structural fingerprint equivalence
+// dan masing-masing mendeklarasikan base gap pada primary axis yang sama.
 func checkPeerContainersProof(children []*ir.Node) bool {
 	if len(children) < 3 {
 		return false
 	}
 
-	var firstAxis SpacingAxis
-	count := 0
+	fp, ok := extractPeerFingerprint(children[0])
+	if !ok {
+		return false
+	}
 
-	for _, c := range children {
-		if c == nil || c.Type != ir.NodeElement {
+	for i := 1; i < len(children); i++ {
+		if !matchesPeerFingerprint(children[i], fp) {
 			return false
-		}
-		_, _, axis, _, ok := extractContainerGapToken(c)
-		if ok {
-			if firstAxis == AxisUnknown {
-				firstAxis = axis
-			} else if firstAxis != axis {
-				return false
-			}
-			count++
 		}
 	}
 
-	return count >= 3 && count == len(children)
+	return true
+}
+
+func peerGroupID(owner *ir.Node) string {
+	return fmt.Sprintf("%p_%d_%d_peers", owner, owner.Span.Line, owner.Span.Column)
 }
 
 // ClassifyLayoutOwner menentukan jenis ownership tata letak suatu node.
@@ -387,7 +593,8 @@ func BuildRhythmGroups(owner *ir.Node, kind LayoutOwnerKind) []RhythmGroup {
 	groupMap := make(map[string]*RhythmGroup)
 
 	if kind == LayoutOwnerPeerContainers || checkPeerContainersProof(children) {
-		buildPeerGapOccurrences(owner, children, ownerID, groupMap)
+		pID := peerGroupID(owner)
+		buildPeerGapOccurrences(children, pID, groupMap)
 	}
 
 	switch kind {
@@ -411,46 +618,33 @@ func BuildRhythmGroups(owner *ir.Node, kind LayoutOwnerKind) []RhythmGroup {
 	return result
 }
 
-func buildPeerGapOccurrences(owner *ir.Node, children []*ir.Node, ownerID string, groupMap map[string]*RhythmGroup) {
-	for i, c := range children {
-		token, val, axis, resp, ok := extractContainerGapToken(c)
-		if !ok {
-			continue
-		}
+func buildPeerGapOccurrences(children []*ir.Node, pID string, groupMap map[string]*RhythmGroup) {
+	for _, c := range children {
+		gaps := extractAllContainerGaps(c)
+		for _, gap := range gaps {
+			key := RhythmPartitionKey{
+				OwnerID:    pID,
+				Axis:       gap.axis,
+				Source:     SpacingSourceGap,
+				Role:       SpacingRoleGroup,
+				Responsive: gap.resp,
+			}
+			keyStr := fmt.Sprintf("%s_%d_%d_%d_%s", key.OwnerID, key.Axis, key.Source, key.Role, key.Responsive.Raw)
 
-		var nextPeer *ir.Node
-		if i+1 < len(children) {
-			nextPeer = children[i+1]
+			if _, exists := groupMap[keyStr]; !exists {
+				groupMap[keyStr] = &RhythmGroup{Key: key}
+			}
+			groupMap[keyStr].Occurrences = append(groupMap[keyStr].Occurrences, SpacingOccurrence{
+				Kind:         ObservationKindPeerProperty,
+				Node:         c,
+				Relationship: nil, // Invariant: A peer-property observation MUST NOT populate SpatialRelationship
+				PeerGroupID:  pID,
+				Value:        gap.val,
+				RawToken:     gap.token,
+				Source:       SpacingSourceGap,
+				Responsive:   gap.resp,
+			})
 		}
-
-		rel := SpatialRelationship{
-			From:   c,
-			To:     nextPeer,
-			Parent: owner,
-			Axis:   axis,
-			Role:   SpacingRoleGroup,
-		}
-
-		key := RhythmPartitionKey{
-			OwnerID:    ownerID + "_peers",
-			Axis:       axis,
-			Source:     SpacingSourceGap,
-			Role:       SpacingRoleGroup,
-			Responsive: resp,
-		}
-		keyStr := fmt.Sprintf("%s_%d_%d_%d_%s", key.OwnerID, key.Axis, key.Source, key.Role, key.Responsive.Raw)
-
-		if _, exists := groupMap[keyStr]; !exists {
-			groupMap[keyStr] = &RhythmGroup{Key: key}
-		}
-		groupMap[keyStr].Occurrences = append(groupMap[keyStr].Occurrences, SpacingOccurrence{
-			Node:         c,
-			Relationship: rel,
-			Value:        val,
-			RawToken:     token,
-			Source:       SpacingSourceGap,
-			Responsive:   resp,
-		})
 	}
 }
 
@@ -464,13 +658,13 @@ func buildMarginOccurrences(owner *ir.Node, children []*ir.Node, prefix string, 
 		}
 
 		nextChild := children[i+1]
-		rel := SpatialRelationship{
+		rel := &SpatialRelationship{
 			From:   c,
 			To:     nextChild,
 			Parent: owner,
 			Axis:   AxisVertical,
 		}
-		rel.Role = ClassifyRelationship(&rel)
+		rel.Role = ClassifyRelationship(rel)
 		if rel.Role == SpacingRoleUnknown {
 			continue
 		}
@@ -488,6 +682,7 @@ func buildMarginOccurrences(owner *ir.Node, children []*ir.Node, prefix string, 
 			groupMap[keyStr] = &RhythmGroup{Key: key}
 		}
 		groupMap[keyStr].Occurrences = append(groupMap[keyStr].Occurrences, SpacingOccurrence{
+			Kind:         ObservationKindInterval,
 			Node:         c,
 			Relationship: rel,
 			Value:        val,
@@ -495,22 +690,6 @@ func buildMarginOccurrences(owner *ir.Node, children []*ir.Node, prefix string, 
 			Source:       SpacingSourceMargin,
 			Responsive:   resp,
 		})
-	}
-}
-
-func parseGapUtility(cleanBase string, isCol bool) (SpacingAxis, string, bool) {
-	switch {
-	case strings.HasPrefix(cleanBase, "gap-y-"):
-		return AxisVertical, cleanBase[len("gap-y-"):], true
-	case strings.HasPrefix(cleanBase, "gap-x-"):
-		return AxisHorizontal, cleanBase[len("gap-x-"):], true
-	case strings.HasPrefix(cleanBase, "gap-"):
-		if isCol {
-			return AxisVertical, cleanBase[len("gap-"):], true
-		}
-		return AxisHorizontal, cleanBase[len("gap-"):], true
-	default:
-		return AxisUnknown, "", false
 	}
 }
 
@@ -525,24 +704,15 @@ func parseSpaceUtility(cleanBase string) (SpacingAxis, string, bool) {
 	}
 }
 
-func isFlexColumn(node *ir.Node) bool {
-	for _, cls := range node.Classes {
-		if StripVariantsOnlyBase(cls) == "flex-col" {
-			return true
-		}
-	}
-	return false
-}
-
 func appendPairOccurrences(children []*ir.Node, owner *ir.Node, ownerID string, axis SpacingAxis, source SpacingSource, val float64, token string, resp ResponsiveState, groupMap map[string]*RhythmGroup) {
 	for i := 0; i < len(children)-1; i++ {
-		rel := SpatialRelationship{
+		rel := &SpatialRelationship{
 			From:   children[i],
 			To:     children[i+1],
 			Parent: owner,
 			Axis:   axis,
 		}
-		rel.Role = ClassifyRelationship(&rel)
+		rel.Role = ClassifyRelationship(rel)
 		if rel.Role == SpacingRoleUnknown {
 			continue
 		}
@@ -560,6 +730,7 @@ func appendPairOccurrences(children []*ir.Node, owner *ir.Node, ownerID string, 
 			groupMap[keyStr] = &RhythmGroup{Key: key}
 		}
 		groupMap[keyStr].Occurrences = append(groupMap[keyStr].Occurrences, SpacingOccurrence{
+			Kind:         ObservationKindInterval,
 			Node:         children[i],
 			Relationship: rel,
 			Value:        val,
@@ -575,13 +746,14 @@ func buildContainerGapOccurrences(owner *ir.Node, children []*ir.Node, ownerID s
 		return
 	}
 
+	mech := detectLayoutMechanism(owner)
 	isCol := isFlexColumn(owner)
 	for _, cls := range owner.Classes {
 		resp, base := extractResponsiveState(cls)
 		cleanBase := StripVariantsOnlyBase(base)
 
-		axis, valStr, ok := parseGapUtility(cleanBase, isCol)
-		if !ok {
+		axis, valStr, ok := parseGapUtility(cleanBase, isCol, mech)
+		if !ok || axis == AxisUnknown {
 			continue
 		}
 

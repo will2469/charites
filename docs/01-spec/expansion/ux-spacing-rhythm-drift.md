@@ -405,26 +405,28 @@ The exact names MAY follow existing project conventions.
 
 ## 8. Classification Pipeline
 
-The analyzer MUST follow a deterministic pipeline.
+The analyzer MUST follow a deterministic pipeline distinguishing between sibling spatial intervals and peer-container property declarations.
 
 ```text
 AST / IR
    ↓
-Layout Node Detection
+Observation Classification
    ↓
-Spacing Extraction
-   ↓
-Layout Group Construction
-   ↓
-Spatial Role Classification
-   ↓
-Peer Relationship Grouping
-   ↓
-Rhythm Model Construction
-   ↓
-Drift Classification
-   ↓
-Diagnostic
+ ┌───────────────┬────────────────────┐
+ │ Interval      │ Peer Property      │
+ │ N-1           │ N                  │
+ │ A -> B        │ A.gap              │
+ │ B -> C        │ B.gap              │
+ │ C -> D        │ C.gap              │
+ └───────────────┴────────────────────┘
+                 ↓
+           Comparability Proof
+                 ↓
+             Partition
+                 ↓
+         Majority Drift Detector
+                 ↓
+            Diagnostic
 ```
 
 No diagnostic logic should directly inspect arbitrary class strings without going through normalized spacing facts.
@@ -596,17 +598,47 @@ Weak evidence MUST NOT independently trigger a warning.
 
 ## 13. Rhythm Model
 
-A rhythm model represents comparable spacing occurrences.
+A rhythm model represents comparable spacing occurrences partitioned into homogeneous groups.
+
+The model distinguishes between two fundamental observation domains:
+1. **Sibling Spatial Intervals ($N-1$ observations):**
+   - Represents spatial intervals between adjacent peer elements (`From -> To`).
+   - Sourced from container `gap-*`, container `space-*`, or contiguous sibling `margin-*`.
+   - Populates `SpatialRelationship{From, To, Parent, Axis, Role}`.
+
+2. **Peer Container Properties ($N$ observations):**
+   - Represents spacing property declarations compared across $N$ equivalent peer containers under a shared parent.
+   - Sourced from each peer container's declared `gap-*` properties.
+   - Evaluates whether homogeneous structural peers (e.g. repeated table rows, form field rows) maintain a consistent internal gap.
+
+### Contract Invariants
+- **Peer Property Invariant:** A peer-property observation **MUST NOT** populate `SpatialRelationship` (`Relationship == nil`). Peer container observations compare property values across equivalent nodes, not directional spatial intervals between nodes.
+- **Topological Invariant:** Sibling intervals require $N-1$ observations for $N$ children. Peer container properties require $N$ observations for $N$ peer containers.
 
 Suggested structure:
 
 ```go
-type RhythmGroup struct {
-    LayoutGroupID NodeID
-    Role          SpacingRole
-    Axis          Axis
+type ObservationKind int
 
-    Occurrences   []SpacingOccurrence
+const (
+    ObservationKindInterval ObservationKind = iota // Sibling spatial interval (From -> To, N-1)
+    ObservationKindPeerProperty                    // Peer container property declaration (N)
+)
+
+type SpacingOccurrence struct {
+    Kind         ObservationKind
+    Node         *ir.Node            // AST node bearing the syntax / diagnostic target
+    Relationship *SpatialRelationship // Populated for intervals; nil for peer properties
+    PeerGroupID  string              // Group ID for peer properties; empty for intervals
+    Value        float64
+    RawToken     string
+    Source       SpacingSource
+    Responsive   ResponsiveState
+}
+
+type RhythmGroup struct {
+    Key         RhythmPartitionKey
+    Occurrences []SpacingOccurrence
 }
 ```
 

@@ -327,6 +327,183 @@ export function CustomComponentsDrift() {
 }`,
 			wantDiags: 1,
 		},
+		{
+			name: "Case 21: Heterogeneous semantic containers (form, section, aside -> 0 diags)",
+			code: `
+export function HeterogeneousSemanticContainers() {
+  return (
+    <div>
+      <form className="flex gap-4">
+        <Field />
+      </form>
+      <section className="flex gap-4">
+        <Field />
+      </section>
+      <aside className="flex gap-7">
+        <Field />
+      </aside>
+    </div>
+  );
+}`,
+			wantDiags: 0,
+		},
+		{
+			name: "Case 22: Heterogeneous landmark components (Header, DataGrid, Footer -> 0 diags)",
+			code: `
+export function HeterogeneousLandmarks() {
+  return (
+    <div>
+      <Header className="flex gap-4" />
+      <DataGrid className="flex gap-4" />
+      <Footer className="flex gap-7" />
+    </div>
+  );
+}`,
+			wantDiags: 0,
+		},
+		{
+			name: "Case 23: Heterogeneous child topology (different child count across rows -> 0 diags)",
+			code: `
+export function HeterogeneousChildTopology() {
+  return (
+    <div className="flex flex-col">
+      <div className="flex gap-4">
+        <Field />
+      </div>
+      <div className="flex gap-4">
+        <Field />
+        <Field />
+      </div>
+      <div className="flex gap-7">
+        <Field />
+        <Field />
+        <Field />
+      </div>
+    </div>
+  );
+}`,
+			wantDiags: 0,
+		},
+		{
+			name: "Case 24: Unrelated responsive breakpoints without base gap -> 0 diags",
+			code: `
+export function UnrelatedResponsiveBreakpoints() {
+  return (
+    <div className="flex flex-col">
+      <div className="flex gap-4">
+        <Field />
+        <Field />
+      </div>
+      <div className="flex md:gap-6">
+        <Field />
+        <Field />
+      </div>
+      <div className="flex lg:gap-7">
+        <Field />
+        <Field />
+      </div>
+    </div>
+  );
+}`,
+			wantDiags: 0,
+		},
+		{
+			name: "Case 25: Homogeneous custom peer containers with Row and [Field, Field] -> 1 diag",
+			code: `
+export function CustomRowPeerContainers() {
+  return (
+    <div className="flex flex-col">
+      <Row className="flex gap-4">
+        <Field />
+        <Field />
+      </Row>
+      <Row className="flex gap-4">
+        <Field />
+        <Field />
+      </Row>
+      <Row className="flex gap-7">
+        <Field />
+        <Field />
+      </Row>
+      <Row className="flex gap-4">
+        <Field />
+        <Field />
+      </Row>
+    </div>
+  );
+}`,
+			wantDiags: 1,
+		},
+		{
+			name: "Case 26: Adversarial topology - child count mismatch in Row 2 -> 0 diags",
+			code: `
+export function AdversarialTopology() {
+  return (
+    <div className="flex flex-col">
+      <Row className="flex gap-4">
+        <Field />
+        <Field />
+      </Row>
+      <Row className="flex gap-4">
+        <Field />
+        <Field />
+        <Field />
+      </Row>
+      <Row className="flex gap-7">
+        <Field />
+        <Field />
+      </Row>
+    </div>
+  );
+}`,
+			wantDiags: 0,
+		},
+		{
+			name: "Case 27: Adversarial mechanism - flex vs grid mismatch in Row 2 -> 0 diags",
+			code: `
+export function AdversarialMechanism() {
+  return (
+    <div className="flex flex-col">
+      <Row className="flex gap-4">
+        <Field />
+        <Field />
+      </Row>
+      <Row className="grid gap-4">
+        <Field />
+        <Field />
+      </Row>
+      <Row className="flex gap-7">
+        <Field />
+        <Field />
+      </Row>
+    </div>
+  );
+}`,
+			wantDiags: 0,
+		},
+		{
+			name: "Case 28: Ambiguous conflicting gap declarations on same axis -> excluded from peer observation",
+			code: `
+export function AmbiguousConflictingGaps() {
+  return (
+    <div className="flex flex-col">
+      <Row className="flex gap-4 gap-6">
+        <Field />
+        <Field />
+      </Row>
+      <Row className="flex gap-4">
+        <Field />
+        <Field />
+      </Row>
+      <Row className="flex gap-4">
+        <Field />
+        <Field />
+      </Row>
+    </div>
+  );
+}`,
+			wantDiags: 0,
+		},
 	}
 
 	for _, tc := range cases {
