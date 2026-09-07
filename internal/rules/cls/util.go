@@ -105,25 +105,148 @@ func isAdContainer(node *ir.Node) bool {
 	return isAdTag(node.Tag) || hasAdAttribute(node.Attributes) || hasAdClass(node.Classes)
 }
 
-// isCarouselTrack mendeteksi apakah node merupakan kontainer atau root track slider/carousel.
-func isCarouselTrack(node *ir.Node) bool {
-	if node == nil || node.Type != ir.NodeElement {
+// SliderClassification merepresentasikan kategori klasifikasi semantik node slider/carousel.
+type SliderClassification int
+
+const (
+	// SliderUnknown menandakan node tidak memiliki bukti kuat sebagai control atau carousel,
+	// atau memiliki bukti yang saling kontradiktif (conservative suppression).
+	SliderUnknown SliderClassification = iota
+
+	// SliderControl menandakan widget interaktif kontrol nilai, formulir, atau tantangan verifikasi.
+	// Node ini BUKAN track konten multi-slide dan aman dari risiko CLS slide transition.
+	SliderControl
+
+	// SliderContentCarousel menandakan kontainer atau track multi-slide untuk konten visual/dinamis.
+	// Node ini wajib memiliki pembatas ketinggian vertikal atau rasio aspek slide.
+	SliderContentCarousel
+)
+
+// ControlEvidence merangkum sinyal kontrol/verifikasi interaktif pada suatu node.
+type ControlEvidence struct {
+	VeryStrong bool // role="slider", aria-valuenow/min/max, onSolve, onVerify
+	Strong     bool // onValueChange, onValueCommit, solved, (TagHint && hasMin && hasMax)
+	Medium     bool // min+max+step, min+max+(value||defaultValue), threshold
+	TagHint    bool // RangeSlider, VolumeSlider, ChallengeSlider, etc.
+}
+
+// CarouselEvidence merangkum sinyal carousel/slider konten pada suatu node.
+type CarouselEvidence struct {
+	Structural bool // horizontal scroll snap, child slide elements
+	Dedicated  bool // Carousel, Swiper, EmblaCarousel
+	Lexical    bool // BannerSlider, ImageSlider, or suffix Carousel
+}
+
+// isControlSliderTag memeriksa apakah tag merupakan komponen kontrol slider/verifikasi yang umum.
+func isControlSliderTag(tag string) bool {
+	switch tag {
+	case "RangeSlider", "VolumeSlider", "OpacitySlider", "ZoomSlider",
+		"ColorSlider", "SeekSlider", "ChallengeSlider", "CaptchaSlider",
+		"VerificationSlider", "SlideToConfirm", "SlideToUnlock", "StepSlider":
+		return true
+	default:
 		return false
 	}
+}
 
-	// Sinyal 1: Tag penamaan carousel
-	switch node.Tag {
-	case "Carousel", "Slider", "Swiper", "EmblaCarousel":
+// isDedicatedCarouselTag memeriksa apakah tag merupakan komponen carousel/swiper kanonikal.
+func isDedicatedCarouselTag(tag string) bool {
+	switch tag {
+	case "Carousel", "Swiper", "EmblaCarousel":
+		return true
+	default:
+		return false
+	}
+}
+
+// isContentSliderTag memeriksa apakah tag merupakan slider presentasi/konten.
+func isContentSliderTag(tag string) bool {
+	if strings.HasSuffix(tag, "Carousel") && !isDedicatedCarouselTag(tag) {
 		return true
 	}
-	if strings.HasSuffix(node.Tag, "Carousel") || strings.HasSuffix(node.Tag, "Slider") {
+	switch tag {
+	case "BannerSlider", "ImageSlider", "MediaSlider", "HeroSlider",
+		"ProductSlider", "TestimonialSlider", "PhotoSlider", "CardSlider",
+		"ContentSlider":
+		return true
+	default:
+		return false
+	}
+}
+
+func hasVeryStrongControlAttributes(attrs map[string]string) bool {
+	if role, ok := attrs["role"]; ok && strings.ToLower(role) == "slider" {
 		return true
 	}
+	signals := []string{"aria-valuenow", "aria-valuemin", "aria-valuemax", "onSolve", "onVerify"}
+	for _, k := range signals {
+		if _, ok := attrs[k]; ok {
+			return true
+		}
+	}
+	return false
+}
 
-	// Sinyal 2: Pola scroll snap horizontal
+func hasStrongControlAttributes(attrs map[string]string) bool {
+	signals := []string{"onValueChange", "onValueCommit", "solved"}
+	for _, k := range signals {
+		if _, ok := attrs[k]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func evaluateRangeAttributes(attrs map[string]string, tagHint bool) (strong bool, medium bool) {
+	_, hasMin := attrs["min"]
+	_, hasMax := attrs["max"]
+	_, hasStep := attrs["step"]
+	_, hasValue := attrs["value"]
+	_, hasDefaultValue := attrs["defaultValue"]
+
+	if tagHint && hasMin && hasMax {
+		strong = true
+	}
+	if hasMin && hasMax && hasStep {
+		medium = true
+	}
+	if hasMin && hasMax && (hasValue || hasDefaultValue) {
+		medium = true
+	}
+	if _, ok := attrs["threshold"]; ok {
+		medium = true
+	}
+	return strong, medium
+}
+
+// extractControlEvidence mengekstrak bukti semantik dan atribut kontrol/verifikasi.
+func extractControlEvidence(node *ir.Node) ControlEvidence {
+	if node == nil || node.Type != ir.NodeElement {
+		return ControlEvidence{}
+	}
+
+	var ev ControlEvidence
+	ev.TagHint = isControlSliderTag(node.Tag)
+
+	if node.Attributes != nil {
+		ev.VeryStrong = hasVeryStrongControlAttributes(node.Attributes)
+		ev.Strong = hasStrongControlAttributes(node.Attributes)
+		rangeStrong, rangeMedium := evaluateRangeAttributes(node.Attributes, ev.TagHint)
+		if rangeStrong {
+			ev.Strong = true
+		}
+		if rangeMedium {
+			ev.Medium = true
+		}
+	}
+
+	return ev
+}
+
+func hasScrollSnapClasses(classes []string) bool {
 	hasOverflowX := false
 	hasSnapX := false
-	for _, cls := range node.Classes {
+	for _, cls := range classes {
 		if cls == "overflow-x-auto" || cls == "overflow-x-scroll" {
 			hasOverflowX = true
 		}
@@ -131,8 +254,104 @@ func isCarouselTrack(node *ir.Node) bool {
 			hasSnapX = true
 		}
 	}
-
 	return hasOverflowX && hasSnapX
+}
+
+func isSlideChildNode(node *ir.Node) bool {
+	if node == nil || node.Type != ir.NodeElement {
+		return false
+	}
+	switch node.Tag {
+	case "Slide", "CarouselItem", "CarouselSlide", "SwiperSlide":
+		return true
+	}
+	if strings.HasSuffix(node.Tag, "Slide") {
+		return true
+	}
+	for _, c := range node.Classes {
+		if c == "snap-center" || c == "snap-start" || c == "snap-end" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSlideChildren(children []*ir.Node) bool {
+	for _, child := range children {
+		if isSlideChildNode(child) {
+			return true
+		}
+	}
+	return false
+}
+
+// extractCarouselEvidence mengekstrak bukti struktural, kanonikal, atau leksikal carousel.
+func extractCarouselEvidence(node *ir.Node) CarouselEvidence {
+	if node == nil || node.Type != ir.NodeElement {
+		return CarouselEvidence{}
+	}
+
+	return CarouselEvidence{
+		Dedicated:  isDedicatedCarouselTag(node.Tag),
+		Lexical:    isContentSliderTag(node.Tag),
+		Structural: hasScrollSnapClasses(node.Classes) || hasSlideChildren(node.Children),
+	}
+}
+
+// classifySlider mengklasifikasikan node ke dalam SliderClassification berdasarkan presedensi bukti.
+func classifySlider(node *ir.Node) SliderClassification {
+	if node == nil || node.Type != ir.NodeElement {
+		return SliderUnknown
+	}
+
+	ctrl := extractControlEvidence(node)
+	car := extractCarouselEvidence(node)
+
+	isSliderNamed := node.Tag == "Slider" || strings.HasSuffix(node.Tag, "Slider")
+	isCarouselNamed := node.Tag == "Carousel" || strings.HasSuffix(node.Tag, "Carousel")
+
+	// Discard non-candidates
+	if !ctrl.VeryStrong && !ctrl.Strong && !ctrl.TagHint &&
+		!car.Dedicated && !car.Structural && !car.Lexical &&
+		!isSliderNamed && !isCarouselNamed {
+		return SliderUnknown
+	}
+
+	// 1. Contradiction: Kontrol semantik kuat bertabrakan dengan struktur carousel riil
+	// Resolusi konservatif: suppress diagnostic untuk mencegah false positive.
+	if (ctrl.VeryStrong || ctrl.Strong) && car.Structural {
+		return SliderUnknown
+	}
+
+	// 2. Control semantics kuat
+	if ctrl.VeryStrong || ctrl.Strong {
+		return SliderControl
+	}
+
+	// 3. Bukti struktural carousel riil (scroll snap horizontal atau child slide)
+	if car.Structural {
+		return SliderContentCarousel
+	}
+
+	// 4. Dedicated carousel component (Carousel, Swiper, EmblaCarousel)
+	// Tidak akan didegradasi oleh prop generic seperti min/max/value.
+	if car.Dedicated {
+		return SliderContentCarousel
+	}
+
+	// 5. Lexical content slider (BannerSlider, ImageSlider, etc.)
+	if car.Lexical {
+		return SliderContentCarousel
+	}
+
+	// 6. Generic Slider atau ambiguous naming tanpa bukti struktural carousel
+	// Ketiadaan bukti != bukti carousel. Standalone <Slider /> mengembalikan SliderUnknown.
+	return SliderUnknown
+}
+
+// isCarouselTrack mendeteksi apakah node merupakan kontainer atau root track slider/carousel.
+func isCarouselTrack(node *ir.Node) bool {
+	return classifySlider(node) == SliderContentCarousel
 }
 
 // hasDimensionAttributes memeriksa keberadaan atribut 'width' dan 'height' eksplisit.

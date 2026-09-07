@@ -46,7 +46,8 @@ func (r *UnconstrainedCarouselRule) Doc() ir.RuleDocumentation {
 		CoreInvariant: "Carousel and slider viewport tracks must constrain container height or bind slide items to fixed aspect ratios to prevent vertical reflow during slide transitions.",
 		Grounding: "Horizontal scrolling tracks and carousels render dynamic collections of cards, banners, or images.\n\n" +
 			"When the carousel track lacks an explicit height (e.g. 'h-64' or 'min-h-[300px]') and slides do not have locked aspect ratios, incoming slides with varying image proportions or dynamic text will force the entire container to expand or collapse vertically.\n\n" +
-			"Fixing the container height or assigning 'aspect-video' / 'aspect-square' to slide items ensures layout stability throughout horizontal panning.",
+			"Fixing the container height or assigning 'aspect-video' / 'aspect-square' to slide items ensures layout stability throughout horizontal panning.\n\n" +
+			"Interactive control sliders (e.g. Radix '<Slider min={0} max={100} />') and security verification challenge widgets (e.g. Cerberus '<ChallengeSlider onSolve={...} />') are disambiguated and exempted from this rule.",
 		Risks: []ir.RiskItem{
 			{
 				Vector:   "Vertical Container Height Jitter",
@@ -91,6 +92,15 @@ func (r *UnconstrainedCarouselRule) Doc() ir.RuleDocumentation {
   ))}
 </div>`,
 			},
+			{
+				Language: "tsx",
+				Comment:  "Interactive verification challenge slider is recognized as a control slider and safely exempted",
+				Code: `<ChallengeSlider
+  onSolve={solveChallenge}
+  onCancel={handleCancel}
+  solved={isSolved}
+/>`,
+			},
 		},
 	}
 }
@@ -98,11 +108,6 @@ func (r *UnconstrainedCarouselRule) Doc() ir.RuleDocumentation {
 // Evaluate memeriksa apakah track carousel memiliki pembatas ketinggian.
 func (r *UnconstrainedCarouselRule) Evaluate(node *ir.Node) []ir.Diagnostic {
 	if !isCarouselTrack(node) {
-		return nil
-	}
-
-	// Jangan beri alarm palsu pada JSX spread attributes ({...props})
-	if hasSpreadProps(node.Attributes) {
 		return nil
 	}
 

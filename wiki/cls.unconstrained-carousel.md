@@ -23,6 +23,8 @@ When the carousel track lacks an explicit height (e.g. 'h-64' or 'min-h-[300px]'
 
 Fixing the container height or assigning 'aspect-video' / 'aspect-square' to slide items ensures layout stability throughout horizontal panning.
 
+Interactive control sliders (e.g. Radix '<Slider min={0} max={100} />') and security verification challenge widgets (e.g. Cerberus '<ChallengeSlider onSolve={...} />') are disambiguated and exempted from this rule.
+
 ---
 ## 3. Vulnerability & Risk Taxonomy
 
@@ -61,6 +63,14 @@ Fixing the container height or assigning 'aspect-video' / 'aspect-square' to sli
     </div>
   ))}
 </div>
+```
+### TSX (Interactive verification challenge slider is recognized as a control slider and safely exempted):
+```tsx
+<ChallengeSlider
+  onSolve={solveChallenge}
+  onCancel={handleCancel}
+  solved={isSolved}
+/>
 ```
 
 ---
