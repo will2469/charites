@@ -55,8 +55,49 @@ if [ "${TARGET_OS}" = "darwin" ] && [ "${TARGET_ARCH}" = "amd64" ]; then
     error "macOS Intel (x86_64) prebuilt binaries are not published. Charites officially supports macOS Apple Silicon (arm64). You can build from source with: go install github.com/${REPO}/cmd/charites@latest"
 fi
 
-# 3. Determine Release Tag (User specified or Latest)
-REQUESTED_TAG="${1:-${CHARITES_VERSION:-${VERSION:-}}}"
+# Parse Arguments & Flags
+FORCE_INSTALL=false
+REQUESTED_TAG=""
+
+for arg in "$@"; do
+    case "$arg" in
+        --force|-f)
+            FORCE_INSTALL=true
+            ;;
+        -*)
+            ;;
+        *)
+            if [ -z "${REQUESTED_TAG}" ]; then
+                REQUESTED_TAG="$arg"
+            fi
+            ;;
+    esac
+done
+
+if [ "${CHARITES_FORCE:-0}" = "1" ]; then
+    FORCE_INSTALL=true
+fi
+
+if [ -z "${REQUESTED_TAG}" ]; then
+    REQUESTED_TAG="${CHARITES_VERSION:-${VERSION:-}}"
+fi
+
+# Concurrency Lock Protection
+LOCK_FILE="${TMPDIR:-/tmp}/charites-installer.lock"
+if [ -e "${LOCK_FILE}" ]; then
+    LOCK_PID=$(cat "${LOCK_FILE}" 2>/dev/null || true)
+    if [ -n "${LOCK_PID}" ] && kill -0 "${LOCK_PID}" 2>/dev/null; then
+        error "Another Charites installer process (PID ${LOCK_PID}) is currently running. Please wait or remove ${LOCK_FILE}."
+    fi
+fi
+echo "$$" > "${LOCK_FILE}"
+
+cleanup() {
+    rm -rf "${TMP_DIR:-}"
+    rm -f "${LOCK_FILE}"
+}
+trap cleanup EXIT INT TERM
+
 TAG="${REQUESTED_TAG}"
 
 if [ -z "${TAG}" ]; then
@@ -76,6 +117,23 @@ if [ -z "${TAG}" ]; then
     fi
 fi
 
+# Guard: Check if already installed
+if command -v charites >/dev/null 2>&1; then
+    EXISTING_BIN="$(command -v charites)"
+    EXISTING_VER="$(charites --version 2>/dev/null | awk '{print $3}' || true)"
+
+    NORM_TAG="${TAG#v}"
+    NORM_EXISTING="${EXISTING_VER#v}"
+
+    if [ -n "${NORM_EXISTING}" ] && [ "${NORM_EXISTING}" = "${NORM_TAG}" ] && [ "${FORCE_INSTALL}" = false ]; then
+        success "Charites ${TAG} is already installed at ${EXISTING_BIN}."
+        printf "  To force reinstall or overwrite, run with: %b--force%b or %bCHARITES_FORCE=1%b\n\n" "${BOLD}" "${NC}" "${BOLD}" "${NC}"
+        exit 0
+    elif [ -n "${NORM_EXISTING}" ]; then
+        info "Existing installation detected: ${EXISTING_VER} at ${EXISTING_BIN}. Proceeding with upgrade to ${TAG}..."
+    fi
+fi
+
 # 4. Prepare Package Metadata
 ARCHIVE_NAME="charites_${TAG}_${TARGET_OS}_${TARGET_ARCH}.tar.gz"
 DOWNLOAD_URL="${GITHUB_URL}/releases/download/${TAG}/${ARCHIVE_NAME}"
@@ -89,10 +147,6 @@ printf "  • Release Package: %s\n\n" "${ARCHIVE_NAME}"
 
 # 5. Create Temporary Directory
 TMP_DIR="$(mktemp -d)"
-cleanup() {
-    rm -rf "${TMP_DIR}"
-}
-trap cleanup EXIT INT TERM
 
 # 6. Download Package
 info "Downloading ${DOWNLOAD_URL}..."

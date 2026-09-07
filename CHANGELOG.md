@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+> **Retention Policy:** Berkas ini hanya menyimpan rilis terbaru dan rilis sebelumnya ($N$ dan $N-1$). Riwayat rilis yang lebih lama diarsipkan di direktori [`docs/05-release/changelogs/`](docs/05-release/changelogs/).
+
+---
+
+## [v1.0.0-beta.3] - 2026-09-07
+
+### Beta Evaluation Rationale & Honest Field-Testing Retrospective
+* **Honest Error & Real-World Diagnostic Discovery:** Pengujian lapangan langsung pada `v1.0.0-beta.2` mengungkap tiga tantangan nyata dalam lingkungan sistem pengembang:
+  1. **PATH Pollution & Collision:** Akumulasi entri path duplikat di shell environment pengembang (seperti `~/.local/bin` yang terduplikasi berulang kali di shell profile) serta potensi tabrakan multiple biner di direktori berbeda.
+  2. **Installer Concurrency & State Guard:** Tidak adanya guard status "already installed" dan lockfile proteksi konkurensi pada script instalasi, yang dapat memicu race condition saat installer dijalankan di latar belakang bersamaan dengan proses uninstall.
+  3. **In-Place Update Archive Unpacking & CLI Flag Shorthand:** Perintah pembaruan bawaan memerlukan kemampuan ekstraksi otomatis langsung dari arsip rilis (`.tar.gz` dan `.zip`) serta pengenalan alias flag (`-u`, `--update`, `-doctor`, `--doctor`) di root CLI.
+* **Continued Multi-Project Calibration:** Pengujian performa deteksi dan kalibrasi rasio false-positive (FP) tetap dilanjutkan pada proyek-proyek eksternal sebelum deklarasi rilis stabil `v1.0.0`.
+
+### Added
+* **Diagnostic Doctor Command (`charites doctor`, `-doctor`, `--doctor`):**
+  - Memeriksa kebersihan `$PATH`, mendeteksi entri direktori duplikat, dan mengaudit tabrakan biner (*multiple binary discovery* & *shadowing*).
+  - Menguji izin penulisan direktori biner untuk menjamin kelancaran fitur pembaruan mandiri (*in-place self-update*).
+  - Memverifikasi konektivitas jaringan ke GitHub Release API dengan batas waktu 3 detik.
+  - Menghasilkan ringkasan rekomendasi remediasi yang dapat langsung dieksekusi pengguna.
+* **Installer Concurrency Lock & Already-Installed Guard (`scripts/install.sh`):**
+  - Lockfile berbasis PID (`/tmp/charites-installer.lock`) untuk mencegah race condition instalasi paralel.
+  - Deteksi otomatis versi yang telah terpasang; jika versi yang sama telah terpasang, instalasi dilewati secara aman tanpa download ulang (dapat dipaksa via `--force` atau `CHARITES_FORCE=1`).
+  - Pencegahan penambahan entri duplikat pada profil shell (`~/.bashrc`, `~/.zshrc`, `~/.profile`).
+* **Archive Unpacking Engine for `charites update`:**
+  - Parser internal berbasis `archive/tar`, `archive/zip`, dan `compress/gzip` untuk mengekstrak biner secara langsung dari arsip rilis resmi GitHub Releases.
+  - Proteksi batas pembacaan (`io.LimitReader` 100MB) untuk mencegah ancaman eksploitasi *decompression bomb* (CWE-409 / gosec G110).
+* **Root CLI Shorthand Aliases:**
+  - Penambahan routing alias `-u`, `--update`, `-update` untuk pembaruan mandiri.
+  - Penambahan routing alias `-doctor`, `--doctor` untuk diagnosis sistem.
+
+### Changed
+* Mengubah retensi berkas `CHANGELOG.md` utama agar fokus pada 2 versi teratas ($N$ dan $N-1$), dengan pengarsipan otomatis versi historis ke `docs/05-release/changelogs/`.
+
 ---
 
 ## [v1.0.0-beta.2] - 2026-09-07
@@ -32,7 +65,7 @@ go install github.com/will2469/charites/cmd/charites@v1.0.0-beta.2
 
 #### Linux & macOS (One-Line Script)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/will2469/charites/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/will2469/charites/main/scripts/install.sh | bash
 ```
 
 #### Windows (PowerShell)
@@ -70,38 +103,4 @@ irm https://raw.githubusercontent.com/will2469/charites/main/install.ps1 | iex
 
 ---
 
-## [v1.0.0-beta.1] - 2026-09-06
-
-### Beta Evaluation Rationale & Field-Testing Focus
-* **Real-World Empirical Validation:** Over 50% of advanced rule combinations, nested component hierarchies, and bespoke Astro/React architectural patterns have only been tested internally. Testing on real-world projects is required to evaluate practical effectiveness, diagnostic precision, and false positive (FP) / false negative (FN) rates under production conditions.
-* **Deferred Scopes:** Certain expansion domains-notably `seo.*` (`SPEC-EXP-12-SEO`)-have been intentionally deferred to avoid superficial overlap with generic linters and keep the compiler focused on design token integrity, accessibility, and Core Web Vitals.
-* **Community & Agent Feedback:** Field feedback and real-world false positive reports are gathered via GitHub Issues and the built-in MCP two-phase HITL tool (`charites_report_issue`).
-
-### Added
-* **Ultra-Fast Zero-CGO Static Analysis Compiler:**
-  - High-performance Go 1.26 AST parsing engine for `.astro`, `.tsx`, `.jsx`, and `.css` files with sub-millisecond per-file traversal without Node.js runtime or CGO overhead.
-  - Unified Intermediate Representation (Leaf IR) streaming Astro and TSX/JSX ASTs into a normalized node graph.
-  - SSOT Multi-Format Design Token Engine parsing `global.css`, `index.css`, `@theme`, and `tokens.json` (W3C DTCG format) with directed graph cycle detection (`ErrCycleDetected`) and recursion budget limits.
-  - Evidence-based token verification ("The Banana Test") guaranteeing zero false positives for untokenized custom utility classes when no semantic token is declared.
-* **90 Canonical Quality Rules across 8 Domains:**
-  - `theme.*` (32 rules): Design token enforcement, slash opacity elimination (`bg-primary/10` $\rightarrow$ `bg-primary-light`), dark mode elevation preservation, CSS Cascade Layer boundaries.
-  - `a11y.*` (16 rules): WCAG 2.2 AA standards, mathematical relative color contrast calculation, form control label bindings, modal keyboard trap prevention, iOS Safari auto-zoom prevention.
-  - `responsive.*` (17 rules): Apple HIG/WCAG touch target ergonomics ($\ge 44 \times 44\text{px}$), container queries (`@container`), dynamic viewport units (`dvh`/`svh`), responsive table overflow wrapping, mobile keyboard safe areas.
-  - `lcp.*`, `cls.*`, `inp.*`, `performance.*` (25 rules): Core Web Vitals optimization including hero image priority (`fetchpriority="high"`), preload links, explicit media aspect-ratio dimensions, layout shift prevention, long task unyielding detection, and Astro island deferred hydration.
-* **Pure Stateless Model Context Protocol (MCP) Server (2026-07-28 Standard):**
-  - `charites_scan`: Workspace component static analysis with rich structured diagnostics and online wiki links.
-  - `charites_explain_rule`: Returns complete 8-Pillars architectural rationale, risk taxonomy, non-compliant examples, and remediation guidance.
-  - `charites_list_rules`: Dynamic discovery of all 90 registered rules, domains, and default severities.
-  - `charites_report_issue`: Two-Phase Human-in-the-Loop (HITL) reporting tool with SHA-256 draft signatures (Phase 1) and user-verified submission (Phase 2).
-* **Rich Multi-Format CLI Reporters:**
-  - Inline ANSI terminal reporter with colorized source snippets and actionable remediation hints.
-  - Machine-readable JSON streaming format (`--format=json`) with rule metadata and online doc URLs.
-  - Markdown audit reporter (`--format=markdown` / `-o report.md`) with executive scorecards, category violation breakdowns, and direct links to online wiki documentation.
-* **1-SSOT Tri-Corpus Testing Harness:**
-  - 17-pattern adversarial test matrix (P1-P5 positive, N1-N5 negative, A1-A7 adversarial) across all rules.
-  - Continuous Go 1.26 fuzzing suite with 14,000+ synthetic mutations verifying zero crashes, memory leaks, or panic hazards.
-* **Self-Management & Installation:**
-  - Automated in-place self-update (`charites update`) and uninstaller (`charites uninstall`).
-  - Cross-platform installation via `go install`, curl installer (`install.sh`), and PowerShell (`install.ps1`).
-
----
+> **Historical Releases:** Changelogs for older versions (e.g. `v1.0.0-beta.1` and earlier) are archived under [`docs/05-release/changelogs/`](docs/05-release/changelogs/).

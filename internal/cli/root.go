@@ -22,6 +22,8 @@ Available Commands:
               Aliases: upgrade
   upgrade     Alias identik untuk 'update'
   uninstall   Copot pemasangan Charites dari sistem secara tuntas tanpa residu
+  doctor      Diagnosis integritas lingkungan, duplikasi $PATH, izin biner, dan konektivitas
+              Aliases: -doctor, --doctor
   version     Cetak versi kompilasi binary, commit git, dan Go runtime
   help        Bantuan penggunaan perintah
 
@@ -71,6 +73,8 @@ func ExecuteWithStreams(args []string, stdin io.Reader, stdout, stderr io.Writer
 		return RunUpdate(args[1:], stdout, stderr)
 	case "uninstall":
 		return RunUninstall(args[1:], stdout, stderr)
+	case "doctor", "-doctor", "--doctor":
+		return RunDoctor(args[1:], stdout, stderr)
 	case "version", "-v", "--version":
 		_, _ = fmt.Fprint(stdout, VersionString())
 		return ExitClean
