@@ -287,7 +287,7 @@ func hasNowrap(classes []string) bool {
 func hasTextOverflowProtection(classes []string) bool {
 	for _, cls := range classes {
 		switch cls {
-		case "truncate", "overflow-hidden", "overflow-x-auto", "overflow-auto", "break-words", "break-all":
+		case "truncate", "overflow-hidden", "overflow-x-auto", "overflow-auto", "break-words", "wrap-break-word", "break-all":
 			return true
 		}
 	}
@@ -300,7 +300,7 @@ func hasCodeWrapOrScroll(node *ir.Node) bool {
 	}
 	for _, cls := range node.Classes {
 		switch cls {
-		case "break-all", "break-words", "whitespace-normal", "whitespace-pre-wrap":
+		case "break-all", "break-words", "wrap-break-word", "whitespace-normal", "whitespace-pre-wrap":
 			return true
 		}
 	}

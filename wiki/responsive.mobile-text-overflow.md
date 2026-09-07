@@ -12,7 +12,7 @@
 Warns when whitespace-nowrap text or code blocks lack truncation, word breaking, or horizontal scroll wrappers
 
 ### Core Invariant:
-> **"Containers declaring 'whitespace-nowrap' must provide overflow mitigation ('truncate', 'overflow-hidden', 'overflow-x-auto'), and inline '<code>' blocks must provide word breaking ('break-all', 'break-words') or horizontal scroll ancestors."**
+> **"Containers declaring 'whitespace-nowrap' must provide overflow mitigation ('truncate', 'overflow-hidden', 'overflow-x-auto'), and inline '<code>' blocks must provide word breaking ('break-all', 'wrap-break-word', 'break-words') or horizontal scroll ancestors."**
 
 ---
 ## 2. Technical Grounding & Engine Realities
@@ -21,7 +21,7 @@ Dynamic strings such as URLs, authentication tokens, UUIDs, IBANs, and email add
 
 Similarly, inline code elements ('<code>') default to unbreaking monospace text. Without 'break-all' or a scrollable parent, long code snippets tear mobile page layouts.
 
-Using 'truncate', 'break-words', or enclosing code inside a scrollable wrapper maintains layout boundaries and satisfies WCAG Reflow requirements.
+Using 'truncate', 'wrap-break-word' (Tailwind CSS v4), 'break-words', or enclosing code inside a scrollable wrapper maintains layout boundaries and satisfies WCAG Reflow requirements.
 
 ---
 ## 3. Vulnerability & Risk Taxonomy
@@ -47,6 +47,12 @@ Using 'truncate', 'break-words', or enclosing code inside a scrollable wrapper m
 <div className="whitespace-nowrap truncate text-sm text-foreground">
   <span>Token Transaksi: {transactionHash}</span>
 </div>
+```
+### TSX (Inline code element with modern Tailwind v4 wrap-break-word):
+```tsx
+<code className="wrap-break-word font-mono text-xs">
+  {apiKey}
+</code>
 ```
 
 ---
