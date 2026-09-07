@@ -89,7 +89,7 @@ flowchart TD
 | `browser` | 12 | [`browser`](browser) |
 | `cls` | 16 | [`cls`](cls) |
 | `design` | 1 | [`design`](design) |
-| `ergonomy` | 4 | [`ergonomy`](ergonomy) |
+| `ergonomy` | 5 | [`ergonomy`](ergonomy) |
 | `inp` | 16 | [`inp`](inp) |
 | `lcp` | 16 | [`lcp`](lcp) |
 | `mobile` | 5 | [`mobile`](mobile) |
@@ -97,7 +97,7 @@ flowchart TD
 | `pwa` | 10 | [`pwa`](pwa) |
 | `responsive` | 17 | [`responsive`](responsive) |
 | `theme` | 32 | [`theme`](theme) |
-| `ux` | 16 | [`ux`](ux) |
+| `ux` | 18 | [`ux`](ux) |
 
 ---
 
@@ -153,6 +153,7 @@ flowchart TD
 | `ergonomy.bottom-nav-thumb-unreachable` | `ergonomy` | `INFO` | Warns when primary call-to-action (CTA) buttons are exclusively located in the top mobile header without reachable alternatives in the bottom thumb zone | [`ergonomy.bottom-nav-thumb-unreachable`](ergonomy.bottom-nav-thumb-unreachable) |
 | `ergonomy.gesture-without-touch-action` | `ergonomy` | `WARN` | Enforces CSS touch-action declaration on elements with custom gesture swipe/drag event handlers | [`ergonomy.gesture-without-touch-action`](ergonomy.gesture-without-touch-action) |
 | `ergonomy.missing-inputmode-keyboard` | `ergonomy` | `INFO` | Enforces contextual virtual keyboard inputmode and type attributes on mobile form inputs (Tesler's Law) | [`ergonomy.missing-inputmode-keyboard`](ergonomy.missing-inputmode-keyboard) |
+| `ergonomy.number-input-wheel-hazard` | `ergonomy` | `WARN` | Flags number inputs without wheel prevention to prevent unintended value mutations during scrolling (Scroll Hijacking) | [`ergonomy.number-input-wheel-hazard`](ergonomy.number-input-wheel-hazard) |
 | `ergonomy.tap-highlight-not-handled` | `ergonomy` | `INFO` | Flags clickable non-native custom elements lacking tactile tap feedback or tap-highlight management | [`ergonomy.tap-highlight-not-handled`](ergonomy.tap-highlight-not-handled) |
 | `inp.context-re-render-cascade` | `inp` | `WARN` | Passing an unmemoized inline object literal to Context.Provider value triggers cascading re-renders across all consumers | [`inp.context-re-render-cascade`](inp.context-re-render-cascade) |
 | `inp.expensive-render-computation` | `inp` | `WARN` | Expensive data transformations (chained .filter() and .sort()) execute synchronously in the render path without useMemo | [`inp.expensive-render-computation`](inp.expensive-render-computation) |
@@ -274,6 +275,8 @@ flowchart TD
 | `ux.missing-autofill` | `ux` | `WARN` | Enforces W3C Living Standard autocomplete attributes on personal identity, credential, and payment form inputs (Tesler's Law) | [`ux.missing-autofill`](ux.missing-autofill) |
 | `ux.monolithic-form-bloat` | `ux` | `WARN` | Warns when a monolithic form contains excessive unchunked inputs (> 9 total or > 7 per chunk), violating Cognitive Load Theory | [`ux.monolithic-form-bloat`](ux.monolithic-form-bloat) |
 | `ux.nav-overflow-chunking` | `ux` | `WARN` | Warns when a navigation landmark contains more than 7 direct navigation links without chunking mechanisms | [`ux.nav-overflow-chunking`](ux.nav-overflow-chunking) |
+| `ux.number-input-identity-misuse` | `ux` | `WARN` | Flags type="number" on discrete identity codes and serial identifiers where mathematical operations are meaningless | [`ux.number-input-identity-misuse`](ux.number-input-identity-misuse) |
+| `ux.number-input-missing-bounds` | `ux` | `WARN` | Flags mathematical number inputs lacking explicit domain lower bounds (min) to prevent accidental out-of-range submissions | [`ux.number-input-missing-bounds`](ux.number-input-missing-bounds) |
 | `ux.orphaned-error-state` | `ux` | `WARN` | Flags error state updates in event handlers that lack corresponding UI error presentation elements | [`ux.orphaned-error-state`](ux.orphaned-error-state) |
 | `ux.radio-overchoice` | `ux` | `WARN` | Warns when radio groups present excessive flat options (> 7) without filtering or combobox grouping, violating Hick-Hyman Law | [`ux.radio-overchoice`](ux.radio-overchoice) |
 | `ux.silent-catch-swallow` | `ux` | `ERROR` | Detects swallowed catch blocks in event handlers that lack user feedback (toast/alert) or re-throw | [`ux.silent-catch-swallow`](ux.silent-catch-swallow) |

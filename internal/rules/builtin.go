@@ -133,6 +133,17 @@ var (
 	_ Rule = (*ux.DestructiveActionUnconfirmedRule)(nil)
 	_ Rule = (*ux.SilentCatchSwallowRule)(nil)
 
+	// ux Wave 5 (Form Input Semantic Integrity & Bounded Precision)
+	_ Rule = (*ux.NumberInputIdentityMisuseRule)(nil)
+	_ Rule = (*ux.NumberInputMissingBoundsRule)(nil)
+
+	// ergonomy Wave 1 & 2 (Virtual Keypad, Gesture, Thumb Zone & Wheel Ergonomics)
+	_ Rule = (*ergonomy.MissingInputmodeKeyboardRule)(nil)
+	_ Rule = (*ergonomy.TapHighlightNotHandledRule)(nil)
+	_ Rule = (*ergonomy.GestureWithoutTouchActionRule)(nil)
+	_ Rule = (*ergonomy.BottomNavThumbUnreachableRule)(nil)
+	_ Rule = (*ergonomy.NumberInputWheelHazardRule)(nil)
+
 	// cls Wave 1 (Rendering Box Reservation, Embed Frames, Ad Slots & Slider Physics)
 	_ Rule = (*cls.UnsizedImageRule)(nil)
 	_ Rule = (*cls.UnsizedEmbedFrameRule)(nil)
@@ -316,6 +327,9 @@ func builtinRules() []Rule {
 		// ergonomy Wave 2 (Thumb Zone & Navigation Ergonomics)
 		ergonomy.NewBottomNavThumbUnreachableRule(),
 
+		// ergonomy Wave 3 (Wheel Ergonomics & Scroll Hijacking Prevention)
+		ergonomy.NewNumberInputWheelHazardRule(),
+
 		// mobile Wave 3 (Mobile Viewport & Obstruction Physics)
 		mobile.NewKeyboardViewportRiskRule(),
 		mobile.NewFixedActionObstructionRule(),
@@ -387,6 +401,10 @@ func builtinRules() []Rule {
 		ux.NewUnboundedAsyncFlagRule(),
 		ux.NewDestructiveActionUnconfirmedRule(),
 		ux.NewSilentCatchSwallowRule(),
+
+		// ux Wave 5 (Form Input Semantic Integrity & Bounded Precision)
+		ux.NewNumberInputIdentityMisuseRule(),
+		ux.NewNumberInputMissingBoundsRule(),
 
 		// cls Wave 1 (Rendering Box Reservation, Embed Frames, Ad Slots & Slider Physics)
 		cls.NewUnsizedImageRule(),

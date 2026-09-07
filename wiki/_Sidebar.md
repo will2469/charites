@@ -80,12 +80,13 @@
 </details>
 
 <details open>
-<summary><b>Ergonomy</b> (4 rules)</summary>
+<summary><b>Ergonomy</b> (5 rules)</summary>
 
 * [**Ergonomy Overview**](ergonomy)
 * [`ergonomy.bottom-nav-thumb-unreachable`](ergonomy.bottom-nav-thumb-unreachable)
 * [`ergonomy.gesture-without-touch-action`](ergonomy.gesture-without-touch-action)
 * [`ergonomy.missing-inputmode-keyboard`](ergonomy.missing-inputmode-keyboard)
+* [`ergonomy.number-input-wheel-hazard`](ergonomy.number-input-wheel-hazard)
 * [`ergonomy.tap-highlight-not-handled`](ergonomy.tap-highlight-not-handled)
 
 </details>
@@ -252,7 +253,7 @@
 </details>
 
 <details open>
-<summary><b>Ux</b> (16 rules)</summary>
+<summary><b>Ux</b> (18 rules)</summary>
 
 * [**Ux Overview**](ux)
 * [`ux.camouflaged-link`](ux.camouflaged-link)
@@ -263,6 +264,8 @@
 * [`ux.missing-autofill`](ux.missing-autofill)
 * [`ux.monolithic-form-bloat`](ux.monolithic-form-bloat)
 * [`ux.nav-overflow-chunking`](ux.nav-overflow-chunking)
+* [`ux.number-input-identity-misuse`](ux.number-input-identity-misuse)
+* [`ux.number-input-missing-bounds`](ux.number-input-missing-bounds)
 * [`ux.orphaned-error-state`](ux.orphaned-error-state)
 * [`ux.radio-overchoice`](ux.radio-overchoice)
 * [`ux.silent-catch-swallow`](ux.silent-catch-swallow)
