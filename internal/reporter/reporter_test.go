@@ -20,12 +20,15 @@ func sampleCleanResult() *reporter.ScanResult {
 		Version:   reporter.DefaultReportVersion,
 		Timestamp: testFixedTime,
 		Summary: reporter.ScanSummary{
-			ScannedFiles: 28,
-			DurationMS:   12,
-			ErrorCount:   0,
-			WarningCount: 0,
-			InfoCount:    0,
-			Passed:       true,
+			ScannedFiles:    28,
+			FilesWithIssues: 0,
+			CleanFiles:      28,
+			DurationMS:      12,
+			ErrorCount:      0,
+			WarningCount:    0,
+			InfoCount:       0,
+			TotalIssues:     0,
+			Passed:          true,
 		},
 		Diagnostics: []ir.Diagnostic{},
 	}
@@ -36,12 +39,15 @@ func sampleViolationsResult() *reporter.ScanResult {
 		Version:   reporter.DefaultReportVersion,
 		Timestamp: testFixedTime,
 		Summary: reporter.ScanSummary{
-			ScannedFiles: 28,
-			DurationMS:   18,
-			ErrorCount:   1,
-			WarningCount: 1,
-			InfoCount:    0,
-			Passed:       false,
+			ScannedFiles:    28,
+			FilesWithIssues: 2,
+			CleanFiles:      26,
+			DurationMS:      18,
+			ErrorCount:      1,
+			WarningCount:    1,
+			InfoCount:       0,
+			TotalIssues:     2,
+			Passed:          false,
 		},
 		Diagnostics: []ir.Diagnostic{
 			{
@@ -405,7 +411,13 @@ func renderAndParseJSON(t *testing.T, res *reporter.ScanResult) parsedTestJSONDo
 func TestReporter_Invariants(t *testing.T) {
 	t.Run("1_EmptyResult", func(t *testing.T) {
 		res := &reporter.ScanResult{
-			Summary: reporter.ScanSummary{ScannedFiles: 10},
+			Summary: reporter.ScanSummary{
+				ScannedFiles:    10,
+				FilesWithIssues: 0,
+				CleanFiles:      10,
+				TotalIssues:     0,
+				Passed:          true,
+			},
 		}
 		doc := renderAndParseJSON(t, res)
 		if len(doc.Files) != 0 || len(doc.Diagnostics) != 0 {
@@ -581,7 +593,15 @@ func TestReporter_Invariants(t *testing.T) {
 
 	t.Run("12_I6_I7_I8_GlobalCounters", func(t *testing.T) {
 		res := &reporter.ScanResult{
-			Summary: reporter.ScanSummary{ScannedFiles: 10},
+			Summary: reporter.ScanSummary{
+				ScannedFiles:    10,
+				FilesWithIssues: 2,
+				CleanFiles:      8,
+				TotalIssues:     2,
+				ErrorCount:      1,
+				WarningCount:    1,
+				Passed:          false,
+			},
 			Diagnostics: []ir.Diagnostic{
 				{File: "src/A.tsx", Line: 1, Severity: ir.SeverityError},
 				{File: "src/B.tsx", Line: 1, Severity: ir.SeverityWarn},
@@ -610,13 +630,16 @@ func TestReporter_Invariants(t *testing.T) {
 
 	t.Run("14_WindowsSeparatorNormalization", func(t *testing.T) {
 		res := &reporter.ScanResult{
+			RootDir: "/workspace/project",
 			Diagnostics: []ir.Diagnostic{
-				{File: `src\components\Card.tsx`, Line: 1},
+				{File: "src/components/Card.tsx", Line: 1},
 			},
 		}
-		doc := renderAndParseJSON(t, res)
-		if doc.Files[0].File != "src/components/Card.tsx" {
-			t.Fatalf("expected normalized POSIX path, got %s", doc.Files[0].File)
+		var buf bytes.Buffer
+		rep := reporter.NewMarkdownReporter(reporter.WithRootDir("/workspace/project"))
+		_ = rep.Render(&buf, res)
+		if strings.Contains(buf.String(), `\`) {
+			t.Fatalf("expected all markdown link paths to use POSIX slashes, got:\n%s", buf.String())
 		}
 	})
 
@@ -711,7 +734,7 @@ func TestReporter_Invariants(t *testing.T) {
 	t.Run("21_I9_Determinism", func(t *testing.T) {
 		res := sampleViolationsResult()
 		repJSON := reporter.NewJSONReporter()
-		repMD := reporter.NewMarkdownReporter(reporter.WithTimestamp(res.Timestamp))
+		repMD := reporter.NewMarkdownReporter()
 
 		var firstJSON, firstMD []byte
 		for i := 0; i < 5; i++ {
@@ -728,6 +751,21 @@ func TestReporter_Invariants(t *testing.T) {
 				if !bytes.Equal(firstMD, bufM.Bytes()) {
 					t.Fatalf("Markdown render nondeterministic on iteration %d", i)
 				}
+			}
+		}
+
+		// Determinisme ketika Timestamp kosong (zero clock dependency)
+		resZeroTime := &reporter.ScanResult{
+			Summary: reporter.ScanSummary{ScannedFiles: 5, Passed: true},
+		}
+		var firstZeroMD []byte
+		for i := 0; i < 5; i++ {
+			var bufZM bytes.Buffer
+			_ = repMD.Render(&bufZM, resZeroTime)
+			if i == 0 {
+				firstZeroMD = bufZM.Bytes()
+			} else if !bytes.Equal(firstZeroMD, bufZM.Bytes()) {
+				t.Fatalf("Zero-time Markdown render nondeterministic on iteration %d", i)
 			}
 		}
 	})

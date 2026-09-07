@@ -3,7 +3,6 @@ package reporter
 import (
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -66,9 +65,8 @@ func (r *MarkdownReporter) Render(w io.Writer, result *ScanResult) error {
 	timeStr, status := r.resolveTimeAndStatus(result)
 	rootDir := r.resolveRootDir(result)
 
-	sortedDiags := SortDiagnosticsCanonical(result.Diagnostics)
-	fileGroups := GroupByFile(sortedDiags)
-	NormalizeSummary(&result.Summary, fileGroups, result.Summary.ScannedFiles)
+	canonicalDiags := cloneAndSortDiagnostics(result.Diagnostics)
+	fileGroups := GroupByFile(canonicalDiags)
 
 	attachedRules := result.AttachedRules
 	if len(attachedRules) == 0 {
@@ -77,9 +75,9 @@ func (r *MarkdownReporter) Render(w io.Writer, result *ScanResult) error {
 
 	var sb strings.Builder
 	r.renderHeader(&sb, timeStr, status)
-	r.renderSummary(&sb, result.Summary, len(attachedRules), len(sortedDiags))
+	r.renderSummary(&sb, result.Summary, len(attachedRules), len(canonicalDiags))
 	r.renderDetailedInfo(&sb, attachedRules)
-	r.renderResults(&sb, fileGroups, len(sortedDiags), rootDir)
+	r.renderResults(&sb, fileGroups, len(canonicalDiags), rootDir)
 
 	_, err := io.WriteString(w, sb.String())
 	return err
@@ -91,9 +89,9 @@ func (r *MarkdownReporter) resolveTimeAndStatus(result *ScanResult) (string, str
 		reportTime = r.timestamp
 	}
 	if reportTime.IsZero() {
-		reportTime = time.Now().UTC()
+		reportTime = time.Unix(0, 0).UTC()
 	}
-	timeStr := reportTime.Format("2006-01-02T15:04:05.000Z")
+	timeStr := reportTime.UTC().Format("2006-01-02T15:04:05.000Z")
 
 	status := "PASSED (Clean)"
 	if len(result.Diagnostics) > 0 {
@@ -231,28 +229,20 @@ func (r *MarkdownReporter) renderFileViolation(sb *strings.Builder, d ir.Diagnos
 }
 
 func resolveAbsAndRelPath(filePath, rootDir string) (posixRel, posixAbs string) {
-	absPath := filePath
-	if !filepath.IsAbs(absPath) {
-		if _, err := os.Stat(filePath); err == nil {
-			if p, err := filepath.Abs(filePath); err == nil {
-				absPath = p
-			} else {
-				absPath = filepath.Join(rootDir, filePath)
-			}
-		} else {
-			absPath = filepath.Join(rootDir, filePath)
-		}
-	}
-
 	relPath := filePath
-	if filepath.IsAbs(relPath) {
-		if rel, err := filepath.Rel(rootDir, relPath); err == nil {
+	if filepath.IsAbs(filePath) {
+		if rel, err := filepath.Rel(rootDir, filePath); err == nil {
 			relPath = rel
 		}
 	}
 
-	posixRel = normalizePOSIXPath(relPath)
-	posixAbs = "/" + strings.TrimPrefix(normalizePOSIXPath(absPath), "/")
+	absPath := filePath
+	if !filepath.IsAbs(filePath) {
+		absPath = filepath.Join(rootDir, filePath)
+	}
+
+	posixRel = filepath.ToSlash(relPath)
+	posixAbs = "/" + strings.TrimPrefix(filepath.ToSlash(absPath), "/")
 	return posixRel, posixAbs
 }
 

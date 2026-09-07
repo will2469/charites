@@ -25,15 +25,14 @@ func (r *JSONReporter) Render(w io.Writer, result *ScanResult) error {
 		version = DefaultReportVersion
 	}
 
-	sortedDiags := SortDiagnosticsCanonical(result.Diagnostics)
-	fileGroups := GroupByFile(sortedDiags)
-	NormalizeSummary(&result.Summary, fileGroups, result.Summary.ScannedFiles)
+	canonicalDiags := cloneAndSortDiagnostics(result.Diagnostics)
+	fileGroups := GroupByFile(canonicalDiags)
 
 	doc := jsonDocument{
 		Version:     version,
 		Summary:     result.Summary,
 		Files:       make([]jsonFileGroup, 0, len(fileGroups)),
-		Diagnostics: make([]jsonDiagnostic, 0, len(sortedDiags)),
+		Diagnostics: make([]jsonDiagnostic, 0, len(canonicalDiags)),
 	}
 
 	for _, fg := range fileGroups {
@@ -67,14 +66,14 @@ func (r *JSONReporter) Render(w io.Writer, result *ScanResult) error {
 		})
 	}
 
-	for _, d := range sortedDiags {
+	for _, d := range canonicalDiags {
 		cat := ""
 		if idx := strings.IndexByte(d.Rule, '.'); idx != -1 {
 			cat = d.Rule[:idx]
 		}
 
 		doc.Diagnostics = append(doc.Diagnostics, jsonDiagnostic{
-			File:     normalizePOSIXPath(d.File),
+			File:     d.File,
 			Line:     d.Line,
 			Column:   d.Column,
 			Rule:     d.Rule,
