@@ -4,7 +4,7 @@ import "fmt"
 
 // Canonical version metadata set via build ldflags or defaults.
 var (
-	Version   = "1.0.0-beta.1"
+	Version   = "1.0.0-beta.2"
 	Commit    = "none"
 	BuildDate = "unknown"
 )

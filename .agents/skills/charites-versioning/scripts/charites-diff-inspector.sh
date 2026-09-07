@@ -8,15 +8,19 @@ set -euo pipefail
 FORMAT="text"
 TARGET_REF="HEAD"
 
-for arg in "$@"; do
-    case "$arg" in
-        --json) FORMAT="json" ;;
+OVERRIDE_VERSION=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --json) FORMAT="json"; shift ;;
+        --version) OVERRIDE_VERSION="$2"; shift 2 ;;
+        --version=*) OVERRIDE_VERSION="${1#*=}"; shift ;;
         -h|--help)
-            echo "Usage: $0 [--json] [target_ref]"
+            echo "Usage: $0 [--json] [--version <version>] [target_ref]"
             echo "Inspects git diff from latest tag to target_ref (default: HEAD)"
             exit 0
             ;;
-        *) TARGET_REF="$arg" ;;
+        *) TARGET_REF="$1"; shift ;;
     esac
 done
 
@@ -28,28 +32,53 @@ fi
 # 1. Resolve Latest Git Tag
 LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || git tag -l --sort=-v:refname | head -n 1 || true)
 
+IS_PRERELEASE=false
+PRE_NAME=""
+PRE_NUM=0
+
 if [ -z "$LATEST_TAG" ]; then
     HAS_TAG=false
     BASE_REF=$(git rev-list --max-parents=0 HEAD 2>/dev/null | head -n 1 || echo "HEAD")
     CURRENT_VERSION="0.0.0"
     PREFIX=""
+    CUR_MAJOR=0
+    CUR_MINOR=0
+    CUR_PATCH=0
 else
     HAS_TAG=true
     BASE_REF="$LATEST_TAG"
-    if [[ "$LATEST_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+    if [[ "$LATEST_TAG" =~ ^v(([0-9]+)\.([0-9]+)\.([0-9]+)-([a-zA-Z0-9]+)\.([0-9]+))$ ]]; then
         PREFIX="v"
         CURRENT_VERSION="${BASH_REMATCH[1]}"
+        CUR_MAJOR="${BASH_REMATCH[2]}"
+        CUR_MINOR="${BASH_REMATCH[3]}"
+        CUR_PATCH="${BASH_REMATCH[4]}"
+        PRE_NAME="${BASH_REMATCH[5]}"
+        PRE_NUM="${BASH_REMATCH[6]}"
+        IS_PRERELEASE=true
+    elif [[ "$LATEST_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+        PREFIX="v"
+        CURRENT_VERSION="${BASH_REMATCH[1]}"
+        IFS='.' read -r CUR_MAJOR CUR_MINOR CUR_PATCH <<< "$CURRENT_VERSION"
+    elif [[ "$LATEST_TAG" =~ ^(([0-9]+)\.([0-9]+)\.([0-9]+)-([a-zA-Z0-9]+)\.([0-9]+))$ ]]; then
+        PREFIX=""
+        CURRENT_VERSION="${BASH_REMATCH[1]}"
+        CUR_MAJOR="${BASH_REMATCH[2]}"
+        CUR_MINOR="${BASH_REMATCH[3]}"
+        CUR_PATCH="${BASH_REMATCH[4]}"
+        PRE_NAME="${BASH_REMATCH[5]}"
+        PRE_NUM="${BASH_REMATCH[6]}"
+        IS_PRERELEASE=true
     elif [[ "$LATEST_TAG" =~ ^([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
         PREFIX=""
         CURRENT_VERSION="${BASH_REMATCH[1]}"
+        IFS='.' read -r CUR_MAJOR CUR_MINOR CUR_PATCH <<< "$CURRENT_VERSION"
     else
         PREFIX=""
         CURRENT_VERSION="0.1.0"
+        IFS='.' read -r CUR_MAJOR CUR_MINOR CUR_PATCH <<< "$CURRENT_VERSION"
     fi
 fi
-
-# Parse Current Major, Minor, Patch
-IFS='.' read -r CUR_MAJOR CUR_MINOR CUR_PATCH <<< "$CURRENT_VERSION"
 
 # 2. Inspect Commits between Base and Target
 if [ "$HAS_TAG" = false ]; then
@@ -124,7 +153,13 @@ else
     NEXT_PATCH=$((CUR_PATCH + 1))
 fi
 
-NEXT_VERSION="${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
+if [ -n "$OVERRIDE_VERSION" ]; then
+    NEXT_VERSION="${OVERRIDE_VERSION#v}"
+elif [ "$IS_PRERELEASE" = true ]; then
+    NEXT_VERSION="${CUR_MAJOR}.${CUR_MINOR}.${CUR_PATCH}-${PRE_NAME}.$((PRE_NUM + 1))"
+else
+    NEXT_VERSION="${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
+fi
 
 # 5. Output Results
 if [ "$FORMAT" = "json" ]; then

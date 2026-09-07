@@ -1,93 +1,123 @@
-# Release Notes - Charites v1.0.0-beta.1 (2026-09-06)
+# Release Notes - Charites v1.0.0-beta.2 (2026-09-07)
 
-Welcome to **Charites v1.0.0-beta.1**, the initial public beta release of the ultra-fast, zero-CGO, zero-Node.js compile-time static analyzer and design token linter for **Astro**, **React TSX/JSX**, and **Tailwind CSS**.
+Welcome to **Charites v1.0.0-beta.2**, the second beta release of the compile-time static analyzer and design token linter for **Astro**, **React TSX/JSX**, and **Tailwind CSS**.
 
----
-
-## 1. Beta Evaluation Rationale & Field-Testing Focus
-
-> [!NOTE]
-> **Why is this release marked `v1.0.0-beta.1`?**
-> Although Charites achieves **100% test passage** across its internal suite (including the canonical 1-SSOT Tri-Corpus, E2E CLI tests, and 14,000+ continuous Go 1.26 fuzzing mutations), this release is deliberately designated as **Beta** for the following reasons:
->
-> 1. **Empirical Real-World Project Validation:** Over 50% of the advanced rule combinations, nested component structures, and bespoke Astro/React architectural patterns have not yet been stress-tested on diverse, production-scale monorepos outside this repository.
-> 2. **False Positive & Precision Tuning:** Static analysis on modern frontend codebases can encounter unusual template string patterns, complex HOC wrappers, or proprietary UI wrappers. The primary objective of `v1.0.0-beta.1` is to measure real-world false positive (FP) and false negative (FN) rates directly in external repositories.
-> 3. **Deferred Expansion Scopes:** Certain expansion domains have been intentionally deferred-such as the `seo.*` domain (`SPEC-EXP-12-SEO`)-to prevent superficial redundancy against established linters (e.g. HTMLHint/axe) and keep the core compiler laser-focused on design systems, accessibility, and Core Web Vitals.
->
-> We encourage developers and teams to test `v1.0.0-beta.1` on their active Astro and React projects and report false-positives or edge cases via the built-in MCP tool `charites_report_issue` or directly on GitHub.
+This release introduces the **File-First Report Hierarchy** for JSON and Markdown outputs, the **Spacing Rhythm Drift** cadence analyzer (`ux.spacing-rhythm-drift`), several new UX and form safety rules, and strict SSOT canonical ordering.
 
 ---
 
-## 2. Highlighted Capabilities & Core Architecture
+## 1. Beta Evaluation Rationale & Multi-Project Calibration
 
-### Ultra-Fast Zero-CGO Static Analysis Compiler
-- **Native Go 1.26 Architecture:** Sub-millisecond per-file AST traversal without Node.js runtime or CGO overhead.
-- **Unified Intermediate Representation (Leaf IR):** Streams `.astro` and `.tsx`/`.jsx` files into a single normalized AST representation.
-- **SSOT Multi-Format Design Token Engine:** Auto-discovers `global.css`, `index.css`, `@theme`, and `tokens.json` (W3C DTCG format). Constructs a directed token graph with cycle detection (`ErrCycleDetected`) and recursion budget limits.
-- **The Banana Test:** Implements evidence-based token verification. Custom or untokenized utilities pass cleanly without false positives if no corresponding semantic token is defined in the token graph.
-
-### 90 Canonical Rules across 8 Quality Domains
-1. **Theme & Design Tokens (`theme.*` - 32 Rules):** Enforces design token consistency, eliminates hardcoded slash opacity modifiers (`bg-primary/10` $\rightarrow$ `bg-primary-light`), prevents dark mode elevation collapse, and safeguards CSS Cascade Layer integrity.
-2. **Accessibility (`a11y.*` - 16 Rules):** Enforces WCAG 2.2 AA standards, calculates mathematical relative color contrast ratios without headless browsers, validates form control bindings, eliminates modal keyboard traps, and prevents iOS Safari auto-zoom hazards.
-3. **Responsive Ergonomics (`responsive.*` - 17 Rules):** Enforces Apple HIG / WCAG touch target dimensions ($\ge 44 \times 44\text{px}$), modern container queries (`@container`), dynamic viewport units (`dvh`/`svh`), responsive table overflow wrapping, and mobile virtual keyboard clearance.
-4. **Core Web Vitals & Runtime Performance (`lcp.*`, `cls.*`, `inp.*`, `performance.*` - 25 Rules):
-   - **LCP:** Prioritizes hero assets (`fetchpriority="high"`), preloads delayed-discovery hero images, and prevents render-blocking head scripts.
-   - **CLS:** Requires explicit dimensions and aspect ratios on media, reserves layout space for dynamic content, and eliminates layout-triggering animations.
-   - **INP:** Detects render-blocking scripts, unyielded long tasks, cascading React Context domain coupling, and un-deferred Astro islands.
-
-### Model Context Protocol (MCP 2026-07-28 Pure Stateless Standard)
-Charites embeds a native, pure stateless MCP server for IDEs and AI coding agents (Claude Desktop, Cursor, Antigravity):
-- `charites_scan`: Audits workspace components and provides structured diagnostics with online wiki links and remediation hints.
-- `charites_explain_rule`: Returns complete 8-Pillars architectural documentation, risk taxonomy, non-compliant examples, and remediation advice.
-- `charites_list_rules`: Discovers all available rules and metadata.
-- `charites_report_issue`: **Cryptographic Two-Phase Human-in-the-Loop (HITL)** reporting tool that generates SHA-256 signed drafts (Phase 1) and submits verified issues via GitHub CLI or prefilled browser URLs upon explicit user confirmation (Phase 2).
-
-### Multi-Format Reporters & CLI Tooling
-- **Terminal Inline ANSI:** Clean, colorized diagnostic reports with source code snippets, column pointers, and actionable remediation tips.
-- **Streaming JSON (`--format=json`):** Machine-readable diagnostic envelope including `doc_url` and rule metadata.
-- **Markdown Audit Reports (`--format=markdown` / `-o report.md`):** Executive summary scorecards, category violation breakdowns, and direct links to online wiki documentation.
-- **Self-Management:** In-place binary self-update (`charites update`) and clean uninstaller (`charites uninstall`).
-
-### 1-SSOT Tri-Corpus Testing Harness
-Every rule is rigorously validated against a 17-pattern matrix in `tests/correctness/<rule_id>/`:
-- **Positive (P1-P5):** Obvious, indirect, helper-wrapped, nested, and aliased violations.
-- **Negative (N1-N5):** Valid design tokens, explicit ignore directives, third-party libraries, semantic HTML, and untokenized custom values (Banana Test).
-- **Adversarial (A1-A7):** Template literals, ternary expressions, spread properties, dynamic object classes, variable shadowing, and cyclic tokens.
-- **Continuous Fuzzing:** Over 14,000 synthetic CSS and AST mutations tested with zero crashes or memory leaks.
+> [!IMPORTANT]
+> **Mengapa Rilis Ini Masih Berstatus Beta (`v1.0.0-beta.2`)?**
+> * **Empirical Multi-Project Calibration:** Evaluasi performa deteksi, akurasi parsing AST, serta rasio *false positive* (FP) / *true positive* (TP) masih memerlukan kontribusi dan pengujian riil pada lebih dari 1 proyek eksternal. Kalibrasi lintas berbagai monorepo produksi (Astro, Next.js/React, Tailwind v3/v4) sangat esensial sebelum menetapkan rilis stabil `v1.0.0`.
+> * **Spatial Rhythm Drift Fine-Tuning:** Rule baru `ux.spacing-rhythm-drift` memperkenalkan model relasional spasial ($N-1$ interval sibling dan observasi properti peer container). Model ini membutuhkan benchmarking performa dan variasi cadence layout dari komunitas developer.
+> * **Community Feedback & Edge Cases:** Kami mengundang tim pengembang untuk menguji rilis ini pada proyek aktif mereka dan melaporkan temuan, performa deteksi, atau false positive melalui GitHub Issues atau MCP tool bawaan `charites_report_issue`.
 
 ---
 
-## 3. Installation & Getting Started
+## 2. Update & Upgrade Commands
 
-### Via Go Toolchain (Recommended for Go Developers)
+Bagi pengguna yang sudah memasang Charites versi sebelumnya (`v1.0.0-beta.1` atau rilis development), gunakan perintah berikut untuk memperbarui:
+
+### A. In-Place Self-Update (Rekomendasi Utama)
+Charites dilengkapi mekanisme pembaruan otomatis di tempat tanpa perlu download manual:
 ```bash
-go install github.com/will2469/charites/cmd/charites@v1.0.0-beta.1
+charites update
+```
+*Alias:*
+```bash
+charites --update
+charites -u
 ```
 
-### Linux & macOS (Automated Script)
+### B. Via Go Toolchain
 ```bash
-curl -fsSL https://raw.githubusercontent.com/will2469/charites/main/scripts/install.sh | bash
+go install github.com/will2469/charites/cmd/charites@v1.0.0-beta.2
 ```
 
-### Windows (PowerShell)
+### C. Linux & macOS (One-Line Updater / Installer)
+```bash
+curl -fsSL https://raw.githubusercontent.com/will2469/charites/main/install.sh | bash
+```
+
+### D. Windows (PowerShell)
 ```powershell
-irm https://raw.githubusercontent.com/will2469/charites/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/will2469/charites/main/install.ps1 | iex
 ```
 
-### Basic Usage
+### E. Verifikasi Versi Terpasang
 ```bash
-# Scan current workspace with default inline ANSI reporter
+charites --version
+```
+*Output yang diharapkan:*
+```text
+charites version 1.0.0-beta.2 (go1.26.x)
+```
+
+---
+
+## 3. Fresh Installation (Pemasangan Baru)
+
+Untuk pemasangan baru pada mesin atau pipeline CI/CD:
+
+```bash
+# Go Developers:
+go install github.com/will2469/charites/cmd/charites@v1.0.0-beta.2
+
+# Linux / macOS:
+curl -fsSL https://raw.githubusercontent.com/will2469/charites/main/install.sh | bash
+
+# Windows PowerShell:
+irm https://raw.githubusercontent.com/will2469/charites/main/install.ps1 | iex
+```
+
+---
+
+## 4. Rangkuman Pembaruan & Fitur Baru (What's New)
+
+###  File-First Output Contract (JSON & Markdown)
+* **Remediation-First Hierarchy:** Mengubah hierarki pelaporan dari *rule-first* menjadi *file-first* (`files: [...]`). Setiap berkas merangkum jumlah error/warning serta daftar temuan dengan koordinat tepat `line:column` dan arahan supresi (`suppression`). Hal ini mempercepat alur kerja remediasi baik bagi pengembang maupun AI coding agent.
+* **Backward Compatibility:** Root-level `diagnostics: [...]` tetap dipertahankan dengan jaminan invarian identik dengan gabungan pelanggaran berkas.
+* **File-Grouped Markdown Audit:** Format `--format=markdown` / `-o audit-report.md` kini menyajikan kartu skor ringkasan eksekutif, tabel pelanggaran terkelompok per-berkas, dan tautan langsung ke wiki dokumentasi kanonikal.
+
+###  Aturan Baru (New Quality & UX Rules)
+1. **`ux.spacing-rhythm-drift`:** Mendeteksi inkonsistensi irama spasial (*spacing cadence*) menggunakan model relasional interval sibling $N-1$ serta observasi properti kontainer peer.
+2. **`ux.destructive-action-unconfirmed` (Fixes #11):** Analisis context-aware state-gating yang mewajibkan dialog atau konfirmasi inline pada tombol aksi destruktif.
+3. **`responsive.mobile-text-overflow` (Fixes #10):** Dukungan penuh utilitas `wrap-break-word` dan overflow handling untuk viewport mobile.
+4. **`responsive.fractional-width-gap-drift` (Fixes #8):** Deteksi layout drift pada flexbox akibat pembagian lebar fraksional yang bertabrakan dengan gap.
+5. **`ux.multiline-input-misuse` (Fixes #7):** Deteksi pencegahan penggunaan `<textarea>` atau multiline input pada field data baris tunggal.
+6. **`semantic.consecutive-br-spacing` (Fixes #6):** Deteksi penggunaan tag `<br>` ganda berturut-turut untuk manipulasi jarak tata letak visual.
+7. **`ux.number-input-wheel-hazard`, `ux.number-input-identity-misuse`, `ux.number-input-missing-bounds` (Fixes #5):** Rangkaian audit keamanan dan keandalan input formulir bertipe number.
+8. **Component-Scoped Style Drift Analyzer (Fixes #4):** Deteksi deviasi token dan style drift antar instans komponen serupa.
+
+###  Presisi Diagnostik, Performa & Determinisme
+* **SSOT Canonical Ordering:** Pengurutan diagnostik 7-dimensi kanonikal kini berada di `internal/ir` (`ir.SortDiagnostics`), mengeliminasi multi-pass sorting di lapisan presenter.
+* **Linear File Grouping ($O(N)$):** Partisi linier murni untuk pengelompokan berkas tanpa alokasi memori berlebih.
+* **Invariant I10 Guarantee:** Metrik `ScanSummary` dijamin murni tanpa manipulasi di layer pelaporan.
+* **Deterministic & Clockless:** Resolusi path murni berbasis string arithmetic (tanpa syscall I/O `os.Stat`) dan timestamp markdown deterministik untuk hasil yang 100% *byte-for-byte reproducible*.
+* **Token Hardening:** Penutupan celah arbitrer pada `scale-[...]`, slash opacity (`bg-primary/10`), dan ekspansi token utilitas `shadow-*`.
+
+---
+
+## 5. Panduan Penggunaan Singkat
+
+```bash
+# Pemindaian standar direktori saat ini
 charites scan .
 
-# Generate comprehensive Markdown audit report
+# Pemindaian dengan laporan JSON terstruktur (file-first)
+charites scan -f json .
+
+# Pemindaian dan pembuatan laporan audit Markdown lengkap
 charites scan -f markdown -o audit-report.md .
 
-# Run MCP server for AI agent integration
+# Menjalankan server Model Context Protocol (MCP 2026-07-28)
 charites mcp
 ```
 
 ---
 
-## 4. Full Changelog
+## 6. Changelog Lengkap
 
-All notable commits and features leading up to this release are documented in [CHANGELOG.md](CHANGELOG.md).
+Rincian commit lengkap dan perbandingan diff dapat dilihat di [CHANGELOG.md](CHANGELOG.md) serta [GitHub Releases](https://github.com/will2469/charites/releases/tag/v1.0.0-beta.2).
