@@ -185,6 +185,18 @@ func TestHardcodeOpacityColorRule_TableDrivenBoundary(t *testing.T) {
 			isViolation:    true,
 			classification: "In-Scope Base",
 		},
+		{
+			name: "InScope_shadow_primary_20",
+			node: &ir.Node{
+				Span:    ir.Span{Line: 32, Column: 3},
+				Classes: []string{"shadow-primary/20"},
+			},
+			wantCount:      1,
+			wantClasses:    []string{"shadow-primary/20"},
+			wantHints:      []string{`Use semantic token "primary-light".`},
+			isViolation:    true,
+			classification: "In-Scope Base Shadow",
+		},
 
 		// 2. In-Scope Variants (Single & Chained)
 		{
@@ -246,6 +258,36 @@ func TestHardcodeOpacityColorRule_TableDrivenBoundary(t *testing.T) {
 			wantHints:      []string{`Use semantic token "primary-light".`, `Use semantic token "destructive-light".`},
 			isViolation:    true,
 			classification: "In-Scope Multiple",
+		},
+		{
+			name: "InScope_bracket_variant_text_primary_20",
+			node: &ir.Node{
+				Span:    ir.Span{Line: 47, Column: 2},
+				Classes: []string{"[&>svg]:text-primary/20"},
+			},
+			wantCount:      1,
+			wantClasses:    []string{"[&>svg]:text-primary/20"},
+			wantHints:      []string{`Use semantic token "primary-light".`},
+			isViolation:    true,
+			classification: "In-Scope Bracket Variant",
+		},
+		{
+			name: "InScope_reproducible_snippet_issue_2",
+			node: &ir.Node{
+				Span:    ir.Span{Line: 48, Column: 1},
+				Classes: []string{"shadow-primary/20", "hover:border-primary/50", "bg-muted/20", "border-warning/40", "text-warning/90"},
+			},
+			wantCount:   5,
+			wantClasses: []string{"shadow-primary/20", "hover:border-primary/50", "bg-muted/20", "border-warning/40", "text-warning/90"},
+			wantHints: []string{
+				`Use semantic token "primary-light".`,
+				"Use an existing semantic token or declare a calibrated semantic token in global.css (e.g. --<base>-<state>) instead of using arbitrary slash opacity modifiers.",
+				`Use semantic token "muted-light".`,
+				"Use an existing semantic token or declare a calibrated semantic token in global.css (e.g. --<base>-<state>) instead of using arbitrary slash opacity modifiers.",
+				"Use an existing semantic token or declare a calibrated semantic token in global.css (e.g. --<base>-<state>) instead of using arbitrary slash opacity modifiers.",
+			},
+			isViolation:    true,
+			classification: "In-Scope Issue #2 Reproducible Snippet",
 		},
 
 		// 3. Clean Negatives (Valid Semantic Tokens & Standard Classes)
@@ -342,14 +384,21 @@ func TestHardcodeOpacityColorRule_TableDrivenBoundary(t *testing.T) {
 			classification: "Out-of-Scope Line-Height",
 		},
 		{
-			name: "OutOfScope_unmapped_opacities",
+			name: "InScope_unmapped_opacities",
 			node: &ir.Node{
 				Span:    ir.Span{Line: 70, Column: 1},
 				Classes: []string{"bg-primary/30", "bg-primary/50", "bg-primary/100", "bg-primary/[0.1]"},
 			},
-			wantCount:      0,
-			isViolation:    false,
-			classification: "Out-of-Scope Unmapped Opacity",
+			wantCount:   4,
+			wantClasses: []string{"bg-primary/30", "bg-primary/50", "bg-primary/100", "bg-primary/[0.1]"},
+			wantHints: []string{
+				"Use an existing semantic token or declare a calibrated semantic token in global.css (e.g. --<base>-<state>) instead of using arbitrary slash opacity modifiers.",
+				"Use an existing semantic token or declare a calibrated semantic token in global.css (e.g. --<base>-<state>) instead of using arbitrary slash opacity modifiers.",
+				"Use an existing semantic token or declare a calibrated semantic token in global.css (e.g. --<base>-<state>) instead of using arbitrary slash opacity modifiers.",
+				"Use an existing semantic token or declare a calibrated semantic token in global.css (e.g. --<base>-<state>) instead of using arbitrary slash opacity modifiers.",
+			},
+			isViolation:    true,
+			classification: "In-Scope Unmapped Opacity",
 		},
 		{
 			name: "OutOfScope_arbitrary_hex_color",
@@ -380,6 +429,16 @@ func TestHardcodeOpacityColorRule_TableDrivenBoundary(t *testing.T) {
 			wantCount:      0,
 			isViolation:    false,
 			classification: "Out-of-Scope Raw Black/White",
+		},
+		{
+			name: "OutOfScope_shadow_elevation_sizes",
+			node: &ir.Node{
+				Span:    ir.Span{Line: 78, Column: 1},
+				Classes: []string{"shadow-sm", "shadow-md", "shadow-lg", "shadow-inner", "shadow-none", "shadow-sm/20"},
+			},
+			wantCount:      0,
+			isViolation:    false,
+			classification: "Out-of-Scope Shadow Elevation Size",
 		},
 
 		// 5. Structural Edge Cases
@@ -542,5 +601,39 @@ func BenchmarkEvaluateHardcodeOpacityColor_DynamicThemeContext(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		_ = rule.Evaluate(node)
+	}
+}
+
+func TestHardcodeOpacityColorRule_UnmappedSemanticOpacities(t *testing.T) {
+	rule := theme.NewHardcodeOpacityColorRule()
+
+	node := &ir.Node{
+		Span:    ir.Span{Line: 12, Column: 4},
+		Classes: []string{"bg-primary/10", "bg-primary/30", "border-warning/40"},
+	}
+
+	diags := rule.Evaluate(node)
+	if len(diags) != 3 {
+		t.Fatalf("expected 3 diagnostics, got %d: %+v", len(diags), diags)
+	}
+
+	// 1. Mapped opacity must emit specific replacement token
+	const wantMapped = `Use semantic token "primary-light".`
+	if diags[0].Hint != wantMapped {
+		t.Errorf("diag 0 hint = %q, want %q", diags[0].Hint, wantMapped)
+	}
+
+	// 2. Unmapped opacities must emit static generic calibrated-token guidance
+	const wantUncalibrated = "Use an existing semantic token or declare a calibrated semantic token in global.css (e.g. --<base>-<state>) instead of using arbitrary slash opacity modifiers."
+	if diags[1].Hint != wantUncalibrated {
+		t.Errorf("diag 1 hint = %q, want %q", diags[1].Hint, wantUncalibrated)
+	}
+	if diags[2].Hint != wantUncalibrated {
+		t.Errorf("diag 2 hint = %q, want %q", diags[2].Hint, wantUncalibrated)
+	}
+
+	// Invariant: The generic hint MUST be an identical static constant across different bases
+	if diags[1].Hint != diags[2].Hint {
+		t.Errorf("generic hint must be an identical static constant across different bases")
 	}
 }

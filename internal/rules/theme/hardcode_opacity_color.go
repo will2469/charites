@@ -88,9 +88,11 @@ func (r *HardcodeOpacityColorRule) ID() string {
 	return "theme.hardcode-opacity-color"
 }
 
+const uncalibratedOpacityHint = "Use an existing semantic token or declare a calibrated semantic token in global.css (e.g. --<base>-<state>) instead of using arbitrary slash opacity modifiers."
+
 // Description mengembalikan penjelasan ringkas maksud dan tujuan rule.
 func (r *HardcodeOpacityColorRule) Description() string {
-	return "Detects utility classes with hardcoded slash opacity modifiers that have official semantic token replacements"
+	return "Detects utility classes with hardcoded or uncalibrated slash opacity modifiers bypassing global.css SSOT"
 }
 
 // Category mengembalikan nama kategori rule.
@@ -129,10 +131,10 @@ func (r *HardcodeOpacityColorRule) Doc() ir.RuleDocumentation {
 			},
 			{
 				Language: "tsx",
-				Comment:  "Chained and single variants with hardcoded opacity",
+				Comment:  "Arbitrary uncalibrated slash opacities and shadow utilities bypassing SSOT",
 				Code: `export function ActionCard() {
   return (
-    <div className="p-4 rounded-lg hover:bg-primary/10 dark:bg-primary/10 md:hover:bg-primary/10">
+    <div className="shadow-primary/20 hover:border-primary/50 bg-muted/20 border-warning/40 text-warning/90">
       <button className="px-3 py-2 text-sm dark:border-destructive/20 sm:dark:hover:border-destructive/20">
         Delete
       </button>
@@ -184,18 +186,81 @@ func (r *HardcodeOpacityColorRule) Doc() ir.RuleDocumentation {
 	}
 }
 
-// stripVariants membuang seluruh prefix varian Tailwind (seperti hover:, dark:, md:hover:)
-// dan mengembalikan base utility class.
-func stripVariants(token string) string {
-	lastColon := strings.LastIndexByte(token, ':')
-	if lastColon >= 0 && lastColon < len(token)-1 {
-		return token[lastColon+1:]
+// Evaluate mengevaluasi sebuah node IR dan mendeteksi utility color ber-slash opacity yang melanggar SSOT.
+// isNonColorOrDelegated determines whether a class prefix and color base should be ignored
+// as a non-color utility or delegated to an orthogonal Charites theme rule.
+func isNonColorOrDelegated(prefix, colorBase string) bool {
+	// 1. Tolak keyword non-color utility (zero noise invariant)
+	if prefix == "text-" && IsTailwindFontSize(colorBase) {
+		return true
 	}
-	return token
+	if strings.HasPrefix(prefix, "border") && IsNonColorBorderKeyword(colorBase) {
+		return true
+	}
+	if prefix == "shadow-" && IsShadowSizeKeyword(colorBase) {
+		return true
+	}
+
+	// 2. Delegasikan ke rule ortogonal sesuai Tri-Corpus SSOT
+	if IsTailwindPrimitiveColor(colorBase) {
+		return true
+	}
+	if IsMonochromeColor(colorBase) {
+		return true
+	}
+	if strings.HasPrefix(colorBase, "[") || IsHexColor(colorBase) {
+		return true
+	}
+
+	return false
 }
 
-// Evaluate mengevaluasi sebuah node IR dan mendeteksi utility color ber-slash opacity yang memiliki
-// pemetaan semantic token pengganti resmi. Mematuhi kontrak pure function dan zero alloc pada node bersih.
+func (r *HardcodeOpacityColorRule) evaluateClass(class string, span ir.Span) (ir.Diagnostic, bool) {
+	// 1. Strip Tailwind variants (mendukung arbitrary variants ber-bracket seperti [&>svg]:...)
+	base := StripVariantsOnlyBase(class)
+
+	// 2. Split alpha modifier menggunakan parser resmi bracket-safe
+	baseNoAlpha, alpha, hasAlpha := SplitAlphaModifier(base)
+	if !hasAlpha {
+		return ir.Diagnostic{}, false
+	}
+
+	// 3. Pisahkan prefix pewarnaan resmi menggunakan registry terpusat
+	prefix, colorBase, ok := SplitColorPrefix(baseNoAlpha)
+	if !ok || isNonColorOrDelegated(prefix, colorBase) {
+		return ir.Diagnostic{}, false
+	}
+
+	// 4. Seluruh basis warna yang tersisa adalah kandidat semantik (semantic candidate).
+	// Cari apakah terdapat token pengganti resmi terkalibrasi di SSOT global.css.
+	tCtx := r.themeCtx
+	if tCtx == nil {
+		tCtx = getDiscoveredTheme()
+	}
+
+	conv := r.convention
+	if conv == nil {
+		conv = NewDefaultCharitesConvention()
+	}
+
+	hint := uncalibratedOpacityHint
+	cands, found := conv.FindOpacityReplacement(colorBase, alpha, tCtx)
+	if found && len(cands) > 0 {
+		hint = "Use semantic token \"" + cands[0].Name + "\"."
+	}
+
+	return ir.Diagnostic{
+		Line:     span.Line,
+		Column:   span.Column,
+		Rule:     r.ID(),
+		Severity: r.DefaultSeverity(),
+		Message:  "Hardcode opacity color: \"" + class + "\"",
+		Hint:     hint,
+	}, true
+}
+
+// Evaluate memeriksa apakah node mengandung utility class dengan arbitrary slash opacity.
+// Mematuhi kontrak pure function, classification boundary bertingkat, dan zero alloc pada node bersih.
 func (r *HardcodeOpacityColorRule) Evaluate(node *ir.Node) []ir.Diagnostic {
 	if node == nil || len(node.Classes) == 0 {
 		return nil
@@ -204,57 +269,10 @@ func (r *HardcodeOpacityColorRule) Evaluate(node *ir.Node) []ir.Diagnostic {
 	//nolint:prealloc // zero-alloc on clean nodes required by QUAL-03
 	var diags []ir.Diagnostic
 	for _, class := range node.Classes {
-		if strings.IndexByte(class, '/') == -1 {
-			continue
+		diag, ok := r.evaluateClass(class, node.Span)
+		if ok {
+			diags = append(diags, diag)
 		}
-
-		base := stripVariants(class)
-		var colorSlash string
-		switch {
-		case strings.HasPrefix(base, "bg-"):
-			colorSlash = base[3:]
-		case strings.HasPrefix(base, "text-"):
-			colorSlash = base[5:]
-		case strings.HasPrefix(base, "border-"):
-			colorSlash = base[7:]
-		case strings.HasPrefix(base, "ring-"):
-			colorSlash = base[5:]
-		default:
-			continue
-		}
-
-		slashIdx := strings.IndexByte(colorSlash, '/')
-		if slashIdx == -1 {
-			continue
-		}
-		colorBase := colorSlash[:slashIdx]
-		opacity := colorSlash[slashIdx+1:]
-
-		tCtx := r.themeCtx
-		if tCtx == nil {
-			tCtx = getDiscoveredTheme()
-		}
-
-		conv := r.convention
-		if conv == nil {
-			conv = NewDefaultCharitesConvention()
-		}
-
-		cands, ok := conv.FindOpacityReplacement(colorBase, opacity, tCtx)
-		if !ok || len(cands) == 0 {
-			continue
-		}
-
-		replacement := cands[0].Name
-
-		diags = append(diags, ir.Diagnostic{
-			Line:     node.Span.Line,
-			Column:   node.Span.Column,
-			Rule:     r.ID(),
-			Severity: r.DefaultSeverity(),
-			Message:  "Hardcode opacity color: \"" + class + "\"",
-			Hint:     "Use semantic token \"" + replacement + "\".",
-		})
 	}
 
 	return diags

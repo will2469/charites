@@ -13,6 +13,17 @@
     },
     {
       "category": "theme",
+      "column": 5,
+      "doc_url": "https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color",
+      "file": "fixtures/projects/opacity_violations/src/components/Card.tsx",
+      "hint": "Use an existing semantic token or declare a calibrated semantic token in global.css (e.g. --\u003cbase\u003e-\u003cstate\u003e) instead of using arbitrary slash opacity modifiers.",
+      "line": 5,
+      "message": "Hardcode opacity color: \"text-secondary/50\"",
+      "rule": "theme.hardcode-opacity-color",
+      "severity": "error"
+    },
+    {
+      "category": "theme",
       "column": 3,
       "doc_url": "https://github.com/will2469/charites/wiki/theme.hardcode-opacity-color",
       "file": "fixtures/projects/opacity_violations/src/pages/index.astro",
@@ -25,7 +36,7 @@
   ],
   "summary": {
     "duration_ms": 0,
-    "error_count": 2,
+    "error_count": 3,
     "info_count": 0,
     "passed": false,
     "scanned_files": 2,

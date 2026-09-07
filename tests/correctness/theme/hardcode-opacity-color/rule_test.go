@@ -104,14 +104,29 @@ func TestRule_ThemeHardcodeOpacityColor_TriCorpus(t *testing.T) {
 			"md:hover:bg-primary/10",
 			"dark:border-destructive/20",
 			"sm:dark:hover:border-destructive/20",
+			"shadow-primary/20",
+			"hover:border-primary/50",
+			"border-warning/40",
+			"text-warning/90",
+			"bg-primary/30",
+			"ring-primary/[0.1]",
 		}
 
 		foundMap := make(map[string]bool)
+		var hasMappedHint, hasUncalibratedHint bool
+		const wantUncalibrated = "Use an existing semantic token or declare a calibrated semantic token in global.css (e.g. --<base>-<state>) instead of using arbitrary slash opacity modifiers."
+
 		for _, d := range diags {
 			for _, pat := range expectedPatterns {
 				if strings.Contains(d.Message, pat) {
 					foundMap[pat] = true
 				}
+			}
+			if strings.Contains(d.Hint, `Use semantic token "primary-light".`) {
+				hasMappedHint = true
+			}
+			if d.Hint == wantUncalibrated {
+				hasUncalibratedHint = true
 			}
 		}
 
@@ -119,6 +134,13 @@ func TestRule_ThemeHardcodeOpacityColor_TriCorpus(t *testing.T) {
 			if !foundMap[pat] {
 				t.Errorf("expected violation for pattern %q was not detected", pat)
 			}
+		}
+
+		if !hasMappedHint {
+			t.Errorf("expected at least one diagnostic with mapped token hint")
+		}
+		if !hasUncalibratedHint {
+			t.Errorf("expected at least one diagnostic with uncalibrated static generic hint")
 		}
 	})
 

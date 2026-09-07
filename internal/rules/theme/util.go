@@ -241,6 +241,7 @@ var OrderedColorPrefixes = []string{
 	"ring-offset-", "ring-",
 	"outline-",
 	"border-",
+	"shadow-",
 	"bg-",
 	"text-",
 	"fill-",
@@ -287,6 +288,27 @@ func IsNonColorBorderKeyword(s string) bool {
 	case "0", "2", "4", "8",
 		"solid", "dashed", "dotted", "double", "hidden", "none",
 		"collapse", "separate":
+		return true
+	default:
+		return false
+	}
+}
+
+// IsShadowSizeKeyword mengidentifikasi keyword ukuran elevasi box-shadow Tailwind non-warna.
+func IsShadowSizeKeyword(s string) bool {
+	switch s {
+	case "sm", "md", "lg", "xl", "2xl", "inner", "none":
+		return true
+	default:
+		return false
+	}
+}
+
+// IsTailwindFontSize mengidentifikasi keyword ukuran tipografi teks Tailwind non-warna.
+// Hanya mengklasifikasi token ukuran font resmi; TIDAK BOLEH mengklasifikasi nama warna semantik.
+func IsTailwindFontSize(s string) bool {
+	switch s {
+	case "xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl", "5xl", "6xl", "7xl", "8xl", "9xl":
 		return true
 	default:
 		return false

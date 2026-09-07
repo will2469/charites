@@ -19,7 +19,7 @@ The `theme` category contains static analysis rules for code quality, architectu
 | `theme.hardcode-border-radius` | `WARN` | Detects hardcoded arbitrary border-radius scalars in Tailwind utility classes | [`theme.hardcode-border-radius`](theme.hardcode-border-radius) | `enabled` |
 | `theme.hardcode-color` | `WARN` | Detects hardcoded arbitrary hex or rgb color literals in Tailwind utility classes and arbitrary properties | [`theme.hardcode-color`](theme.hardcode-color) | `enabled` |
 | `theme.hardcode-monochrome` | `WARN` | Detects hardcoded monochrome utilities (white/black) that fail to adapt across light and dark themes | [`theme.hardcode-monochrome`](theme.hardcode-monochrome) | `enabled` |
-| `theme.hardcode-opacity-color` | `ERROR` | Detects utility classes with hardcoded slash opacity modifiers that have official semantic token replacements | [`theme.hardcode-opacity-color`](theme.hardcode-opacity-color) | `enabled` |
+| `theme.hardcode-opacity-color` | `ERROR` | Detects utility classes with hardcoded or uncalibrated slash opacity modifiers bypassing global.css SSOT | [`theme.hardcode-opacity-color`](theme.hardcode-opacity-color) | `enabled` |
 | `theme.hardcode-shadow-color` | `WARN` | Detects hardcoded color literals embedded in box-shadow declarations | [`theme.hardcode-shadow-color`](theme.hardcode-shadow-color) | `enabled` |
 | `theme.hardcode-size` | `WARN` | Detects hardcoded arbitrary size, spacing, or typography scalars in Tailwind utility classes | [`theme.hardcode-size`](theme.hardcode-size) | `enabled` |
 | `theme.hardcode-z-index` | `WARN` | Detects hardcoded arbitrary z-index scalars that trigger stacking context wars | [`theme.hardcode-z-index`](theme.hardcode-z-index) | `enabled` |

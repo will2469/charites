@@ -9,7 +9,7 @@
 
 ## 1. Overview & Core Invariant
 
-Detects utility classes with hardcoded slash opacity modifiers that have official semantic token replacements
+Detects utility classes with hardcoded or uncalibrated slash opacity modifiers bypassing global.css SSOT
 
 ### Core Invariant:
 > **"Every color opacity variation that represents a semantic state or visual elevation must use a centralized semantic design token rather than an arbitrary slash modifier."**
@@ -44,11 +44,11 @@ Charites enforces pre-calibrated semantic tokens (e.g. primary-light, primary-su
   <span class="badge ring-1 ring-warning/10 bg-primary/5">Warning</span>
 </div>
 ```
-### TSX (Chained and single variants with hardcoded opacity):
+### TSX (Arbitrary uncalibrated slash opacities and shadow utilities bypassing SSOT):
 ```tsx
 export function ActionCard() {
   return (
-    <div className="p-4 rounded-lg hover:bg-primary/10 dark:bg-primary/10 md:hover:bg-primary/10">
+    <div className="shadow-primary/20 hover:border-primary/50 bg-muted/20 border-warning/40 text-warning/90">
       <button className="px-3 py-2 text-sm dark:border-destructive/20 sm:dark:hover:border-destructive/20">
         Delete
       </button>

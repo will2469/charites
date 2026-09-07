@@ -124,6 +124,9 @@ func isColorUtility(prefix, remainder string) bool {
 	if strings.HasPrefix(prefix, "border") && IsNonColorBorderKeyword(remainder) {
 		return false
 	}
+	if prefix == "shadow-" && IsShadowSizeKeyword(remainder) {
+		return false
+	}
 	return true
 }
 
