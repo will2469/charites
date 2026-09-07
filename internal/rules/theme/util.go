@@ -494,9 +494,101 @@ func IsNonStandardFractionalScale(base string) bool {
 	return false
 }
 
-// IsHardcodedSizeUtility mendeteksi apakah token menggunakan utility dimensi, spacing, posisi, atau tipografi hardcode
-// baik dalam format kurung arbitrer ([13px], [230px]) maupun notasi pecahan desimal non-standar (p-3.25, p-2.75).
-func IsHardcodedSizeUtility(base string) bool {
+var arbitraryScalePrefixes = []string{
+	"-scale-x-[", "scale-x-[",
+	"-scale-y-[", "scale-y-[",
+	"-scale-z-[", "scale-z-[",
+	"-scale-[", "scale-[",
+}
+
+// isValidScaleValue memverifikasi apakah string merupakan nilai float, integer,
+// atau persentase skala yang valid secara sintaksis (misal "0.99", "1.02", ".98", "95%", "-0.95", "+1.05").
+// Menolak bentuk korup seperti "abc", "1..2", "--0.95", ".", "calc(...)".
+func isValidScaleValue(s string) bool {
+	s = strings.TrimSpace(s)
+	if len(s) == 0 {
+		return false
+	}
+	if strings.HasSuffix(s, "%") {
+		s = strings.TrimSpace(s[:len(s)-1])
+	}
+	if len(s) == 0 {
+		return false
+	}
+	if s[0] == '-' || s[0] == '+' {
+		s = s[1:]
+	}
+	if len(s) == 0 {
+		return false
+	}
+
+	hasDigit := false
+	hasDot := false
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		switch {
+		case b >= '0' && b <= '9':
+			hasDigit = true
+		case b == '.':
+			if hasDot {
+				return false
+			}
+			hasDot = true
+		default:
+			return false
+		}
+	}
+	return hasDigit
+}
+
+func isArbitraryScaleProperty(base string) bool {
+	prop, val, ok := ParseArbitraryProperty(base)
+	if !ok {
+		return false
+	}
+	switch strings.ToLower(prop) {
+	case "scale", "scale-x", "scale-y", "scale-z":
+		if strings.Contains(val, "var(--") {
+			return false
+		}
+		fields := strings.Fields(val)
+		if len(fields) == 0 {
+			return false
+		}
+		for _, f := range fields {
+			if !isValidScaleValue(f) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+// IsArbitraryScaleUtility mendeteksi apakah token menggunakan arbitrary inline scale modifier
+// baik dalam format Tailwind utility (scale-[0.99], -scale-x-[0.95]) maupun arbitrary property ([scale:0.98]).
+// Nilai yang memuat var(--...) dikecualikan sebagai token-backed scale (clean).
+func IsArbitraryScaleUtility(base string) bool {
+	if isArbitraryScaleProperty(base) {
+		return true
+	}
+
+	for _, prefix := range arbitraryScalePrefixes {
+		if strings.HasPrefix(base, prefix) && strings.HasSuffix(base, "]") {
+			inner := base[len(prefix) : len(base)-1]
+			if strings.Contains(inner, "var(--") {
+				return false
+			}
+			return isValidScaleValue(inner)
+		}
+	}
+
+	return false
+}
+
+// isArbitrarySpatialScalar mendeteksi dimensi spasial dan tipografi arbitrer ber-unit (p-[19px], w-[320px], text-[15px]).
+func isArbitrarySpatialScalar(base string) bool {
 	if prop, val, ok := ParseArbitraryProperty(base); ok {
 		if SpatialPropertyNames[strings.ToLower(prop)] {
 			return HasHardcodedScalarUnit(val)
@@ -522,12 +614,44 @@ func IsHardcodedSizeUtility(base string) bool {
 		}
 	}
 
-	// Deteksi pecahan desimal liar (misal p-3.25, p-2.75, w-3.25)
-	if IsNonStandardFractionalScale(base) {
-		return true
-	}
-
 	return false
+}
+
+// SizeClassKind mendefinisikan taksonomi kepemilikan eksplisit untuk ukuran, spacing, dan skala di theme.hardcode-size.
+type SizeClassKind int
+
+const (
+	// SizeClassNone menandakan kelas bersih atau di luar domain kepemilikan rule ini (rotate, duration, opacity).
+	SizeClassNone SizeClassKind = iota
+	// SizeClassArbitraryScale menandakan modifier skala arbitrer (scale-[0.99], [scale:0.98]).
+	SizeClassArbitraryScale
+	// SizeClassNonStandardFraction menandakan pecahan desimal non-standar (p-3.25, w-2.75).
+	SizeClassNonStandardFraction
+	// SizeClassArbitraryScalar menandakan skalar dimensi/spacing arbitrer ber-unit (p-[19px], w-[320px]).
+	SizeClassArbitraryScalar
+)
+
+// ClassifySizeUtility adalah Single Source of Truth (SSOT) klasifikasi kepemilikan utilitas ukuran dan skala.
+// Aturan Preseden: Transform-scale dievaluasi pertama kali agar diagnosanya tidak ter-shadow oleh generic scalar.
+func ClassifySizeUtility(base string) SizeClassKind {
+	// 1. Precedence: Transform scale evaluated first
+	if IsArbitraryScaleUtility(base) {
+		return SizeClassArbitraryScale
+	}
+	// 2. Non-standard fractional scales (p-3.25, w-2.75)
+	if IsNonStandardFractionalScale(base) {
+		return SizeClassNonStandardFraction
+	}
+	// 3. Spatial dimensions and typography scalars (p-[19px], [padding:20px])
+	if isArbitrarySpatialScalar(base) {
+		return SizeClassArbitraryScalar
+	}
+	return SizeClassNone
+}
+
+// IsHardcodedSizeUtility adalah adapter boolean backward-compatible berbasis SSOT ClassifySizeUtility.
+func IsHardcodedSizeUtility(base string) bool {
+	return ClassifySizeUtility(base) != SizeClassNone
 }
 
 // BorderRadiusPrefixes adalah daftar prefix border radius Tailwind.

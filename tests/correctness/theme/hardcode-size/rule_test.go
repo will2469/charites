@@ -39,14 +39,27 @@ func TestRule_ThemeHardcodeSize_TriCorpus(t *testing.T) {
 			"tracking-[0.7px]",
 			"p-3.25",
 			"w-2.75",
+			"active:scale-[0.99]",
+			"-scale-[0.99]",
+			"hover:scale-[1.02]",
+			"-scale-x-[0.95]",
+			"scale-y-[1.05]",
+			"scale-z-[1.05]",
+			"[scale:0.98]",
 		}
 
 		foundMap := make(map[string]bool)
+		const wantScaleHint = "Avoid arbitrary inline scale modifiers. Define a standardized scale token/variable in global.css (e.g. --scale-press) or use standard Tailwind scale steps (scale-95, scale-105)."
+		var hasScaleHint bool
+
 		for _, d := range diags {
 			for _, pat := range expectedPatterns {
 				if strings.Contains(d.Message, pat) {
 					foundMap[pat] = true
 				}
+			}
+			if d.Hint == wantScaleHint {
+				hasScaleHint = true
 			}
 		}
 
@@ -54,6 +67,10 @@ func TestRule_ThemeHardcodeSize_TriCorpus(t *testing.T) {
 			if !foundMap[pat] {
 				t.Errorf("expected violation for pattern %q was not detected", pat)
 			}
+		}
+
+		if !hasScaleHint {
+			t.Errorf("expected at least one diagnostic with arbitrary scale hint")
 		}
 	})
 

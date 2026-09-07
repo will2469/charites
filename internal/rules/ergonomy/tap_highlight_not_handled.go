@@ -44,7 +44,7 @@ func (r *TapHighlightNotHandledRule) Doc() ir.RuleDocumentation {
 		},
 		CoreInvariant: "Non-native clickable elements (<div onClick>, <span role=\"button\">) must declare deliberate active feedback or suppress the default Android Chrome grey tap highlight box.",
 		Grounding: "On Chromium Android, tapping an element without a native button role causes the browser to flash a rigid semi-transparent grey overlay box.\n\n" +
-			"Without deliberate 'active:' micro-interactions (such as 'active:scale-[0.99]' or 'active:bg-muted') or setting '[-webkit-tap-highlight-color:transparent]', " +
+			"Without deliberate 'active:' micro-interactions (such as 'active:scale-95' or 'active:bg-muted') or setting '[-webkit-tap-highlight-color:transparent]', " +
 			"the application exhibits noticeable visual glitches and lacks native tactile responsiveness.",
 		Risks: []ir.RiskItem{
 			{
@@ -80,7 +80,7 @@ func (r *TapHighlightNotHandledRule) Doc() ir.RuleDocumentation {
   role="button"
   tabIndex={0}
   onClick={handleSelectCard}
-  className="p-4 bg-card border rounded-2xl active:bg-muted/60 active:scale-[0.99] transition-transform [-webkit-tap-highlight-color:transparent]"
+  className="p-4 bg-card border rounded-2xl active:bg-muted/60 active:scale-95 transition-transform [-webkit-tap-highlight-color:transparent]"
 >
   <span>Pilihan Layanan</span>
 </div>`,
@@ -115,7 +115,7 @@ func (r *TapHighlightNotHandledRule) Evaluate(node *ir.Node) []ir.Diagnostic {
 			Rule:     r.ID(),
 			Severity: r.DefaultSeverity(),
 			Message:  "Non-native interactive element has click/touch handler without active feedback or tap-highlight styling. Android Chrome will show a rigid grey tap highlight box.",
-			Hint:     "Add tactile feedback (e.g. 'active:bg-muted/60 active:scale-[0.99]') and consider '[-webkit-tap-highlight-color:transparent]'.",
+			Hint:     "Add tactile feedback (e.g. 'active:bg-muted/60 active:scale-95') and consider '[-webkit-tap-highlight-color:transparent]'.",
 		},
 	}
 }

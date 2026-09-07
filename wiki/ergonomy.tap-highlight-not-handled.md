@@ -19,7 +19,7 @@ Flags clickable non-native custom elements lacking tactile tap feedback or tap-h
 
 On Chromium Android, tapping an element without a native button role causes the browser to flash a rigid semi-transparent grey overlay box.
 
-Without deliberate 'active:' micro-interactions (such as 'active:scale-[0.99]' or 'active:bg-muted') or setting '[-webkit-tap-highlight-color:transparent]', the application exhibits noticeable visual glitches and lacks native tactile responsiveness.
+Without deliberate 'active:' micro-interactions (such as 'active:scale-95' or 'active:bg-muted') or setting '[-webkit-tap-highlight-color:transparent]', the application exhibits noticeable visual glitches and lacks native tactile responsiveness.
 
 ---
 ## 3. Vulnerability & Risk Taxonomy
@@ -51,7 +51,7 @@ Without deliberate 'active:' micro-interactions (such as 'active:scale-[0.99]' o
   role="button"
   tabIndex={0}
   onClick={handleSelectCard}
-  className="p-4 bg-card border rounded-2xl active:bg-muted/60 active:scale-[0.99] transition-transform [-webkit-tap-highlight-color:transparent]"
+  className="p-4 bg-card border rounded-2xl active:bg-muted/60 active:scale-95 transition-transform [-webkit-tap-highlight-color:transparent]"
 >
   <span>Pilihan Layanan</span>
 </div>
