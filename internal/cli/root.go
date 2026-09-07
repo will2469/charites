@@ -67,7 +67,7 @@ func ExecuteWithStreams(args []string, stdin io.Reader, stdout, stderr io.Writer
 		return RunMCP(args[1:], stdin, stdout, stderr)
 	case "wiki":
 		return RunWiki(args[1:], stdout, stderr)
-	case "update", "upgrade":
+	case "update", "upgrade", "-u", "--update", "-update":
 		return RunUpdate(args[1:], stdout, stderr)
 	case "uninstall":
 		return RunUninstall(args[1:], stdout, stderr)

@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -60,17 +63,89 @@ func fetchLatestRelease(client *http.Client) (*githubRelease, error) {
 }
 
 func findAssetDownloadURL(rel *githubRelease) string {
-	expectedAsset := fmt.Sprintf("charites-%s-%s", runtime.GOOS, runtime.GOARCH)
+	rawAsset := fmt.Sprintf("charites-%s-%s", runtime.GOOS, runtime.GOARCH)
 	if runtime.GOOS == "windows" {
-		expectedAsset += ".exe"
+		rawAsset += ".exe"
 	}
 
 	for _, asset := range rel.Assets {
-		if strings.EqualFold(asset.Name, expectedAsset) {
+		if strings.EqualFold(asset.Name, rawAsset) {
 			return asset.BrowserDownloadURL
 		}
 	}
+
+	archiveSuffix := fmt.Sprintf("_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+	if runtime.GOOS == "windows" {
+		archiveSuffix = fmt.Sprintf("_%s_%s.zip", runtime.GOOS, runtime.GOARCH)
+	}
+	for _, asset := range rel.Assets {
+		if strings.HasSuffix(strings.ToLower(asset.Name), archiveSuffix) {
+			return asset.BrowserDownloadURL
+		}
+	}
+
 	return ""
+}
+
+// maxUpdateBinarySize membatasi ukuran ekstraksi binary hingga 100MB untuk mitigasi decompression bomb (CWE-409 / G110).
+const maxUpdateBinarySize = 100 * 1024 * 1024
+
+func extractBinaryFromTarGz(r io.Reader, w io.Writer) error {
+	gzr, err := gzip.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("failed to decompress gzip: %w", err)
+	}
+	defer func() { _ = gzr.Close() }()
+
+	tr := tar.NewReader(gzr)
+	binaryName := "charites"
+	if runtime.GOOS == "windows" {
+		binaryName = "charites.exe"
+	}
+
+	for {
+		header, hErr := tr.Next()
+		if errors.Is(hErr, io.EOF) {
+			break
+		}
+		if hErr != nil {
+			return fmt.Errorf("failed to read tar entry: %w", hErr)
+		}
+		if filepath.Base(header.Name) == binaryName {
+			limitReader := io.LimitReader(tr, maxUpdateBinarySize)
+			if _, copyErr := io.Copy(w, limitReader); copyErr != nil {
+				return fmt.Errorf("failed to extract binary: %w", copyErr)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("binary %q not found in tar.gz archive", binaryName)
+}
+
+func extractBinaryFromZip(zipPath string, w io.Writer) error {
+	zr, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return fmt.Errorf("failed to open zip archive: %w", err)
+	}
+	defer func() { _ = zr.Close() }()
+
+	binaryName := "charites.exe"
+	for _, file := range zr.File {
+		if filepath.Base(file.Name) == binaryName {
+			rc, openErr := file.Open()
+			if openErr != nil {
+				return fmt.Errorf("failed to open zip entry: %w", openErr)
+			}
+			defer func() { _ = rc.Close() }()
+
+			limitReader := io.LimitReader(rc, maxUpdateBinarySize)
+			if _, copyErr := io.Copy(w, limitReader); copyErr != nil {
+				return fmt.Errorf("failed to extract binary from zip: %w", copyErr)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("binary %q not found in zip archive", binaryName)
 }
 
 func downloadAndReplaceBinary(client *http.Client, downloadURL string) error {
@@ -105,10 +180,42 @@ func downloadAndReplaceBinary(client *http.Client, downloadURL string) error {
 	}
 	tmpName := tmpFile.Name()
 
-	_, copyErr := io.Copy(tmpFile, dlResp.Body)
+	var writeErr error
+	switch {
+	case strings.HasSuffix(downloadURL, ".tar.gz"):
+		writeErr = extractBinaryFromTarGz(dlResp.Body, tmpFile)
+	case strings.HasSuffix(downloadURL, ".zip"):
+		// Download zip to temp file first to support zip.Reader random access
+		zipTmp, zErr := os.CreateTemp(execDir, "charites-zip-*")
+		if zErr != nil {
+			_ = tmpFile.Close()
+			_ = os.Remove(tmpName)
+			return fmt.Errorf("failed to create temp zip file: %w", zErr)
+		}
+		zipPath := zipTmp.Name()
+		defer func() { _ = os.Remove(zipPath) }()
+
+		limitBody := io.LimitReader(dlResp.Body, maxUpdateBinarySize)
+		if _, cErr := io.Copy(zipTmp, limitBody); cErr != nil {
+			_ = zipTmp.Close()
+			_ = tmpFile.Close()
+			_ = os.Remove(tmpName)
+			return fmt.Errorf("failed to download zip archive: %w", cErr)
+		}
+		_ = zipTmp.Close()
+
+		writeErr = extractBinaryFromZip(zipPath, tmpFile)
+	default:
+		limitBody := io.LimitReader(dlResp.Body, maxUpdateBinarySize)
+		_, writeErr = io.Copy(tmpFile, limitBody)
+	}
+
 	closeErr := tmpFile.Close()
-	if copyErr != nil || closeErr != nil {
+	if writeErr != nil || closeErr != nil {
 		_ = os.Remove(tmpName)
+		if writeErr != nil {
+			return writeErr
+		}
 		return fmt.Errorf("failed to write update file")
 	}
 

@@ -31,7 +31,7 @@ func TestUpdateAndUpgradeEquivalence(t *testing.T) {
 	cli.CharitesUpdateURL = server.URL
 	defer func() { cli.CharitesUpdateURL = oldURL }()
 
-	commands := []string{"update", "upgrade"}
+	commands := []string{"update", "upgrade", "-u", "--update", "-update"}
 	for _, cmd := range commands {
 		t.Run("subcommand "+cmd, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
