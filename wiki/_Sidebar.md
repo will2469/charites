@@ -262,7 +262,7 @@
 </details>
 
 <details open>
-<summary><b>Ux</b> (19 rules)</summary>
+<summary><b>Ux</b> (20 rules)</summary>
 
 * [**Ux Overview**](ux)
 * [`ux.camouflaged-link`](ux.camouflaged-link)
@@ -280,6 +280,7 @@
 * [`ux.radio-overchoice`](ux.radio-overchoice)
 * [`ux.silent-catch-swallow`](ux.silent-catch-swallow)
 * [`ux.spacing-inversion`](ux.spacing-inversion)
+* [`ux.spacing-rhythm-drift`](ux.spacing-rhythm-drift)
 * [`ux.submit-feedback-missing`](ux.submit-feedback-missing)
 * [`ux.unbounded-async-flag`](ux.unbounded-async-flag)
 * [`ux.unconventional-home-link`](ux.unconventional-home-link)

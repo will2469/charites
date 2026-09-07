@@ -271,6 +271,11 @@ rules:
     severity: warning
     tier: 2
     description: "Jarak spasi internal elemen anak lebih besar daripada jarak pemisah kontainer induk (pelanggaran Gestalt Proximity)."
+  - id: ux.spacing-rhythm-drift
+    category: ux
+    severity: warning
+    tier: 2
+    description: "Mendeteksi sekuens spasi yang membentuk ritme lokal tidak konsisten di dalam satu grup tata letak yang sama."
   - id: ux.nav-overflow-chunking
     category: ux
     severity: warning

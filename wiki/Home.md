@@ -98,7 +98,7 @@ flowchart TD
 | `responsive` | 18 | [`responsive`](responsive) |
 | `semantic` | 1 | [`semantic`](semantic) |
 | `theme` | 32 | [`theme`](theme) |
-| `ux` | 19 | [`ux`](ux) |
+| `ux` | 20 | [`ux`](ux) |
 
 ---
 
@@ -285,6 +285,7 @@ flowchart TD
 | `ux.radio-overchoice` | `ux` | `WARN` | Warns when radio groups present excessive flat options (> 7) without filtering or combobox grouping, violating Hick-Hyman Law | [`ux.radio-overchoice`](ux.radio-overchoice) |
 | `ux.silent-catch-swallow` | `ux` | `ERROR` | Detects swallowed catch blocks in event handlers that lack user feedback (toast/alert) or re-throw | [`ux.silent-catch-swallow`](ux.silent-catch-swallow) |
 | `ux.spacing-inversion` | `ux` | `WARN` | Warns when child element intra-spacing exceeds parent gap or when space-y conflicts with child mt margin in Tailwind v3 | [`ux.spacing-inversion`](ux.spacing-inversion) |
+| `ux.spacing-rhythm-drift` | `ux` | `WARN` | Detects spacing sequences that form an inconsistent local rhythm within the same layout group | [`ux.spacing-rhythm-drift`](ux.spacing-rhythm-drift) |
 | `ux.submit-feedback-missing` | `ux` | `WARN` | Enforces reentry guard (disabled) and perceivable feedback (aria-busy/spinner) on async mutation triggers | [`ux.submit-feedback-missing`](ux.submit-feedback-missing) |
 | `ux.unbounded-async-flag` | `ux` | `ERROR` | Detects async handlers setting loading flags without guaranteed reset in finally/catch exit paths | [`ux.unbounded-async-flag`](ux.unbounded-async-flag) |
 | `ux.unconventional-home-link` | `ux` | `WARN` | Enforces Jakob's Law by ensuring header logo/brand identity links to the root home page ('/') | [`ux.unconventional-home-link`](ux.unconventional-home-link) |

@@ -115,6 +115,7 @@ var (
 
 	// ux Wave 1 (Spatial Hierarchy, Navigation Chunking & CTA Clarity)
 	_ Rule = (*ux.SpacingInversionRule)(nil)
+	_ Rule = (*ux.SpacingRhythmDriftRule)(nil)
 	_ Rule = (*ux.NavOverflowChunkingRule)(nil)
 	_ Rule = (*ux.CompetingPrimaryCTARule)(nil)
 	_ Rule = (*ux.CamouflagedLinkRule)(nil)
@@ -391,6 +392,7 @@ func builtinRules() []Rule {
 
 		// ux Wave 1 (Spatial Hierarchy, Navigation Chunking & CTA Clarity)
 		ux.NewSpacingInversionRule(),
+		ux.NewSpacingRhythmDriftRule(),
 		ux.NewNavOverflowChunkingRule(),
 		ux.NewCompetingPrimaryCTARule(),
 		ux.NewCamouflagedLinkRule(),
