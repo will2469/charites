@@ -96,6 +96,7 @@ flowchart TD
 | `performance` | 16 | [`performance`](performance) |
 | `pwa` | 10 | [`pwa`](pwa) |
 | `responsive` | 17 | [`responsive`](responsive) |
+| `semantic` | 1 | [`semantic`](semantic) |
 | `theme` | 32 | [`theme`](theme) |
 | `ux` | 18 | [`ux`](ux) |
 
@@ -235,6 +236,7 @@ flowchart TD
 | `responsive.unwrapped-table-overflow` | `responsive` | `WARN` | Warns when an HTML table element lacks a responsive horizontal scroll wrapper (overflow-x-auto) or responsive display transformation | [`responsive.unwrapped-table-overflow`](responsive.unwrapped-table-overflow) |
 | `responsive.viewport-meta-missing` | `responsive` | `WARN` | Warns when <meta name="viewport"> is missing width=device-width or viewport-fit=cover | [`responsive.viewport-meta-missing`](responsive.viewport-meta-missing) |
 | `responsive.viewport-unit-leak` | `responsive` | `WARN` | Warns when viewport height relies on static 100vh instead of modern dynamic dvh or svh units | [`responsive.viewport-unit-leak`](responsive.viewport-unit-leak) |
+| `semantic.consecutive-br-spacing` | `semantic` | `WARN` | Flags consecutive <br> tags used for paragraph spacing violating WCAG 1.3.1 (Technique F34) | [`semantic.consecutive-br-spacing`](semantic.consecutive-br-spacing) |
 | `theme.apply-bloat` | `theme` | `WARN` | Detects excessive use of @apply with more than 8 utility classes in CSS or style blocks | [`theme.apply-bloat`](theme.apply-bloat) |
 | `theme.backdrop-blur-hardcode` | `theme` | `WARN` | Detects hardcoded arbitrary blur and backdrop-blur scalars in Tailwind utility classes | [`theme.backdrop-blur-hardcode`](theme.backdrop-blur-hardcode) |
 | `theme.chart-color-hardcode` | `theme` | `ERROR` | Detects hardcoded color values on chart visualization components | [`theme.chart-color-hardcode`](theme.chart-color-hardcode) |

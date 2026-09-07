@@ -12,6 +12,7 @@ import (
 	"github.com/will2469/charites/internal/rules/performance"
 	"github.com/will2469/charites/internal/rules/pwa"
 	"github.com/will2469/charites/internal/rules/responsive"
+	"github.com/will2469/charites/internal/rules/semantic"
 	"github.com/will2469/charites/internal/rules/theme"
 	"github.com/will2469/charites/internal/rules/ux"
 )
@@ -136,6 +137,9 @@ var (
 	// ux Wave 5 (Form Input Semantic Integrity & Bounded Precision)
 	_ Rule = (*ux.NumberInputIdentityMisuseRule)(nil)
 	_ Rule = (*ux.NumberInputMissingBoundsRule)(nil)
+
+	// semantic Wave 1 (Document Structure & Content Semantics)
+	_ Rule = (*semantic.ConsecutiveBRSpacingRule)(nil)
 
 	// ergonomy Wave 1 & 2 (Virtual Keypad, Gesture, Thumb Zone & Wheel Ergonomics)
 	_ Rule = (*ergonomy.MissingInputmodeKeyboardRule)(nil)
@@ -405,6 +409,9 @@ func builtinRules() []Rule {
 		// ux Wave 5 (Form Input Semantic Integrity & Bounded Precision)
 		ux.NewNumberInputIdentityMisuseRule(),
 		ux.NewNumberInputMissingBoundsRule(),
+
+		// semantic Wave 1 (Document Structure & Content Semantics)
+		semantic.NewConsecutiveBRSpacingRule(),
 
 		// cls Wave 1 (Rendering Box Reservation, Embed Frames, Ad Slots & Slider Physics)
 		cls.NewUnsizedImageRule(),

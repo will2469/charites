@@ -59,15 +59,8 @@ func (e *extractor) extract() *ir.Node {
 	for e.pos < e.len {
 		ch := e.src[e.pos]
 
-		// 1. Komentar baris tunggal: // ...
-		if ch == '/' && e.pos+1 < e.len && e.src[e.pos+1] == '/' {
-			e.skipLineComment()
-			continue
-		}
-
-		// 2. Komentar blok: /* ... */ atau {/* ... */}
-		if ch == '/' && e.pos+1 < e.len && e.src[e.pos+1] == '*' {
-			e.skipBlockComment()
+		// 1. Komentar baris tunggal atau blok: // atau /*
+		if ch == '/' && e.tryHandleComment() {
 			continue
 		}
 
@@ -90,6 +83,12 @@ func (e *extractor) extract() *ir.Node {
 			}
 			// Bukan tag JSX valid (misal operator perbandingan count < 10 atau generics)
 			e.advance()
+			continue
+		}
+
+		// 6. Teks anak JSX di dalam elemen atau fragment
+		if e.bld.StackDepth() > 0 && ch != '{' && ch != '}' {
+			e.consumeJSXChildText()
 			continue
 		}
 
@@ -344,6 +343,29 @@ func (e *extractor) consumeRawTextElement(tagName string) {
 	e.finalizeRawText(tagName, textStart, startLine, startCol, 0)
 }
 
+func (e *extractor) consumeJSXChildText() {
+	startLine := e.line
+	startCol := e.col
+	textStart := e.pos
+
+	for e.pos < e.len && e.src[e.pos] != '<' && e.src[e.pos] != '{' && e.src[e.pos] != '}' {
+		if e.src[e.pos] == '/' && e.pos+1 < e.len && (e.src[e.pos+1] == '/' || e.src[e.pos+1] == '*') {
+			break
+		}
+		e.advance()
+	}
+
+	rawText := string(e.src[textStart:e.pos])
+	if strings.TrimSpace(rawText) != "" {
+		e.bld.AddText(rawText, ir.Span{
+			Line:      startLine,
+			Column:    startCol,
+			EndLine:   e.line,
+			EndColumn: e.col,
+		})
+	}
+}
+
 func (e *extractor) matchClosingPrefix(prefix string) bool {
 	if e.pos+len(prefix) > e.len {
 		return false
@@ -375,6 +397,21 @@ func (e *extractor) finalizeRawText(tagName string, textStart, startLine, startC
 	e.bld.CloseElement(tagName)
 }
 
+func (e *extractor) tryHandleComment() bool {
+	if e.pos+1 >= e.len {
+		return false
+	}
+	if e.src[e.pos+1] == '/' {
+		e.skipLineComment()
+		return true
+	}
+	if e.src[e.pos+1] == '*' {
+		e.skipBlockComment()
+		return true
+	}
+	return false
+}
+
 func (e *extractor) skipLineComment() {
 	e.advance() // '/'
 	e.advance() // '/'
@@ -397,6 +434,12 @@ func (e *extractor) skipBlockComment() {
 			raw := string(e.src[commentStart:e.pos])
 			if e.bld.StackDepth() > 0 {
 				e.bld.AddComment(raw, ir.Span{Line: startLine, Column: startCol, EndLine: e.line, EndColumn: e.col})
+				for e.pos < e.len && (e.src[e.pos] == ' ' || e.src[e.pos] == '\t' || e.src[e.pos] == '\r' || e.src[e.pos] == '\n') {
+					e.advance()
+				}
+				if e.pos < e.len && e.src[e.pos] == '}' {
+					e.advance()
+				}
 			}
 			return
 		}

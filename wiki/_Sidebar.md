@@ -214,6 +214,14 @@
 </details>
 
 <details open>
+<summary><b>Semantic</b> (1 rules)</summary>
+
+* [**Semantic Overview**](semantic)
+* [`semantic.consecutive-br-spacing`](semantic.consecutive-br-spacing)
+
+</details>
+
+<details open>
 <summary><b>Theme</b> (32 rules)</summary>
 
 * [**Theme Overview**](theme)
